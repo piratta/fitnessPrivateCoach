@@ -7,6 +7,7 @@ import BillingManager from './BillingManager';
 import { initChatIfEmpty } from '../utils/chatStore';
 import { MOCK_CLIENTS } from '../utils/mockClients';
 import { MOCK_ROUTINES } from '../utils/mockRoutines';
+import { API_BASE_URL } from '../config';
 import '../index.css';
 
 export default function CoachDashboard({ user, onLogout }) {
@@ -39,14 +40,49 @@ export default function CoachDashboard({ user, onLogout }) {
 
   const [clients, setClients] = useState(MOCK_CLIENTS);
 
-  // Seed default messages into localStorage on first load
+  // Fetch clients from backend database
   useEffect(() => {
-    clients.forEach(c => {
-      if (c.messages && c.messages.length > 0) {
-        initChatIfEmpty(c.email, c.messages);
+    const token = localStorage.getItem('token');
+    fetch(`${API_BASE_URL}/api/users/clients`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
       }
-    });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    })
+    .then(res => {
+      if (res.ok) return res.json();
+      return [];
+    })
+    .then(data => {
+      const formattedClients = data.map(u => {
+        const existingMock = MOCK_CLIENTS.find(c => c.email === u.email);
+        return {
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          username: u.username,
+          status: u.status || 'Activo',
+          weight: existingMock ? existingMock.weight : '75kg',
+          goal: u.goal || 'Hipertrofia',
+          billingPlanId: u.billingPlanId || 'bp1',
+          completion: existingMock ? existingMock.completion : 0,
+          nextReview: existingMock ? existingMock.nextReview : 'En 1 mes',
+          weightHistory: existingMock ? existingMock.weightHistory : [75.0],
+          adherenceHistory: existingMock ? existingMock.adherenceHistory : [0],
+          waistHistory: existingMock ? existingMock.waistHistory : [0],
+          caderaHistory: existingMock ? existingMock.caderaHistory : [0],
+          cuelloHistory: existingMock ? existingMock.cuelloHistory : [0],
+          bicepsHistory: existingMock ? existingMock.bicepsHistory : [0],
+          piernaHistory: existingMock ? existingMock.piernaHistory : [0],
+          volumeHistory: existingMock ? existingMock.volumeHistory : [0],
+          messages: [],
+          hasRoutine: existingMock ? existingMock.hasRoutine : false,
+          reviewFrequency: u.reviewFrequency || 'Semanal'
+        };
+      });
+      setClients(formattedClients);
+    })
+    .catch(err => console.error("Error loading clients:", err));
+  }, []);
 
   useEffect(() => {
     const handleChatUpdate = (e) => {

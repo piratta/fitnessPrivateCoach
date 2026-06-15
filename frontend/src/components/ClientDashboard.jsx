@@ -30,6 +30,31 @@ export default function ClientDashboard({ user, onLogout }) {
         if (mockUser.weightHistory?.length) {
           setSelectedMonths([Math.max(0, mockUser.weightHistory.length - 1)]);
         }
+      } else {
+        setClientData({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          username: user.username,
+          status: user.status || 'Activo',
+          weight: 'N/A',
+          goal: user.goal || 'Hipertrofia',
+          billingPlanId: user.billingPlanId || 'bp1',
+          completion: 0,
+          nextReview: 'Pendiente',
+          weightHistory: [0],
+          adherenceHistory: [0],
+          waistHistory: [0],
+          caderaHistory: [0],
+          cuelloHistory: [0],
+          bicepsHistory: [0],
+          piernaHistory: [0],
+          volumeHistory: [0],
+          messages: [],
+          hasRoutine: false,
+          reviewFrequency: user.reviewFrequency || 'Semanal'
+        });
+        setSelectedMonths([0]);
       }
     }
   }, [user, activeTab]); // re-fetch if tab changes to simulate "polling" or refreshing 
