@@ -16,6 +16,9 @@ public class UserDto {
     private String reviewFrequency;
     private String billingPlanId;
 
+    public UserDto() {
+    }
+
     public UserDto(User user) {
         this.id = user.getId();
         this.email = user.getEmail();
