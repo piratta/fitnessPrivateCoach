@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getClientBillingStatus } from '../utils/statusUtils';
+import { useDialog } from './ui/Dialog';
 import '../index.css';
 
 export default function BillingManager({ clients, setClients, billingPlans, setBillingPlans }) {
+  const dialog = useDialog();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
   const [showPlansModal, setShowPlansModal] = useState(false);
@@ -215,8 +217,9 @@ export default function BillingManager({ clients, setClients, billingPlans, setB
                     </td>
                     <td style={{ padding: '15px', textAlign: 'right' }}>
                       {(status.text === 'BAJA' || status.text === 'Pendiente' || status.text === 'Desactivado') ? (
-                        <button onClick={() => {
-                          if (window.confirm(`⚠️ ¿Estás seguro de eliminar PERMANENTEMENTE a ${client.name}?\n\nSu suscripción ha caducado. Esta acción no se puede deshacer y se borrarán todos sus datos.`)) {
+                        <button onClick={async () => {
+                          const ok = await dialog.confirm(`⚠️ ¿Estás seguro de eliminar PERMANENTEMENTE a ${client.name}?\n\nSu suscripción ha caducado. Esta acción no se puede deshacer y se borrarán todos sus datos.`, { title: 'Eliminar cliente' });
+                          if (ok) {
                             setClients(prev => prev.filter(c => c.id !== client.id));
                             showToast(`🗑️ Cliente ${client.name} eliminado permanentemente`);
                           }
@@ -245,10 +248,11 @@ export default function BillingManager({ clients, setClients, billingPlans, setB
                       </select>
                       <button 
                         style={{ background: 'rgba(255, 170, 0, 0.1)', border: '1px solid #ffaa00', color: '#ffaa00', padding: '6px 12px', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 'bold' }}
-                        onClick={() => {
+                        onClick={async () => {
                           const period = document.getElementById(`grace-period-${client.id}`).value;
                           if (period === 'Desactivar') {
-                            if (window.confirm(`¿Desactivar a ${client.name}? No podrá acceder a sus rutinas hasta que renueve.`)) {
+                            const ok = await dialog.confirm(`¿Desactivar a ${client.name}? No podrá acceder a sus rutinas hasta que renueve.`, { title: 'Desactivar cliente' });
+                            if (ok) {
                               setClients(prev => prev.map(c => c.id === client.id ? { ...c, status: 'Inactivo' } : c));
                               showToast(`🛑 Cliente ${client.name} desactivado`);
                             }

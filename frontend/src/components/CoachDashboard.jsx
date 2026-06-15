@@ -1,20 +1,41 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import ClientList from './ClientList';
 import WorkoutBuilder from './WorkoutBuilder';
 import ReviewManager from './ReviewManager';
 import TemplateManager from './TemplateManager';
 import BillingManager from './BillingManager';
-import { initChatIfEmpty } from '../utils/chatStore';
+import { initChatIfEmpty, connectWebSocket, disconnectWebSocket } from '../utils/chatStore';
 import { MOCK_CLIENTS } from '../utils/mockClients';
 import { MOCK_ROUTINES } from '../utils/mockRoutines';
+import { useDialog } from './ui/Dialog';
 import { API_BASE_URL } from '../config';
 import '../index.css';
 
-export default function CoachDashboard({ user, onLogout }) {
+export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
+  const dialog = useDialog();
   const [activeTab, setActiveTab] = useState('resumen');
   const [templateMode, setTemplateMode] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [workoutClient, setWorkoutClient] = useState('');
+  
+  // Profile Editor State
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    name: user.name || '',
+    lastName: user.lastName || '',
+    birthDate: user.birthDate || '',
+    email: user.email || ''
+  });
+
+  useEffect(() => {
+    setProfileForm({
+      name: user.name || '',
+      lastName: user.lastName || '',
+      birthDate: user.birthDate || '',
+      email: user.email || ''
+    });
+  }, [user]);
 
   const sampleRoutine = {
     Lunes: MOCK_ROUTINES["Día 1 - Pecho y Tríceps"] || [],
@@ -135,18 +156,61 @@ export default function CoachDashboard({ user, onLogout }) {
     .catch(err => console.error("Error loading clients:", err));
   }, []);
 
+  // Connect to WebSocket and receive live messages globally
   useEffect(() => {
-    const handleChatUpdate = (e) => {
-      const { clientEmail, sender } = e.detail;
-      if (sender === 'client' && window.activeChatEmail !== clientEmail) {
-        setClients(prev => prev.map(c => 
-          c.email === clientEmail ? { ...c, unreadMessages: (c.unreadMessages || 0) + 1 } : c
-        ));
-      }
+    if (!user?.email) return;
+
+    const handleWsMessage = (message) => {
+      const clientEmail = message.clientEmail;
+      const text = message.text;
+
+      setClients(prev => {
+        const clientObj = prev.find(c => c.email === clientEmail);
+        const clientName = clientObj ? clientObj.name.split(' ')[0] : 'Cliente';
+
+        if (message.sender === 'client') {
+          if (window.activeChatEmail !== clientEmail) {
+            // Show toast notification
+            dialog.toast(`Nuevo mensaje de ${clientName}: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`, { variant: 'info' });
+            return prev.map(c => 
+              c.email === clientEmail 
+                ? { 
+                    ...c, 
+                    unreadMessages: (c.unreadMessages || 0) + 1, 
+                    messages: [...(c.messages || []), { sender: message.sender, text: message.text, time: message.time }] 
+                  } 
+                : c
+            );
+          } else {
+            return prev.map(c => {
+              if (c.email === clientEmail) {
+                const isDuplicate = (c.messages || []).some(m => m.text === message.text && m.time === message.time && m.sender === message.sender);
+                if (isDuplicate) return c;
+                return { ...c, messages: [...(c.messages || []), { sender: message.sender, text: message.text, time: message.time }] };
+              }
+              return c;
+            });
+          }
+        } else if (message.sender === 'coach') {
+          return prev.map(c => {
+            if (c.email === clientEmail) {
+              const isDuplicate = (c.messages || []).some(m => m.text === message.text && m.time === message.time && m.sender === message.sender);
+              if (isDuplicate) return c;
+              return { ...c, messages: [...(c.messages || []), { sender: message.sender, text: message.text, time: message.time }] };
+            }
+            return c;
+          });
+        }
+        return prev;
+      });
     };
-    window.addEventListener('chatUpdated', handleChatUpdate);
-    return () => window.removeEventListener('chatUpdated', handleChatUpdate);
-  }, []);
+
+    connectWebSocket(handleWsMessage);
+
+    return () => {
+      disconnectWebSocket(handleWsMessage);
+    };
+  }, [user?.email, dialog]);
 
   const totalUnread = clients.reduce((acc, c) => acc + (c.unreadMessages || 0), 0);
   const pendingReviews = clients.filter(c => c.nextReview === 'Pendiente' || c.nextReview === 'Hoy').length;
@@ -175,8 +239,8 @@ export default function CoachDashboard({ user, onLogout }) {
           </h2>
         </div>
         <div className="mobile-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ fontWeight: '600', fontSize: '1rem' }}>{user.name}</p>
+          <div onClick={() => setShowProfileModal(true)} style={{ textAlign: 'right', cursor: 'pointer' }} title="Editar mi perfil">
+            <p style={{ fontWeight: '600', fontSize: '1rem', textDecoration: 'underline' }}>{user.name}</p>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>{user.role}</p>
           </div>
           <button 
@@ -250,6 +314,80 @@ export default function CoachDashboard({ user, onLogout }) {
         {activeTab === 'revisiones' && <ReviewManager clients={clients} setClients={setClients} />}
         {activeTab === 'facturacion' && <BillingManager clients={clients} setClients={setClients} billingPlans={billingPlans} setBillingPlans={setBillingPlans} />}
       </div>
+
+      {/* Modal Perfil del Entrenador */}
+      {showProfileModal && createPortal(
+        <div className="fade-in" onClick={() => setShowProfileModal(false)} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(10px)',
+          zIndex: 2000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px'
+        }}>
+          <div className="glass-panel" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '500px', background: 'rgba(20, 20, 24, 0.98)', padding: '30px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border-light)', paddingBottom: '15px' }}>
+              <h3 style={{ fontSize: '1.4rem', color: 'var(--accent-primary)', fontWeight: '800' }}>Mi Perfil</h3>
+              <button onClick={() => setShowProfileModal(false)} style={{ background: 'transparent', border: 'none', color: '#ff4500', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
+            </div>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!profileForm.name.trim() || !profileForm.email.trim()) {
+                await dialog.alert("El nombre y el correo electrónico son obligatorios.", { title: "Campos vacíos" });
+                return;
+              }
+              const token = localStorage.getItem('token');
+              try {
+                const res = await fetch(`${API_BASE_URL}/api/users/me`, {
+                  method: 'PUT',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                  },
+                  body: JSON.stringify({
+                    name: profileForm.name,
+                    lastName: profileForm.lastName,
+                    birthDate: profileForm.birthDate,
+                    email: profileForm.email
+                  })
+                });
+                if (res.ok) {
+                  const updatedUser = await res.json();
+                  if (onUserUpdate) onUserUpdate(updatedUser);
+                  dialog.toast("Perfil actualizado con éxito", { variant: 'success' });
+                  setShowProfileModal(false);
+                } else {
+                  const errText = await res.text();
+                  await dialog.alert("Error al actualizar perfil: " + errText, { title: "Error" });
+                }
+              } catch (err) {
+                await dialog.alert("Error de red al actualizar perfil.", { title: "Error" });
+              }
+            }} style={{ display: 'grid', gap: '15px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 'bold' }}>Nombre</label>
+                <input type="text" className="input-field" value={profileForm.name} onChange={e => setProfileForm({ ...profileForm, name: e.target.value })} style={{ marginBottom: 0 }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 'bold' }}>Apellidos</label>
+                <input type="text" className="input-field" value={profileForm.lastName} onChange={e => setProfileForm({ ...profileForm, lastName: e.target.value })} style={{ marginBottom: 0 }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 'bold' }}>Fecha de Nacimiento</label>
+                <input type="date" className="input-field" value={profileForm.birthDate} onChange={e => setProfileForm({ ...profileForm, birthDate: e.target.value })} style={{ marginBottom: 0, colorScheme: 'dark' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 'bold' }}>Email</label>
+                <input type="email" className="input-field" value={profileForm.email} onChange={e => setProfileForm({ ...profileForm, email: e.target.value })} style={{ marginBottom: 0 }} />
+              </div>
+              
+              <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+                <button type="button" onClick={() => setShowProfileModal(false)} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid var(--border-light)', color: '#fff', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Cancelar</button>
+                <button type="submit" className="btn-primary" style={{ flex: 2, padding: '12px' }}>💾 Guardar Cambios</button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
 
     </div>
   );

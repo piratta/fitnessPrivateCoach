@@ -21,8 +21,8 @@ function App() {
     <DialogProvider>
       {!user && <Login onLogin={handleLogin} />}
       {user?.role === 'SUPER_ADMIN' && <AdminDashboard user={user} onLogout={handleLogout} />}
-      {user?.role === 'COACH' && <CoachDashboard user={user} onLogout={handleLogout} />}
-      {user?.role === 'PREMIUM_CLIENT' && <ClientDashboard user={user} onLogout={handleLogout} />}
+      {user?.role === 'COACH' && <CoachDashboard user={user} onLogout={handleLogout} onUserUpdate={setUser} />}
+      {user?.role === 'PREMIUM_CLIENT' && <ClientDashboard user={user} onLogout={handleLogout} onUserUpdate={setUser} />}
     </DialogProvider>
   );
 }

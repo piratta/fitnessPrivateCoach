@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MOCK_CLIENTS } from '../utils/mockClients';
+import { useDialog } from './ui/Dialog';
 import '../index.css';
 
 export default function ReviewManager({ clients, setClients }) {
+  const dialog = useDialog();
   const [selectedClientForReview, setSelectedClientForReview] = useState(null);
   const [selectedMonths, setSelectedMonths] = useState([]);
   const [timeScale, setTimeScale] = useState('Meses');
@@ -529,7 +531,7 @@ export default function ReviewManager({ clients, setClients }) {
                   <button 
                     className="btn-primary" 
                     style={{ width: '100%', padding: '15px', fontSize: '1.2rem', marginTop: '10px' }}
-                    onClick={() => {
+                    onClick={async () => {
                       const reviewDataToSave = {
                         ...(selectedClientForReview.pendingReviewData || selectedClientForReview.lastCompletedReview || {}),
                         drawings,
@@ -565,7 +567,7 @@ export default function ReviewManager({ clients, setClients }) {
                         clientObj.lastCompletedReview = reviewDataToSave;
                       }
 
-                      alert(`Evaluación de ${selectedClientForReview.name} enviada con éxito.`);
+                      await dialog.alert(`Evaluación de ${selectedClientForReview.name} enviada con éxito.`, { title: 'Evaluación enviada' });
                       setSelectedClientForReview(null);
                     }}
                   >

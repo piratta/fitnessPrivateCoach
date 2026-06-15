@@ -9,12 +9,13 @@ import { useDialog } from './ui/Dialog';
 import { API_BASE_URL } from '../config';
 import '../index.css';
 
-export default function ClientDashboard({ user, onLogout }) {
+export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   const dialog = useDialog();
   const [isReviewLocked, setIsReviewLocked] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [activeTab, setActiveTab] = useState('workout'); 
   const [clientData, setClientData] = useState(null);
+  const [showRoutineTable, setShowRoutineTable] = useState(false);
   const [showEvaluationModal, setShowEvaluationModal] = useState(false);
   const [isModifyingReview, setIsModifyingReview] = useState(false);
   const [selectedMonths, setSelectedMonths] = useState([0]);
@@ -263,6 +264,7 @@ export default function ClientDashboard({ user, onLogout }) {
 
         if (!showChatModalRef.current && message.sender === 'coach') {
           setUnreadMessages(prev => prev + 1);
+          dialog.toast(`Mensaje de tu entrenador: ${message.text}`, { variant: 'info' });
         }
       }
     };
@@ -532,6 +534,152 @@ export default function ClientDashboard({ user, onLogout }) {
     setIsWorkoutStarted(true);
   };
 
+  const downloadRoutinePDF = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    let daysHtml = '';
+    Object.keys(clientData.routine).forEach(day => {
+      const exercises = clientData.routine[day] || [];
+      if (exercises.length === 0) return;
+
+      let exercisesRows = '';
+      exercises.forEach(ex => {
+        exercisesRows += `
+          <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: left; font-weight: bold;">
+              ${ex.name} ${ex.isOptional ? '<span style="font-size: 0.75rem; color: #ffaa00; font-weight: normal; margin-left: 5px;">(Opcional)</span>' : ''}
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: center;">${ex.reps || '—'}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: center; color: #555;">${ex.intensity || '—'}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: center; font-weight: bold;">${ex.expectedWeight ? ex.expectedWeight + ' kg' : '—'}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: left; color: #666; font-style: italic; font-size: 0.85rem;">${ex.notes || '—'}</td>
+          </tr>
+        `;
+      });
+
+      daysHtml += `
+        <div style="margin-bottom: 30px; page-break-inside: avoid;">
+          <h3 style="font-size: 1.25rem; color: #111; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 12px; text-transform: uppercase;">${day}</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 0.9rem;">
+            <thead>
+              <tr style="background-color: #f5f5f5;">
+                <th style="padding: 10px; text-align: left; border-bottom: 2px solid #ddd; width: 35%;">Ejercicio</th>
+                <th style="padding: 10px; text-align: center; border-bottom: 2px solid #ddd; width: 15%;">Series x Reps</th>
+                <th style="padding: 10px; text-align: center; border-bottom: 2px solid #ddd; width: 15%;">Intensidad</th>
+                <th style="padding: 10px; text-align: center; border-bottom: 2px solid #ddd; width: 15%;">Peso Esp.</th>
+                <th style="padding: 10px; text-align: left; border-bottom: 2px solid #ddd; width: 20%;">Notas</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${exercisesRows}
+            </tbody>
+          </table>
+        </div>
+      `;
+    });
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Plan de Entrenamiento - ${clientData.name}</title>
+        <meta charset="utf-8" />
+        <style>
+          body {
+            font-family: 'Outfit', -apple-system, sans-serif;
+            color: #333;
+            line-height: 1.4;
+            padding: 30px;
+            max-width: 800px;
+            margin: 0 auto;
+          }
+          .header {
+            text-align: center;
+            border-bottom: 3px double #333;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 2.2rem;
+            letter-spacing: -1px;
+            text-transform: uppercase;
+          }
+          .header p {
+            margin: 5px 0 0;
+            color: #666;
+            font-size: 0.95rem;
+          }
+          .meta-info {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            font-size: 0.85rem;
+            border: 1px solid #eee;
+          }
+          .meta-item strong {
+            display: block;
+            color: #000;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            margin-bottom: 3px;
+          }
+          @media print {
+            body {
+              padding: 0;
+            }
+            @page {
+              margin: 1.5cm;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Plan de Entrenamiento Personalizado</h1>
+          <p>PRVT FITNESS Premium Coaching</p>
+        </div>
+        
+        <div class="meta-info">
+          <div class="meta-item">
+            <strong>Cliente</strong>
+            ${clientData.name}
+          </div>
+          <div class="meta-item">
+            <strong>Objetivo de Pesos</strong>
+            ${clientData.progressionStrategy || 'Sobrecarga Progresiva'}
+          </div>
+          <div class="meta-item">
+            <strong>Frecuencia</strong>
+            Revisión ${clientData.reviewFrequency || 'Semanal'}
+          </div>
+        </div>
+
+        ${daysHtml || '<p style="text-align: center; color: #666;">No hay ejercicios programados en la rutina actual.</p>'}
+
+        <div style="margin-top: 50px; text-align: center; font-size: 0.8rem; color: #888; border-top: 1px solid #eee; padding-top: 20px;">
+          PRVTFITNESS &copy; ${new Date().getFullYear()} &bull; Todos los derechos reservados.
+        </div>
+
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 500);
+          }
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   const fmtLogDate = (l) => {
     if (!l.logDate) return '';
     const parts = l.logDate.split('-');
@@ -753,14 +901,24 @@ export default function ClientDashboard({ user, onLogout }) {
               ) : (
                 <div>
                 
-                {/* Estrategia asignada */}
-                <div style={{ background: 'rgba(224, 248, 0, 0.05)', border: '1px dashed var(--accent-primary)', padding: '10px 15px', borderRadius: '8px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '1.5rem' }}>🎯</span>
-                  <div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '2px' }}>Objetivo de Pesos Semanal</div>
-                    <div style={{ color: 'var(--accent-primary)', fontWeight: 'bold', fontSize: '0.95rem' }}>{user.progressionStrategy || "Sobrecarga Progresiva (Subir peso)"}</div>
-                  </div>
-                </div>
+                 {/* Estrategia asignada y botón de tabla */}
+                 <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                   <div style={{ flex: 1, minWidth: '200px', background: 'rgba(224, 248, 0, 0.05)', border: '1px dashed var(--accent-primary)', padding: '10px 15px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 0 }}>
+                     <span style={{ fontSize: '1.5rem' }}>🎯</span>
+                     <div>
+                       <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '2px' }}>Objetivo de Pesos Semanal</div>
+                       <div style={{ color: 'var(--accent-primary)', fontWeight: 'bold', fontSize: '0.95rem' }}>{clientData.progressionStrategy || user.progressionStrategy || "Sobrecarga Progresiva (Subir peso)"}</div>
+                     </div>
+                   </div>
+                   <button 
+                     onClick={() => setShowRoutineTable(true)} 
+                     style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-light)', color: '#fff', padding: '10px 18px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}
+                     onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                     onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                   >
+                     <span>📋</span> Ver Tabla / PDF
+                   </button>
+                 </div>
 
                 {/* Selector de Días */}
                 <div className="scrollable-tabs" style={{ marginBottom: '15px', borderBottom: '1px solid var(--border-light)' }}>
@@ -1608,6 +1766,69 @@ export default function ClientDashboard({ user, onLogout }) {
               <button type="submit" style={{ flex: 2, padding: '12px', background: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Guardar Medidas</button>
             </div>
           </form>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal Rutina Completa (Tabla/PDF) */}
+      {showRoutineTable && clientData?.routine && createPortal(
+        <div className="fade-in" onClick={() => setShowRoutineTable(false)} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(10px)',
+          zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px'
+        }}>
+          <div className="glass-panel" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '800px', maxHeight: '90vh', background: 'rgba(20, 20, 24, 0.98)', padding: '30px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border-light)', paddingBottom: '15px', flexShrink: 0 }}>
+              <div>
+                <h3 style={{ fontSize: '1.4rem', color: 'var(--accent-primary)', fontWeight: '800' }}>Mi Rutina Completa</h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Evolución semanal en formato tabular.</p>
+              </div>
+              <button onClick={() => setShowRoutineTable(false)} style={{ background: 'transparent', border: 'none', color: '#ff4500', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
+            </div>
+            
+            <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gap: '25px', paddingRight: '5px' }}>
+              {Object.keys(clientData.routine).map(day => {
+                const exercises = clientData.routine[day] || [];
+                if (exercises.length === 0) return null;
+                return (
+                  <div key={day} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '15px' }}>
+                    <h4 style={{ color: 'var(--accent-primary)', borderBottom: '1px solid var(--border-light)', paddingBottom: '8px', marginBottom: '12px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.95rem' }}>{day}</h4>
+                    <div className="table-responsive">
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                        <thead>
+                          <tr style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)', textTransform: 'uppercase', fontSize: '0.75rem' }}>
+                            <th style={{ padding: '8px', textAlign: 'left' }}>Ejercicio</th>
+                            <th style={{ padding: '8px', textAlign: 'center' }}>Objetivo</th>
+                            <th style={{ padding: '8px', textAlign: 'center' }}>Intensidad</th>
+                            <th style={{ padding: '8px', textAlign: 'center' }}>Peso Esp.</th>
+                            <th style={{ padding: '8px', textAlign: 'left' }}>Notas</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {exercises.map((ex, exIdx) => (
+                            <tr key={exIdx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                              <td style={{ padding: '10px 8px', fontWeight: '600' }}>{ex.name} {ex.isOptional && <span style={{ color: '#ffaa00', fontSize: '0.7rem' }}>(Opc.)</span>}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'center' }}>{ex.reps || '—'}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'center', color: 'var(--text-muted)' }}>{ex.intensity || '—'}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'center', color: 'var(--accent-primary)', fontWeight: 'bold' }}>{ex.expectedWeight ? `${ex.expectedWeight} kg` : '—'}</td>
+                              <td style={{ padding: '10px 8px', color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.8rem' }}>{ex.notes || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px', flexShrink: 0 }}>
+              <button onClick={() => setShowRoutineTable(false)} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid var(--border-light)', color: '#fff', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Cerrar</button>
+              <button onClick={downloadRoutinePDF} className="btn-primary" style={{ flex: 2, padding: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
+                🖨️ Descargar PDF Personalizado
+              </button>
+            </div>
+          </div>
         </div>,
         document.body
       )}

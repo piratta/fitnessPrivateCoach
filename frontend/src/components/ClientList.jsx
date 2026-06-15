@@ -157,45 +157,15 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
     return () => { window.activeChatEmail = null; };
   }, [showChatModal, selectedClient]);
 
-  // Connect to WebSocket on mount and listen to messages
+  // Sync selectedClient with the latest state from parent clients array
   useEffect(() => {
-    const handleWsMessage = (message) => {
-      const currentActiveEmail = activeClientEmailRef.current;
-      if (message.clientEmail === currentActiveEmail) {
-        setSelectedClient(prev => {
-          if (!prev) return prev;
-          const isDuplicate = prev.messages.some(m => m.text === message.text && m.time === message.time && m.sender === message.sender);
-          if (isDuplicate) return prev;
-          return { ...prev, messages: [...prev.messages, { sender: message.sender, text: message.text, time: message.time }] };
-        });
-
-        setClients(prev => prev.map(c => {
-          if (c.email === message.clientEmail) {
-            const isDuplicate = (c.messages || []).some(m => m.text === message.text && m.time === message.time && m.sender === message.sender);
-            if (isDuplicate) return c;
-            return { ...c, messages: [...(c.messages || []), { sender: message.sender, text: message.text, time: message.time }], unreadMessages: 0 };
-          }
-          return c;
-        }));
-      } else {
-        // Update background client message lists
-        setClients(prev => prev.map(c => {
-          if (c.email === message.clientEmail) {
-            const isDuplicate = (c.messages || []).some(m => m.text === message.text && m.time === message.time && m.sender === message.sender);
-            if (isDuplicate) return c;
-            return { ...c, messages: [...(c.messages || []), { sender: message.sender, text: message.text, time: message.time }] };
-          }
-          return c;
-        }));
+    if (selectedClient) {
+      const latest = clients.find(c => c.id === selectedClient.id);
+      if (latest && JSON.stringify(latest.messages) !== JSON.stringify(selectedClient.messages)) {
+        setSelectedClient(prev => prev ? { ...prev, messages: latest.messages } : null);
       }
-    };
-
-    connectWebSocket(handleWsMessage);
-
-    return () => {
-      disconnectWebSocket(handleWsMessage);
-    };
-  }, [setClients]);
+    }
+  }, [clients, selectedClient?.id]);
 
   // Fetch initial history when chat opens
   useEffect(() => {
@@ -212,7 +182,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
     
     const parts = newClient.name.trim().split(/\s+/);
     if (parts.length < 3) {
-      alert("Se requiere el nombre y ambos apellidos (ej. Ana Gómez Pérez) para generar el usuario.");
+      await dialog.alert("Se requiere el nombre y ambos apellidos (ej. Ana Gómez Pérez) para generar el usuario.", { title: "Nombre incompleto" });
       return;
     }
 
@@ -234,7 +204,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
 
       if (!response.ok) {
         const errorText = await response.text();
-        alert("Error al registrar cliente: " + errorText);
+        await dialog.alert("Error al registrar cliente: " + errorText, { title: "Error" });
         return;
       }
 
@@ -272,7 +242,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
       setNewClient({ name: '', email: '', weight: '', goal: 'Hipertrofia', reviewFrequency: 'Semanal', billingPlanId: billingPlans?.[0]?.id || 'bp1' });
     } catch (err) {
       console.error(err);
-      alert("Error de red al crear el cliente en el servidor.");
+      await dialog.alert("Error de red al crear el cliente en el servidor.", { title: "Error de red" });
     }
   };
 
@@ -319,10 +289,11 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleToggleStatus = () => {
+  const handleToggleStatus = async () => {
     const isActivo = selectedClient.status === 'Activo';
     const msg = isActivo ? `¿Estás seguro de que deseas desactivar a ${selectedClient.name}? No podrá recibir nuevas rutinas.` : `¿Deseas volver a activar a ${selectedClient.name}?`;
-    if (window.confirm(msg)) {
+    const ok = await dialog.confirm(msg, { danger: isActivo, confirmText: isActivo ? 'Desactivar' : 'Activar' });
+    if (ok) {
       const newStatus = isActivo ? 'Inactivo' : 'Activo';
       setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, status: newStatus } : c));
       setSelectedClient({ ...selectedClient, status: newStatus });
@@ -732,10 +703,10 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
                       setSelectedClient(prev => ({ ...prev, progressionStrategy: newStrategy }));
                       setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, progressionStrategy: newStrategy } : c));
                     } else {
-                      alert("Error al guardar la estrategia de progresión en el servidor.");
+                      await dialog.alert("Error al guardar la estrategia de progresión en el servidor.", { title: "Error" });
                     }
                   } catch (err) {
-                    alert("Error de red al guardar la estrategia.");
+                    await dialog.alert("Error de red al guardar la estrategia.", { title: "Error" });
                   }
                 }}
                 style={{ width: '100%', marginBottom: 0 }}
@@ -770,10 +741,10 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
                       setSelectedClient(prev => ({ ...prev, reviewFrequency: newFrequency }));
                       setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, reviewFrequency: newFrequency } : c));
                     } else {
-                      alert("Error al guardar la periodicidad de revisiones en el servidor.");
+                      await dialog.alert("Error al guardar la periodicidad de revisiones en el servidor.", { title: "Error" });
                     }
                   } catch (err) {
-                    alert("Error de red al guardar la periodicidad.");
+                    await dialog.alert("Error de red al guardar la periodicidad.", { title: "Error" });
                   }
                 }}
                 style={{ width: '100%', marginBottom: 0 }}
@@ -1208,10 +1179,10 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
               <div>
                 <span style={{ fontSize: '0.8rem', color: 'var(--accent-primary)', fontWeight: 'bold', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Contraseña Temporal</span>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(224, 248, 0, 0.05)', padding: '10px 14px', borderRadius: '6px', border: '1px dashed var(--accent-primary)', marginTop: '5px' }}>
-                  <code style={{ fontSize: '1.1rem', color: '#fff', fontWeight: 'bold', fontFamily: 'monospace' }}>{createdClientInfo.username}</code>
+                  <code style={{ fontSize: '1.1rem', color: '#fff', fontWeight: 'bold', fontFamily: 'monospace' }}>{createdClientInfo.password || createdClientInfo.username}</code>
                 </div>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '6px' }}>
-                  ⚠️ Igual al usuario. Se le pedirá cambiarla al primer inicio de sesión.
+                  {createdClientInfo.isReset ? '⚠️ Nueva contraseña temporal. Se le pedirá cambiarla al inicio de sesión.' : '⚠️ Igual al usuario. Se le pedirá cambiarla al primer inicio de sesión.'}
                 </span>
               </div>
             </div>

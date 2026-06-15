@@ -181,7 +181,7 @@ export default function ReviewTab({ onLockChange }) {
       ))}
 
       {active ? (
-        <ActiveReview review={active} onAcknowledge={acknowledge} />
+        <ActiveReview review={active} onAcknowledge={acknowledge} refresh={refresh} />
       ) : lock.locked ? (
         <LockedView secondsLeft={secondsLeft} nextReviewAt={lock.nextReviewAt} />
       ) : (
@@ -274,10 +274,54 @@ function PhotoStrip({ images }) {
   );
 }
 
-function ActiveReview({ review, onAcknowledge }) {
+function ActiveReview({ review, onAcknowledge, refresh }) {
+  const dialog = useDialog();
   const validated = review.status === 'VALIDATED';
+  const fileInputs = useRef({});
+
+  const pickPhoto = (slot, fromCamera) => {
+    const input = fileInputs.current[`${slot}_${fromCamera ? 'cam' : 'lib'}`];
+    if (input) input.click();
+  };
+
+  const onFileSelected = async (slot, e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      dialog.toast('Selecciona una imagen', { variant: 'error' });
+      return;
+    }
+    try {
+      dialog.toast('Subiendo imagen...', { variant: 'info' });
+      await reviewsApi.uploadImage(review.id, file, slot);
+      dialog.toast('Imagen subida correctamente', { variant: 'success' });
+      if (refresh) refresh();
+    } catch (err) {
+      dialog.toast('No se pudo subir la imagen', { variant: 'error' });
+    }
+  };
+
+  const handleRemove = async (imageId) => {
+    try {
+      await reviewsApi.deleteImage(imageId);
+      dialog.toast('Imagen eliminada', { variant: 'success' });
+      if (refresh) refresh();
+    } catch (err) {
+      dialog.toast('No se pudo eliminar la imagen', { variant: 'error' });
+    }
+  };
+
   return (
     <>
+      {/* Hidden file inputs for ActiveReview pending state */}
+      {!validated && PHOTO_SLOTS.map(({ key }) => (
+        <span key={key}>
+          <input ref={(el) => (fileInputs.current[`${key}_cam`] = el)} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={(e) => onFileSelected(key, e)} />
+          <input ref={(el) => (fileInputs.current[`${key}_lib`] = el)} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => onFileSelected(key, e)} />
+        </span>
+      ))}
+
       <div style={{ background: validated ? 'rgba(0,230,118,0.1)' : 'rgba(224,248,0,0.1)', border: `1px solid ${validated ? '#00e676' : 'var(--accent-primary)'}`, padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
         <h3 style={{ color: validated ? '#00e676' : 'var(--accent-primary)', marginBottom: '5px' }}>
           {validated ? '✅ Evaluación Recibida' : '⏳ Revisión Enviada'}
@@ -303,7 +347,38 @@ function ActiveReview({ review, onAcknowledge }) {
         )}
       </div>
 
-      <div style={{ marginBottom: '20px' }}><PhotoStrip images={review.images} /></div>
+      {!validated ? (
+        <>
+          <h4 style={{ marginBottom: '10px' }}>Tus Fotos (Puedes modificarlas mientras está pendiente)</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px', marginBottom: '20px' }}>
+            {PHOTO_SLOTS.map(({ key, label }) => {
+              const img = review.images?.find((i) => i.view === key);
+              return (
+                <div key={key} style={{ background: 'rgba(255,255,255,0.03)', border: '2px dashed var(--border-light)', borderRadius: '8px', padding: '10px' }}>
+                  <div style={{ aspectRatio: '3/4', borderRadius: '6px', overflow: 'hidden', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                    {img ? (
+                      <AuthImage imageId={img.id} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      label
+                    )}
+                  </div>
+                  <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>{label}</div>
+                  {img ? (
+                    <button onClick={() => handleRemove(img.id)} style={{ width: '100%', padding: '8px', background: 'rgba(255,69,0,0.1)', border: '1px solid #ff4500', color: '#ff4500', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.8rem' }}>🗑️ Quitar</button>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button onClick={() => pickPhoto(key, true)} style={{ flex: 1, padding: '8px', background: 'rgba(224,248,0,0.1)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.8rem' }}>📷 Cámara</button>
+                      <button onClick={() => pickPhoto(key, false)} style={{ flex: 1, padding: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-light)', color: '#fff', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.8rem' }}>🖼️ Galería</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <div style={{ marginBottom: '20px' }}><PhotoStrip images={review.images} /></div>
+      )}
 
       {validated && (
         <button className="btn-primary" style={{ width: '100%', padding: '15px', fontSize: '1.1rem' }} onClick={onAcknowledge}>

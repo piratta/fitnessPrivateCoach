@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import SearchableExerciseSelect from './SearchableExerciseSelect';
+import { useDialog } from './ui/Dialog';
 import { API_BASE_URL } from '../config';
 import '../index.css';
 
 const DAYS_OF_WEEK = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
 export default function WorkoutBuilder({ clients = [], templates = [], isTemplateMode = false, editingTemplate = null, initialClient = '', setClients }) {
+  const dialog = useDialog();
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [templateTitle, setTemplateTitle] = useState(editingTemplate ? editingTemplate.title : '');
   const [templateDescription, setTemplateDescription] = useState(editingTemplate ? editingTemplate.description : '');
@@ -60,7 +62,7 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
   const addExercise = (day) => {
     setWeeklyRoutine({
       ...weeklyRoutine,
-      [day]: [...weeklyRoutine[day], { name: '', reps: '', intensity: '', notes: '', isOptional: false }]
+      [day]: [...weeklyRoutine[day], { name: '', reps: '', intensity: '', notes: '', expectedWeight: '', isOptional: false }]
     });
   };
 
@@ -292,7 +294,7 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
                 title="Eliminar ejercicio"
               >✕</button>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '15px', marginBottom: '10px', marginTop: '15px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.5fr 1.5fr 1.5fr', gap: '15px', marginBottom: '10px', marginTop: '15px' }}>
                 <SearchableExerciseSelect 
                   value={ex.name} 
                   onChange={(val) => updateExercise(activeDay, index, 'name', val)} 
@@ -315,6 +317,14 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
                   <option value="RPE 10">RPE 10</option>
                   <option value="Al fallo">Al fallo</option>
                 </select>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  style={{ marginBottom: 0 }} 
+                  placeholder="Peso esp. (kg)" 
+                  value={ex.expectedWeight || ''} 
+                  onChange={e => updateExercise(activeDay, index, 'expectedWeight', e.target.value)} 
+                />
               </div>
               <input type="text" className="input-field" style={{ marginBottom: 0, width: '100%' }} placeholder="Notas técnicas para el cliente (ej. Baja lento en 3 segundos)" value={ex.notes} onChange={e => updateExercise(activeDay, index, 'notes', e.target.value)} />
             </div>
@@ -331,15 +341,15 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
         </button>
         <button type="button" className="btn-primary" style={{ flex: 2 }} onClick={async () => {
           if (isTemplateMode) {
-            alert("Plantilla maestra guardada con éxito.");
+            dialog.toast("Plantilla maestra guardada con éxito.", { variant: 'success' });
           } else {
             if (!selectedClient) {
-              alert("Por favor, selecciona un cliente primero.");
+              await dialog.alert("Por favor, selecciona un cliente primero.", { title: "Faltan datos" });
               return;
             }
             const clientObj = clients.find(c => c.name === selectedClient);
             if (!clientObj) {
-              alert("Cliente no encontrado.");
+              await dialog.alert("Cliente no encontrado.", { title: "Error" });
               return;
             }
             const token = localStorage.getItem('token');
@@ -359,12 +369,12 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
                     c.id === clientObj.id ? { ...c, hasRoutine: true, routineJson: routineStr, routine: JSON.parse(routineStr) } : c
                   ));
                 }
-                alert(`Rutina asignada y guardada con éxito para ${selectedClient}.`);
+                dialog.toast(`Rutina asignada con éxito a ${selectedClient}.`, { variant: 'success' });
               } else {
-                alert("Error al guardar la rutina en el servidor.");
+                await dialog.alert("Error al guardar la rutina en el servidor.", { title: "Error" });
               }
             } catch (err) {
-              alert("Error de red al guardar la rutina.");
+              await dialog.alert("Error de red al guardar la rutina.", { title: "Error" });
             }
           }
         }}>
@@ -391,7 +401,7 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '20px' }}>
               Selecciona una plantilla para cargarla en el planificador.
             </p>
-
+ 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               {templates.map(t => (
                 <div 
@@ -399,7 +409,7 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
                   onClick={() => {
                     const fallbackRoutine = { Lunes: [], Martes: [], Miércoles: [], Jueves: [], Viernes: [], Sábado: [], Domingo: [] };
                     setWeeklyRoutine(t.routine ? JSON.parse(JSON.stringify(t.routine)) : fallbackRoutine);
-                    alert(`Plantilla "${t.title}" cargada en el planificador.`);
+                    dialog.toast(`Plantilla "${t.title}" cargada.`, { variant: 'success' });
                     setShowTemplateModal(false);
                   }}
                   style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '8px', cursor: 'pointer', border: '1px solid transparent', transition: 'border 0.2s' }}
