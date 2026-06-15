@@ -17,11 +17,17 @@ public enum ReviewStatus {
     ARCHIVED;
 
     public boolean canTransitionTo(ReviewStatus target) {
-        return switch (this) {
-            case PENDING -> target == VALIDATED;
-            case VALIDATED -> target == FEEDBACK_RECEIVED;
-            case FEEDBACK_RECEIVED -> target == ARCHIVED;
-            case ARCHIVED -> false;
-        };
+        switch (this) {
+            case PENDING:
+                return target == VALIDATED;
+            case VALIDATED:
+                return target == FEEDBACK_RECEIVED;
+            case FEEDBACK_RECEIVED:
+                return target == ARCHIVED;
+            case ARCHIVED:
+                return false;
+            default:
+                return false;
+        }
     }
 }
