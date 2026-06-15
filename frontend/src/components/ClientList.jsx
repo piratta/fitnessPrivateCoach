@@ -13,6 +13,8 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [createdClientInfo, setCreatedClientInfo] = useState(null);
+  const [copied, setCopied] = useState(false);
 
   const handleSort = (key) => {
     let direction = 'asc';
@@ -200,13 +202,25 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
         hasRoutine: false
       }]);
 
-      alert(`Cliente registrado con éxito en el sistema.\nUsuario y contraseña inicial: ${createdUser.username}`);
+      setCreatedClientInfo({
+        name: createdUser.name,
+        email: createdUser.email,
+        username: createdUser.username
+      });
       setIsAddingClient(false);
       setNewClient({ name: '', email: '', weight: '', goal: 'Hipertrofia', reviewFrequency: 'Semanal', billingPlanId: billingPlans?.[0]?.id || 'bp1' });
     } catch (err) {
       console.error(err);
       alert("Error de red al crear el cliente en el servidor.");
     }
+  };
+
+  const handleCopyCredentials = () => {
+    if (!createdClientInfo) return;
+    const textToCopy = `Nombre: ${createdClientInfo.name}\nEmail: ${createdClientInfo.email}\nUsuario: ${createdClientInfo.username}\nContraseña: ${createdClientInfo.username}`;
+    navigator.clipboard.writeText(textToCopy);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleToggleStatus = () => {
@@ -961,6 +975,59 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
                   );
                 })
               )}
+            </div>
+          </div>
+        </div>, document.body
+      )}
+
+      {createdClientInfo && createPortal(
+        <div className="fade-in" onClick={() => setCreatedClientInfo(null)} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(10px)',
+          zIndex: 1002, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px'
+        }}>
+          <div className="glass-panel" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '500px', background: 'rgba(20, 20, 24, 0.98)', padding: '30px', display: 'flex', flexDirection: 'column', border: '1px solid var(--accent-primary)', borderRadius: '16px', boxShadow: '0 0 30px rgba(224, 248, 0, 0.2)' }}>
+            <div style={{ textAlign: 'center', marginBottom: '25px' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '10px' }}>✅</div>
+              <h3 style={{ fontSize: '1.6rem', color: 'var(--accent-primary)', fontWeight: '800', margin: '0 0 10px 0' }}>¡Cliente Creado!</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>
+                Copia las siguientes credenciales para compartirlas con el cliente:
+              </p>
+            </div>
+            
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '20px', display: 'grid', gap: '15px', marginBottom: '25px' }}>
+              <div>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'bold', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Nombre</span>
+                <span style={{ fontSize: '1.05rem', color: '#fff', fontWeight: '600' }}>{createdClientInfo.name}</span>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'bold', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Email</span>
+                <span style={{ fontSize: '1.05rem', color: '#fff', fontWeight: '600' }}>{createdClientInfo.email}</span>
+              </div>
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '15px' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--accent-primary)', fontWeight: 'bold', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Usuario</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(224, 248, 0, 0.05)', padding: '10px 14px', borderRadius: '6px', border: '1px dashed var(--accent-primary)', marginTop: '5px' }}>
+                  <code style={{ fontSize: '1.1rem', color: '#fff', fontWeight: 'bold', fontFamily: 'monospace' }}>{createdClientInfo.username}</code>
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.8rem', color: 'var(--accent-primary)', fontWeight: 'bold', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Contraseña Temporal</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(224, 248, 0, 0.05)', padding: '10px 14px', borderRadius: '6px', border: '1px dashed var(--accent-primary)', marginTop: '5px' }}>
+                  <code style={{ fontSize: '1.1rem', color: '#fff', fontWeight: 'bold', fontFamily: 'monospace' }}>{createdClientInfo.username}</code>
+                </div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '6px' }}>
+                  ⚠️ Igual al usuario. Se le pedirá cambiarla al primer inicio de sesión.
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gap: '10px' }}>
+              <button className="btn-primary" onClick={handleCopyCredentials} style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '12px', fontSize: '1rem', fontWeight: '800' }}>
+                {copied ? '✅ ¡Copiado al Portapapeles!' : '📋 Copiar Credenciales'}
+              </button>
+              <button onClick={() => setCreatedClientInfo(null)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', width: '100%', padding: '12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'} onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}>
+                Entendido / Cerrar
+              </button>
             </div>
           </div>
         </div>, document.body
