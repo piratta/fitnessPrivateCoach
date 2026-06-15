@@ -331,9 +331,10 @@ export default function ClientDashboard({ user, onLogout }) {
     }
   };
 
-  const progress = isDaySkipped ? 100 : (Math.round((Object.values(currentLogs).flat().filter(s => s.completed || s.skipped).length / Object.values(currentLogs).flat().length) * 100) || 0);
+  const progress = isDaySkipped ? 100 : (currentLogs && Object.values(currentLogs).flat().length > 0 ? (Math.round((Object.values(currentLogs).flat().filter(s => s.completed || s.skipped).length / Object.values(currentLogs).flat().length) * 100) || 0) : 0);
 
   const handleFinishWorkout = async () => {
+    if (!currentLogs) return;
     const totalSets = Object.values(currentLogs).flat().length;
     const completedSets = Object.values(currentLogs).flat().filter(s => s.completed);
     
@@ -817,7 +818,7 @@ export default function ClientDashboard({ user, onLogout }) {
                             <div key={exIdx} className="glass-panel" style={{ padding: '20px', borderLeft: exercise.isOptional ? '4px solid #ffaa00' : '4px solid var(--accent-primary)', background: 'rgba(20, 20, 24, 0.8)' }}>
                               <div style={{ marginBottom: '15px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                  <h4 style={{ fontSize: '1.2rem', fontWeight: '800', lineHeight: '1.2', flex: 1, paddingRight: '15px', textDecoration: currentLogs[exIdx].every(s => s.skipped) ? 'line-through' : 'none', color: currentLogs[exIdx].every(s => s.skipped) ? 'var(--text-muted)' : '#fff' }}>{exercise.name}</h4>
+                                  <h4 style={{ fontSize: '1.2rem', fontWeight: '800', lineHeight: '1.2', flex: 1, paddingRight: '15px', textDecoration: currentLogs && currentLogs[exIdx] && currentLogs[exIdx].every(s => s.skipped) ? 'line-through' : 'none', color: currentLogs && currentLogs[exIdx] && currentLogs[exIdx].every(s => s.skipped) ? 'var(--text-muted)' : '#fff' }}>{exercise.name}</h4>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                     <button onClick={() => toggleSkipExercise(exIdx)} disabled={isWorkoutLocked} style={{ background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-muted)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold', cursor: isWorkoutLocked ? 'not-allowed' : 'pointer' }}>🚫 OMITIR</button>
                                     {exercise.isOptional && <span style={{ background: 'rgba(255, 170, 0, 0.1)', color: '#ffaa00', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>OPCIONAL</span>}
@@ -836,7 +837,7 @@ export default function ClientDashboard({ user, onLogout }) {
                                 <div className="tracker-grid" style={{ display: 'grid', gridTemplateColumns: '40px 1fr 1fr 100px', gap: '10px', padding: '10px 15px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                                   <div style={{ textAlign: 'center' }}>Set</div><div style={{ textAlign: 'center' }}>kg</div><div style={{ textAlign: 'center' }}>Reps</div><div style={{ textAlign: 'center' }}>Acciones</div>
                                 </div>
-                                {currentLogs[exIdx].map((set, setIdx) => {
+                                {currentLogs && currentLogs[exIdx] && currentLogs[exIdx].map((set, setIdx) => {
                                   const isEditing = editingSets[`${exIdx}-${setIdx}`];
                                   const inputDisabled = (!isEditing && (set.completed || set.skipped || isWorkoutLocked));
                                   
