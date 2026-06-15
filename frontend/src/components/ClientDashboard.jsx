@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import InitialQuestionnaire from './InitialQuestionnaire';
 import { MOCK_ROUTINES } from '../utils/mockRoutines';
-import { getChatMessages, addChatMessage } from '../utils/chatStore';
+import { getChatMessages, addChatMessage, connectWebSocket, disconnectWebSocket, sendWebSocketMessage } from '../utils/chatStore';
 import { MOCK_CLIENTS } from '../utils/mockClients';
 import { API_BASE_URL } from '../config';
 import '../index.css';
@@ -214,6 +214,12 @@ export default function ClientDashboard({ user, onLogout }) {
   const [messages, setMessages] = useState([]);
   const [unreadMessages, setUnreadMessages] = useState(0);
 
+  const showChatModalRef = useRef(showChatModal);
+
+  useEffect(() => {
+    showChatModalRef.current = showChatModal;
+  }, [showChatModal]);
+
   // Fetch initial messages
   useEffect(() => {
     if (user?.email) {
@@ -221,25 +227,32 @@ export default function ClientDashboard({ user, onLogout }) {
     }
   }, [user?.email]);
 
-  // Polling for new messages every 3 seconds
+  // Connect to WebSocket and receive live messages
   useEffect(() => {
     if (!user?.email) return;
-    const interval = setInterval(() => {
-      getChatMessages(user.email).then(newMsgs => {
-        setMessages(prev => {
-          // If there are more messages than before, and modal is closed, increment unread
-          if (!showChatModal && newMsgs.length > prev.length) {
-             const added = newMsgs.length - prev.length;
-             setUnreadMessages(unread => unread + added);
-          }
-          return newMsgs;
-        });
-      });
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [user?.email, showChatModal]);
 
-  // When opening modal, reset unread and fetch immediately
+    const handleWsMessage = (message) => {
+      if (message.clientEmail === user.email) {
+        setMessages(prev => {
+          const isDuplicate = prev.some(m => m.text === message.text && m.time === message.time && m.sender === message.sender);
+          if (isDuplicate) return prev;
+          return [...prev, { sender: message.sender, text: message.text, time: message.time }];
+        });
+
+        if (!showChatModalRef.current && message.sender === 'coach') {
+          setUnreadMessages(prev => prev + 1);
+        }
+      }
+    };
+
+    connectWebSocket(handleWsMessage);
+
+    return () => {
+      disconnectWebSocket(handleWsMessage);
+    };
+  }, [user?.email]);
+
+  // When opening modal, reset unread and fetch history immediately
   useEffect(() => {
     if (showChatModal && user?.email) {
       setUnreadMessages(0);
@@ -324,10 +337,15 @@ export default function ClientDashboard({ user, onLogout }) {
     if (!chatInput.trim()) return;
     const input = chatInput;
     setChatInput('');
-    // Optimistic UI update could be added here, but we'll await the real response
-    const updatedMessages = await addChatMessage(user.email, input);
-    if (updatedMessages) {
-      setMessages(prev => [...prev, updatedMessages]);
+    
+    // Try sending via WebSocket
+    const sent = sendWebSocketMessage(user.email, input);
+    if (!sent) {
+      // Fallback to REST POST
+      const msgDto = await addChatMessage(user.email, input);
+      if (msgDto) {
+        setMessages(prev => [...prev, msgDto]);
+      }
     }
   };
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { MOCK_ROUTINES } from '../utils/mockRoutines';
-import { getChatMessages, addChatMessage } from '../utils/chatStore';
+import { getChatMessages, addChatMessage, connectWebSocket, disconnectWebSocket, sendWebSocketMessage } from '../utils/chatStore';
 import { getClientBillingStatus } from '../utils/statusUtils';
 import { API_BASE_URL } from '../config';
 import '../index.css';
@@ -131,6 +131,11 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
   const [chatInput, setChatInput] = useState('');
   const chatEndRef = useRef(null);
 
+  const activeClientEmailRef = useRef(null);
+
+  useEffect(() => {
+    activeClientEmailRef.current = selectedClient?.email;
+  }, [selectedClient?.email]);
 
   // Scroll automático en el chat
   useEffect(() => {
@@ -148,34 +153,54 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
     return () => { window.activeChatEmail = null; };
   }, [showChatModal, selectedClient]);
 
-  // Fetch initial messages and set up polling when a chat is open
+  // Connect to WebSocket on mount and listen to messages
   useEffect(() => {
-    let interval;
-    if (showChatModal && selectedClient?.email) {
-      // Fetch immediately
-      getChatMessages(selectedClient.email).then(msgs => {
-        setSelectedClient(prev => ({ ...prev, messages: msgs }));
-        setClients(prev => prev.map(c => c.email === selectedClient.email ? { ...c, unreadMessages: 0 } : c));
-      });
-
-      // Poll every 3 seconds
-      interval = setInterval(() => {
-        getChatMessages(selectedClient.email).then(newMsgs => {
-          setSelectedClient(prev => {
-             // Only update if there are new messages to avoid unnecessary renders
-             if (prev && newMsgs.length > prev.messages.length) {
-                return { ...prev, messages: newMsgs };
-             }
-             return prev;
-          });
-          // Keep unread messages at 0 since chat is open
-          setClients(prev => prev.map(c => c.email === selectedClient.email ? { ...c, unreadMessages: 0 } : c));
+    const handleWsMessage = (message) => {
+      const currentActiveEmail = activeClientEmailRef.current;
+      if (message.clientEmail === currentActiveEmail) {
+        setSelectedClient(prev => {
+          if (!prev) return prev;
+          const isDuplicate = prev.messages.some(m => m.text === message.text && m.time === message.time && m.sender === message.sender);
+          if (isDuplicate) return prev;
+          return { ...prev, messages: [...prev.messages, { sender: message.sender, text: message.text, time: message.time }] };
         });
-      }, 3000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
+
+        setClients(prev => prev.map(c => {
+          if (c.email === message.clientEmail) {
+            const isDuplicate = (c.messages || []).some(m => m.text === message.text && m.time === message.time && m.sender === message.sender);
+            if (isDuplicate) return c;
+            return { ...c, messages: [...(c.messages || []), { sender: message.sender, text: message.text, time: message.time }], unreadMessages: 0 };
+          }
+          return c;
+        }));
+      } else {
+        // Update background client message lists
+        setClients(prev => prev.map(c => {
+          if (c.email === message.clientEmail) {
+            const isDuplicate = (c.messages || []).some(m => m.text === message.text && m.time === message.time && m.sender === message.sender);
+            if (isDuplicate) return c;
+            return { ...c, messages: [...(c.messages || []), { sender: message.sender, text: message.text, time: message.time }] };
+          }
+          return c;
+        }));
+      }
     };
+
+    connectWebSocket(handleWsMessage);
+
+    return () => {
+      disconnectWebSocket(handleWsMessage);
+    };
+  }, [setClients]);
+
+  // Fetch initial history when chat opens
+  useEffect(() => {
+    if (showChatModal && selectedClient?.email) {
+      getChatMessages(selectedClient.email).then(msgs => {
+        setSelectedClient(prev => prev ? { ...prev, messages: msgs } : null);
+        setClients(prev => prev.map(c => c.email === selectedClient.email ? { ...c, messages: msgs, unreadMessages: 0 } : c));
+      });
+    }
   }, [showChatModal, selectedClient?.email, setClients]);
 
   const handleAddClient = async () => {
@@ -277,14 +302,23 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
     const input = chatInput;
     setChatInput('');
     
-    const updatedMessages = await addChatMessage(selectedClient.email, input);
-    
-    if (updatedMessages) {
-      setClients(clients.map(c => {
-        if (c.id === selectedClient.id) return { ...c, messages: updatedMessages };
-        return c;
-      }));
-      setSelectedClient({ ...selectedClient, messages: updatedMessages });
+    // Try sending via WebSocket
+    const sent = sendWebSocketMessage(selectedClient.email, input);
+    if (!sent) {
+      // Fallback to REST POST
+      const msgDto = await addChatMessage(selectedClient.email, input);
+      if (msgDto) {
+        setSelectedClient(prev => {
+          if (!prev) return prev;
+          return { ...prev, messages: [...prev.messages, msgDto] };
+        });
+        setClients(prev => prev.map(c => {
+          if (c.email === selectedClient.email) {
+            return { ...c, messages: [...(c.messages || []), msgDto] };
+          }
+          return c;
+        }));
+      }
     }
   };
 
@@ -477,8 +511,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
                   onClick={() => {
                     setOpenedFromTable(true);
                     setClients(prev => prev.map(c => c.id === client.id ? { ...c, unreadMessages: 0 } : c));
-                    const currentMsgs = getChatMessages(client.email);
-                    setSelectedClient({...client, unreadMessages: 0, messages: currentMsgs});
+                    setSelectedClient({...client, unreadMessages: 0, messages: client.messages || []});
                     setShowChatModal(true);
                   }}
                   style={{ background: 'transparent', border: 'none', cursor: 'pointer', position: 'relative', fontSize: '1.2rem', color: client.unreadMessages > 0 ? 'var(--accent-primary)' : 'var(--text-muted)' }}

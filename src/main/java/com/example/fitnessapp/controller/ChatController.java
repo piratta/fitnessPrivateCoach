@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
+import com.example.fitnessapp.websocket.ChatWebSocketHandler;
 
 @RestController
 @RequestMapping("/api/chat")
@@ -24,6 +25,9 @@ public class ChatController {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private ChatWebSocketHandler chatWebSocketHandler;
 
     @GetMapping("/{clientEmail}")
     public ResponseEntity<List<ChatMessageDto>> getChatHistory(@PathVariable String clientEmail) {
@@ -83,7 +87,12 @@ public class ChatController {
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
         String senderPerspective = currentUser.getRole() == Role.PREMIUM_CLIENT ? "client" : "coach";
-        
-        return ResponseEntity.ok(new ChatMessageDto(senderPerspective, msg.getMessageText(), "Hoy " + msg.getSentAt().format(formatter)));
+        ChatMessageDto dto = new ChatMessageDto(senderPerspective, msg.getMessageText(), "Hoy " + msg.getSentAt().format(formatter));
+
+        // Broadcast to WebSocket connections
+        String clientEmailToUse = currentUser.getRole() == Role.PREMIUM_CLIENT ? currentUser.getEmail() : receiver.getEmail();
+        chatWebSocketHandler.broadcastMessage(clientEmailToUse, dto);
+
+        return ResponseEntity.ok(dto);
     }
 }

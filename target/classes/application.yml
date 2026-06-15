@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:fitnessdb
+    url: jdbc:h2:file:./fitnessdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     username: sa
     password: password
     driverClassName: org.h2.Driver
@@ -33,3 +33,20 @@ jwt:
 #     properties:
 #       hibernate:
 #         dialect: org.hibernate.dialect.PostgreSQLDialect
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://ep-muddy-poetry-ab2hlmw1-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require}
+    username: ${DATABASE_USERNAME:neondb_owner}
+    password: ${DATABASE_PASSWORD:npg_qhsvFmEC69eQ}
+    driverClassName: org.postgresql.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
