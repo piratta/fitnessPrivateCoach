@@ -48,6 +48,7 @@ spring:
     username: ${DATABASE_USERNAME:neondb_owner}
     password: ${DATABASE_PASSWORD:npg_qhsvFmEC69eQ}
     driverClassName: org.postgresql.Driver
+    connection-properties: prepareThreshold=0
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
