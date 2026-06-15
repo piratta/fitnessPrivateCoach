@@ -20,7 +20,21 @@ async function request(path, { method = 'GET', body, isForm } = {}) {
   });
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
-    try { message = (await res.text()) || message; } catch { /* ignore */ }
+    try {
+      const text = await res.text();
+      if (text) {
+        try {
+          const parsed = JSON.parse(text);
+          message = parsed.message || parsed.error || text;
+        } catch { message = text; }
+      }
+    } catch { /* ignore */ }
+    // On 401 the token is stale or signed with a different secret; force re-login.
+    if (res.status === 401) {
+      localStorage.removeItem('token');
+      // Defer reload so callers can show their message first.
+      setTimeout(() => { window.location.reload(); }, 1500);
+    }
     const err = new Error(message);
     err.status = res.status;
     throw err;

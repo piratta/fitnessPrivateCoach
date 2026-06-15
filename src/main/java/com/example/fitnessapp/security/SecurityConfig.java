@@ -54,8 +54,11 @@ public class SecurityConfig {
             .exceptionHandling(eh -> eh
                 .authenticationEntryPoint((req, res, e) -> {
                     res.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
-                    res.setContentType("application/json");
-                    res.getWriter().write("{\"error\":\"unauthorized\",\"message\":\"" + e.getMessage() + "\"}");
+                    res.setContentType("application/json;charset=UTF-8");
+                    Object reasonAttr = req.getAttribute("auth.failureReason");
+                    String reason = reasonAttr != null ? reasonAttr.toString() : e.getMessage();
+                    String safe = reason == null ? "" : reason.replace("\\", "\\\\").replace("\"", "\\\"");
+                    res.getWriter().write("{\"error\":\"unauthorized\",\"message\":\"" + safe + "\"}");
                 })
                 .accessDeniedHandler((req, res, e) -> {
                     res.setStatus(jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN);

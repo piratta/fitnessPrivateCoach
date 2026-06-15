@@ -81,7 +81,11 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
       fetchProfile();
       fetchProgressHistory();
     } catch (e) {
-      await dialog.alert('No se pudieron guardar tus datos iniciales. Inténtalo de nuevo.', { title: 'Error' });
+      if (e.status === 401) {
+        await dialog.alert('Tu sesión ha caducado. Vuelve a iniciar sesión para continuar.', { title: 'Sesión expirada' });
+      } else {
+        await dialog.alert(e.message || 'No se pudieron guardar tus datos iniciales.', { title: 'Error' });
+      }
     }
   };
 
