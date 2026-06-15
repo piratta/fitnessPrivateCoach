@@ -82,7 +82,9 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
       fetchProgressHistory();
     } catch (e) {
       if (e.status === 401) {
-        await dialog.alert('Tu sesión ha caducado. Vuelve a iniciar sesión para continuar.', { title: 'Sesión expirada' });
+        const detail = e.message && e.message !== 'unauthorized' ? `\n\nDetalle: ${e.message}` : '';
+        await dialog.alert(`Tu sesión no es válida. Vuelve a iniciar sesión para continuar.${detail}`, { title: 'Sesión expirada' });
+        onLogout && onLogout();
       } else {
         await dialog.alert(e.message || 'No se pudieron guardar tus datos iniciales.', { title: 'Error' });
       }

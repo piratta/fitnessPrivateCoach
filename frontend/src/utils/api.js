@@ -29,11 +29,11 @@ async function request(path, { method = 'GET', body, isForm } = {}) {
         } catch { message = text; }
       }
     } catch { /* ignore */ }
-    // On 401 the token is stale or signed with a different secret; force re-login.
+    // On 401 the token is stale or signed with a different secret. Clear it so
+    // the next page reload sends the user back to login, but DO NOT reload
+    // automatically — the caller should surface the backend message first.
     if (res.status === 401) {
       localStorage.removeItem('token');
-      // Defer reload so callers can show their message first.
-      setTimeout(() => { window.location.reload(); }, 1500);
     }
     const err = new Error(message);
     err.status = res.status;
