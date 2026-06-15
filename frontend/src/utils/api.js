@@ -29,12 +29,11 @@ async function request(path, { method = 'GET', body, isForm } = {}) {
         } catch { message = text; }
       }
     } catch { /* ignore */ }
-    // On 401 the token is stale or signed with a different secret. Clear it so
-    // the next page reload sends the user back to login, but DO NOT reload
-    // automatically — the caller should surface the backend message first.
-    if (res.status === 401) {
-      localStorage.removeItem('token');
-    }
+    // Note: we deliberately do NOT clear the token here on 401. A 401 from one
+    // endpoint while other endpoints still work with the same token is a
+    // server-side bug (likely the endpoint not yet deployed), not an actual
+    // expired session — wiping the token would mask the real cause and force
+    // the user out for no reason. The caller decides what to do with err.status.
     const err = new Error(message);
     err.status = res.status;
     throw err;

@@ -41,6 +41,22 @@ public class UserController {
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
+    /**
+     * Diagnostic endpoint. Returns who the server thinks is calling without
+     * touching the database. If this returns 200 with the principal but
+     * {@code POST /api/users/me/complete-onboarding} returns 401, the deploy
+     * is missing the onboarding endpoint.
+     */
+    @GetMapping("/me/whoami")
+    public ResponseEntity<Map<String, Object>> whoami() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        Map<String, Object> body = new HashMap<>();
+        body.put("authenticated", auth != null && auth.isAuthenticated());
+        body.put("principal", auth != null ? auth.getName() : null);
+        body.put("authorities", auth != null ? auth.getAuthorities().toString() : null);
+        return ResponseEntity.ok(body);
+    }
+
     @GetMapping("/me")
     public ResponseEntity<UserDto> getMe() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();

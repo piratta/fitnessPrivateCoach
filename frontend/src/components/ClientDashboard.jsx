@@ -81,13 +81,15 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
       fetchProfile();
       fetchProgressHistory();
     } catch (e) {
-      if (e.status === 401) {
-        const detail = e.message && e.message !== 'unauthorized' ? `\n\nDetalle: ${e.message}` : '';
-        await dialog.alert(`Tu sesión no es válida. Vuelve a iniciar sesión para continuar.${detail}`, { title: 'Sesión expirada' });
-        onLogout && onLogout();
-      } else {
-        await dialog.alert(e.message || 'No se pudieron guardar tus datos iniciales.', { title: 'Error' });
-      }
+      // Do NOT auto-logout here: the GET /me right before this succeeded with the same token,
+      // so a 401 from this endpoint specifically is a server-side bug (probably the endpoint
+      // not yet deployed). Show the backend message so the user can report it instead of
+      // getting kicked out.
+      const detail = e.message && e.message !== 'unauthorized' && e.message !== 'forbidden'
+        ? `\n\nDetalle del servidor: ${e.message}`
+        : '';
+      const title = e.status === 401 ? 'Error de autorización' : 'Error';
+      await dialog.alert(`No se pudieron guardar tus datos iniciales. Vuelve a intentarlo en unos segundos.${detail}`, { title });
     }
   };
 
