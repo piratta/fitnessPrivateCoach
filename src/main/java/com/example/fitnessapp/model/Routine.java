@@ -24,8 +24,7 @@ public class Routine {
     @JoinColumn(name = "client_id")
     private User client;
 
-    @Column(nullable = false)
-    private boolean isPreset = false;
+    private Boolean isPreset = false;
 
     @OneToMany(mappedBy = "routine", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<RoutineDay> days = new ArrayList<>();
@@ -45,7 +44,7 @@ public class Routine {
     public User getClient() { return client; }
     public void setClient(User client) { this.client = client; }
 
-    public boolean isPreset() { return isPreset; }
+    public boolean isPreset() { return isPreset != null && isPreset; }
     public void setPreset(boolean preset) { isPreset = preset; }
 
     public List<RoutineDay> getDays() { return days; }

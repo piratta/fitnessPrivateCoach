@@ -35,7 +35,7 @@ public class User {
     private boolean mustChangePassword = false;
 
     // True until the client fills in the initial measurements questionnaire on first login.
-    private boolean onboardingCompleted = false;
+    private Boolean onboardingCompleted = false;
 
     // Optional profile data (trainer self-profile + clients).
     private String lastName;
@@ -110,7 +110,7 @@ public class User {
     public boolean isMustChangePassword() { return mustChangePassword; }
     public void setMustChangePassword(boolean mustChangePassword) { this.mustChangePassword = mustChangePassword; }
 
-    public boolean isOnboardingCompleted() { return onboardingCompleted; }
+    public boolean isOnboardingCompleted() { return onboardingCompleted != null && onboardingCompleted; }
     public void setOnboardingCompleted(boolean onboardingCompleted) { this.onboardingCompleted = onboardingCompleted; }
 
     public String getLastName() { return lastName; }

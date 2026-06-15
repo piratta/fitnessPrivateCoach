@@ -28,7 +28,7 @@ public class WorkoutSession {
     @Column(nullable = false)
     private LocalDate sessionDate;
 
-    private boolean isSkipped = false;
+    private Boolean isSkipped = false;
 
     private String clientComments;
     private String videoLink;
@@ -71,7 +71,7 @@ public class WorkoutSession {
     public LocalDate getSessionDate() { return sessionDate; }
     public void setSessionDate(LocalDate sessionDate) { this.sessionDate = sessionDate; }
 
-    public boolean isSkipped() { return isSkipped; }
+    public boolean isSkipped() { return isSkipped != null && isSkipped; }
     public void setSkipped(boolean skipped) { isSkipped = skipped; }
 
     public String getClientComments() { return clientComments; }

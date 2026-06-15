@@ -25,7 +25,7 @@ public class RoutineExercise {
     
     private String notes; // ej. "Bajar controlado"
     
-    private boolean isOptional = false;
+    private Boolean isOptional = false;
 
     public RoutineExercise() {}
 
@@ -48,6 +48,6 @@ public class RoutineExercise {
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
 
-    public boolean isOptional() { return isOptional; }
+    public boolean isOptional() { return isOptional != null && isOptional; }
     public void setOptional(boolean optional) { isOptional = optional; }
 }
