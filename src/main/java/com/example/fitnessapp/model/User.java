@@ -34,11 +34,20 @@ public class User {
 
     private boolean mustChangePassword = false;
 
+    // True until the client fills in the initial measurements questionnaire on first login.
+    private boolean onboardingCompleted = false;
+
+    // Optional profile data (trainer self-profile + clients).
+    private String lastName;
+    private java.time.LocalDate birthDate;
+
     // --- New Fields for Fitness App ---
-    private String goal; 
-    private String status = "Activo"; 
+    private String goal;
+    private String status = "Activo";
     private String videoLink;
     private LocalDateTime lastReviewDate;
+    // Moment from which the next review is allowed. Computed from lastReviewDate + reviewFrequency.
+    private LocalDateTime nextReviewAt;
     private String reviewFrequency = "Semanal"; // Semanal, Bisemanal, 3 Semanas, Mensual, Bimensual
     private String progressionStrategy = "Sobrecarga Progresiva (Subir peso)"; // Mantenimiento, Descarga, Subir reps, etc.
 
@@ -100,6 +109,18 @@ public class User {
 
     public boolean isMustChangePassword() { return mustChangePassword; }
     public void setMustChangePassword(boolean mustChangePassword) { this.mustChangePassword = mustChangePassword; }
+
+    public boolean isOnboardingCompleted() { return onboardingCompleted; }
+    public void setOnboardingCompleted(boolean onboardingCompleted) { this.onboardingCompleted = onboardingCompleted; }
+
+    public String getLastName() { return lastName; }
+    public void setLastName(String lastName) { this.lastName = lastName; }
+
+    public java.time.LocalDate getBirthDate() { return birthDate; }
+    public void setBirthDate(java.time.LocalDate birthDate) { this.birthDate = birthDate; }
+
+    public LocalDateTime getNextReviewAt() { return nextReviewAt; }
+    public void setNextReviewAt(LocalDateTime nextReviewAt) { this.nextReviewAt = nextReviewAt; }
 
     public String getRoutineJson() { return routineJson; }
     public void setRoutineJson(String routineJson) { this.routineJson = routineJson; }

@@ -8,8 +8,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -42,14 +44,35 @@ public class ProgressLogController {
         return ResponseEntity.ok(history);
     }
 
+    /**
+     * UPSERT: a measurement is unique per (client, day). If the client logs again on the same
+     * date (e.g. several weights the same day) we update the existing row instead of inserting a
+     * duplicate, so the last value entered wins and no new column appears in the comparison view.
+     * Only non-null fields overwrite the previous ones (a weight-only quick entry keeps the
+     * measurements already recorded for that day).
+     */
     @PostMapping
+    @Transactional
     public ResponseEntity<?> addProgressLog(@RequestBody ProgressLog log) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String email = auth.getName();
         User client = userRepository.findByEmail(email).orElseThrow();
-        
-        log.setClient(client);
-        ProgressLog saved = progressLogRepository.save(log);
+
+        LocalDate date = log.getLogDate() != null ? log.getLogDate() : LocalDate.now();
+
+        ProgressLog entity = progressLogRepository.findByClientAndLogDate(client, date)
+                .orElseGet(ProgressLog::new);
+        entity.setClient(client);
+        entity.setLogDate(date);
+
+        if (log.getWeight() != null) entity.setWeight(log.getWeight());
+        if (log.getWaist() != null)  entity.setWaist(log.getWaist());
+        if (log.getHip() != null)    entity.setHip(log.getHip());
+        if (log.getNeck() != null)   entity.setNeck(log.getNeck());
+        if (log.getBiceps() != null) entity.setBiceps(log.getBiceps());
+        if (log.getLeg() != null)    entity.setLeg(log.getLeg());
+
+        ProgressLog saved = progressLogRepository.save(entity);
         return ResponseEntity.ok(saved);
     }
 }

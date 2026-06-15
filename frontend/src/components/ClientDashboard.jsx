@@ -1,14 +1,17 @@
 import React, { useState, useRef, useEffect, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import InitialQuestionnaire from './InitialQuestionnaire';
-import { MOCK_ROUTINES } from '../utils/mockRoutines';
+import ReviewTab from './ReviewTab';
+import GalleryTab from './GalleryTab';
 import { getChatMessages, addChatMessage, connectWebSocket, disconnectWebSocket, sendWebSocketMessage } from '../utils/chatStore';
-import { MOCK_CLIENTS } from '../utils/mockClients';
+import { usersApi } from '../utils/api';
+import { useDialog } from './ui/Dialog';
 import { API_BASE_URL } from '../config';
 import '../index.css';
 
 export default function ClientDashboard({ user, onLogout }) {
-  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(true);
+  const dialog = useDialog();
+  const [isReviewLocked, setIsReviewLocked] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [activeTab, setActiveTab] = useState('workout'); 
   const [clientData, setClientData] = useState(null);
@@ -61,6 +64,26 @@ export default function ClientDashboard({ user, onLogout }) {
     .catch(err => console.error("Error fetching profile", err));
   };
 
+  const handleCompleteOnboarding = async (formData) => {
+    // Map the questionnaire fields to the ProgressLog shape persisted by the backend.
+    const measurements = {
+      weight: formData.peso ? parseFloat(formData.peso) : null,
+      waist: formData.cintura ? parseFloat(formData.cintura) : null,
+      hip: formData.cadera ? parseFloat(formData.cadera) : null,
+      neck: formData.cuello ? parseFloat(formData.cuello) : null,
+      biceps: formData.biceps ? parseFloat(formData.biceps) : null,
+      leg: formData.pierna ? parseFloat(formData.pierna) : null,
+    };
+    try {
+      await usersApi.completeOnboarding(measurements);
+      dialog.toast('¡Bienvenido! Datos iniciales guardados', { variant: 'success' });
+      fetchProfile();
+      fetchProgressHistory();
+    } catch (e) {
+      await dialog.alert('No se pudieron guardar tus datos iniciales. Inténtalo de nuevo.', { title: 'Error' });
+    }
+  };
+
   const fetchProgressHistory = () => {
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -70,11 +93,10 @@ export default function ClientDashboard({ user, onLogout }) {
     .then(res => res.json())
     .then(data => {
       setProgressHistory(data);
-      if (data.length > 0) {
-        setSelectedMonths([Math.max(0, data.length - 1)]);
-      } else {
-        setSelectedMonths([0]);
-      }
+      // Default the comparison selector to the latest day that has body measurements.
+      const measureCount = data.filter(l =>
+        [l.waist, l.hip, l.neck, l.biceps, l.leg].some(v => v !== null && v !== undefined)).length;
+      setSelectedMonths([Math.max(0, measureCount - 1)]);
     })
     .catch(err => console.error("Error fetching progress history", err));
   };
@@ -297,7 +319,7 @@ export default function ClientDashboard({ user, onLogout }) {
     
     // Prevent completing if weight is empty
     if (!currentSet.completed && (!currentSet.weight || currentSet.weight.toString().trim() === '')) {
-      alert("⚠️ Por favor, introduce el peso levantado antes de marcar la serie como completada.");
+      dialog.toast("Introduce el peso levantado antes de completar la serie", { variant: 'error' });
       return;
     }
 
@@ -357,7 +379,7 @@ export default function ClientDashboard({ user, onLogout }) {
     const completedSets = Object.values(currentLogs).flat().filter(s => s.completed);
     
     if (completedSets.length === 0) {
-      alert("⚠️ No has completado ninguna serie. Registra al menos una serie para poder finalizar el entrenamiento.");
+      await dialog.alert("No has completado ninguna serie. Registra al menos una para finalizar el entrenamiento.", { title: 'Entrenamiento incompleto' });
       return;
     }
 
@@ -449,11 +471,11 @@ export default function ClientDashboard({ user, onLogout }) {
   const handleSaveProgress = async (e) => {
     if (e) e.preventDefault();
     if (!logForm.logDate) {
-      alert("Por favor, selecciona una fecha.");
+      await dialog.alert("Selecciona una fecha.", { title: 'Faltan datos' });
       return;
     }
     if (!logForm.weight || logForm.weight.toString().trim() === '') {
-      alert("Por favor, introduce al menos el peso.");
+      await dialog.alert("Introduce al menos el peso.", { title: 'Faltan datos' });
       return;
     }
     
@@ -476,7 +498,7 @@ export default function ClientDashboard({ user, onLogout }) {
         })
       });
       if (response.ok) {
-        alert("Medición registrada con éxito.");
+        dialog.toast("Medición registrada con éxito", { variant: 'success' });
         setShowLogModal(false);
         setLogForm({
           logDate: new Date().toISOString().split('T')[0],
@@ -489,17 +511,18 @@ export default function ClientDashboard({ user, onLogout }) {
         });
         fetchProgressHistory();
       } else {
-        alert("Error al registrar la medición.");
+        dialog.toast("Error al registrar la medición", { variant: 'error' });
       }
     } catch (err) {
       console.error(err);
-      alert("Error de red.");
+      dialog.toast("Error de red", { variant: 'error' });
     }
   };
 
-  const handleStartWorkout = () => {
+  const handleStartWorkout = async () => {
     if (hasFinishedSession) {
-      if (!window.confirm("Ya has completado un entrenamiento en esta sesión. ¿Estás seguro de que quieres volver a empezar?")) {
+      const ok = await dialog.confirm("Ya has completado un entrenamiento en esta sesión. ¿Volver a empezar?", { confirmText: 'Sí, reiniciar' });
+      if (!ok) {
         return;
       }
       setHasFinishedSession(false);
@@ -509,21 +532,27 @@ export default function ClientDashboard({ user, onLogout }) {
     setIsWorkoutStarted(true);
   };
 
-  const progressDates = progressHistory.map(l => {
+  const fmtLogDate = (l) => {
     if (!l.logDate) return '';
     const parts = l.logDate.split('-');
-    if (parts.length === 3) {
-      return `${parts[2]}/${parts[1]}`;
-    }
-    return l.logDate;
-  });
+    return parts.length === 3 ? `${parts[2]}/${parts[1]}` : l.logDate;
+  };
 
+  // Full history (used by the weight evolution chart).
+  const progressDates = progressHistory.map(fmtLogDate);
   const weightHistory = progressHistory.length > 0 ? progressHistory.map(l => l.weight || 0) : (clientData?.weightHistory || [0]);
-  const waistHistory = progressHistory.length > 0 ? progressHistory.map(l => l.waist || 0) : (clientData?.waistHistory || [0]);
-  const caderaHistory = progressHistory.length > 0 ? progressHistory.map(l => l.hip || 0) : (clientData?.caderaHistory || [0]);
-  const cuelloHistory = progressHistory.length > 0 ? progressHistory.map(l => l.neck || 0) : (clientData?.cuelloHistory || [0]);
-  const bicepsHistory = progressHistory.length > 0 ? progressHistory.map(l => l.biceps || 0) : (clientData?.bicepsHistory || [0]);
-  const piernaHistory = progressHistory.length > 0 ? progressHistory.map(l => l.leg || 0) : (clientData?.piernaHistory || [0]);
+
+  // A weight-only quick entry must NOT create a new column in the measurement comparison, so the
+  // comparison table and body-measurement charts only use days that recorded a body measurement.
+  const measurementLogs = progressHistory.filter(l =>
+    [l.waist, l.hip, l.neck, l.biceps, l.leg].some(v => v !== null && v !== undefined));
+  const measurementDates = measurementLogs.map(fmtLogDate);
+  const cmpWeight = measurementLogs.length > 0 ? measurementLogs.map(l => l.weight || 0) : [0];
+  const waistHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.waist || 0) : (clientData?.waistHistory || [0]);
+  const caderaHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.hip || 0) : (clientData?.caderaHistory || [0]);
+  const cuelloHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.neck || 0) : (clientData?.cuelloHistory || [0]);
+  const bicepsHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.biceps || 0) : (clientData?.bicepsHistory || [0]);
+  const piernaHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.leg || 0) : (clientData?.piernaHistory || [0]);
   const volumeHistory = clientData?.volumeHistory || [4500, 4800, 5200, 5500, 5800, 6000, 6500, 7000, 7500, 7800, 8200, 8500];
   const adherenceHistory = clientData?.adherenceHistory || [90, 85, 95, 90, 100, 80, 95, 90, 100, 100, 95, 95];
 
@@ -617,8 +646,9 @@ export default function ClientDashboard({ user, onLogout }) {
             {/* Points and Labels */}
             {history.map((val, index) => {
               let label = `Mes ${index + 1}`;
-              if (type !== 'adherence' && type !== 'volume' && progressDates[index]) {
-                label = progressDates[index];
+              const datesForType = type === 'weight' ? progressDates : measurementDates;
+              if (type !== 'adherence' && type !== 'volume' && datesForType[index]) {
+                label = datesForType[index];
               } else if ((type === 'adherence' || type === 'volume') && clientData?.reviewFrequency) {
                 const labelType = clientData.reviewFrequency.toLowerCase().includes('semana') ? 'Semana' : 'Mes';
                 label = `${labelType} ${index + 1}`;
@@ -702,8 +732,8 @@ export default function ClientDashboard({ user, onLogout }) {
 
       {/* Main Content */}
       <div style={{ flex: 1, padding: '0 20px', maxWidth: '600px', margin: '0 auto', width: '100%' }}>
-        {!hasCompletedOnboarding ? (
-          <InitialQuestionnaire onComplete={() => setHasCompletedOnboarding(true)} />
+        {clientData && clientData.onboardingCompleted === false ? (
+          <InitialQuestionnaire onComplete={handleCompleteOnboarding} />
         ) : (
           <div className="fade-in">
             
@@ -786,15 +816,41 @@ export default function ClientDashboard({ user, onLogout }) {
                 ) : (
                   <div className="fade-in" style={{ display: 'grid', gap: '25px' }}>
                     {!isWorkoutStarted && !isWorkoutLocked ? (
-                      <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                        <button 
-                          onClick={handleStartWorkout} 
-                          className="btn-primary" 
-                          style={{ padding: '25px 40px', fontSize: '1.5rem', borderRadius: '50px', boxShadow: '0 10px 30px rgba(224, 248, 0, 0.3)' }}
-                        >
-                          ▶ EMPEZAR ENTRENAMIENTO
-                        </button>
-                        <p style={{ marginTop: '20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Pulsa para activar el cronómetro y registrar marcas.</p>
+                      <div>
+                        <div style={{ textAlign: 'center', padding: '20px 0 30px' }}>
+                          <button
+                            onClick={handleStartWorkout}
+                            className="btn-primary"
+                            style={{ padding: '25px 40px', fontSize: '1.5rem', borderRadius: '50px', boxShadow: '0 10px 30px rgba(224, 248, 0, 0.3)' }}
+                          >
+                            ▶ EMPEZAR ENTRENAMIENTO
+                          </button>
+                          <p style={{ marginTop: '20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Pulsa para activar el cronómetro y registrar marcas.</p>
+                        </div>
+
+                        {/* Previsualización solo-lectura de los ejercicios del día */}
+                        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--border-light)', borderRadius: '8px', padding: '12px 15px', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ fontSize: '1.2rem' }}>👁️</span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Vista previa de lo que te toca hoy (solo lectura). Empieza el entrenamiento para registrar tus marcas.</span>
+                        </div>
+                        <div style={{ display: 'grid', gap: '12px' }}>
+                          {activeWorkout.map((ex, exIdx) => (
+                            <div key={exIdx} className="glass-panel" style={{ padding: '16px', borderLeft: ex.isOptional ? '4px solid #ffaa00' : '4px solid var(--accent-primary)', opacity: 0.92 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <h4 style={{ fontSize: '1.1rem', fontWeight: 800 }}>{ex.name}</h4>
+                                {ex.isOptional && <span style={{ background: 'rgba(255,170,0,0.1)', color: '#ffaa00', padding: '3px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>OPCIONAL</span>}
+                              </div>
+                              <div style={{ display: 'flex', gap: '15px', marginTop: '8px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                <span>🎯 Objetivo: <strong style={{ color: '#fff' }}>{ex.reps}</strong></span>
+                                {ex.intensity && <span>🔥 Int: <strong style={{ color: '#fff' }}>{ex.intensity}</strong></span>}
+                                {(ex.expectedWeight !== undefined && ex.expectedWeight !== null && ex.expectedWeight !== '') && (
+                                  <span>🏋️ Peso esperado: <strong style={{ color: '#fff' }}>{ex.expectedWeight} kg</strong></span>
+                                )}
+                              </div>
+                              {ex.notes && <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '8px', fontStyle: 'italic' }}>📝 {ex.notes}</p>}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     ) : (
                       <>
@@ -918,8 +974,9 @@ export default function ClientDashboard({ user, onLogout }) {
                           </div>
                         ) : (
                           <div style={{ marginTop: '30px', marginBottom: '20px' }}>
-                            <button onClick={() => {
-                              if(window.confirm('¿Seguro que quieres volver a empezar este entrenamiento desde cero? Perderás los registros no guardados de esta sesión.')) {
+                            <button onClick={async () => {
+                              const ok = await dialog.confirm('¿Volver a empezar este entrenamiento desde cero? Perderás los registros no guardados de esta sesión.', { danger: true, confirmText: 'Reiniciar' });
+                              if (ok) {
                                 setIsWorkoutLocked(false);
                                 setIsWorkoutStarted(false);
                                 setWorkoutSeconds(0);
@@ -949,7 +1006,7 @@ export default function ClientDashboard({ user, onLogout }) {
                     <button 
                       onClick={async () => {
                         if (!dailyWeight || dailyWeight.toString().trim() === '') {
-                          alert("Por favor, introduce un peso válido.");
+                          await dialog.alert("Introduce un peso válido.", { title: 'Faltan datos' });
                           return;
                         }
                         const token = localStorage.getItem('token');
@@ -966,14 +1023,14 @@ export default function ClientDashboard({ user, onLogout }) {
                             })
                           });
                           if (response.ok) {
-                            alert("Peso diario guardado con éxito.");
+                            dialog.toast("Peso diario guardado", { variant: 'success' });
                             fetchProgressHistory();
                           } else {
-                            alert("Error al guardar el peso.");
+                            dialog.toast("Error al guardar el peso", { variant: 'error' });
                           }
                         } catch (err) {
                           console.error(err);
-                          alert("Error de red.");
+                          dialog.toast("Error de red", { variant: 'error' });
                         }
                       }}
                       style={{ marginLeft: 'auto', padding: '12px 20px', background: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}
@@ -1011,8 +1068,8 @@ export default function ClientDashboard({ user, onLogout }) {
                               setSelectedMonths(newMonths);
                             }}
                           >
-                            {weightHistory.map((_, idx) => (
-                              <option key={idx} value={idx}>{idx === weightHistory.length - 1 ? 'Actual' : (progressDates[idx] ? progressDates[idx] : `${timeScaleLabel} ${idx + 1}`)}</option>
+                            {cmpWeight.map((_, idx) => (
+                              <option key={idx} value={idx}>{idx === cmpWeight.length - 1 ? 'Actual' : (measurementDates[idx] ? measurementDates[idx] : `${timeScaleLabel} ${idx + 1}`)}</option>
                             ))}
                           </select>
                           {selectedMonths.length > 2 && (
@@ -1023,7 +1080,7 @@ export default function ClientDashboard({ user, onLogout }) {
                           )}
                         </div>
                       ))}
-                      {selectedMonths.length < 3 && weightHistory.length > 0 && (
+                      {selectedMonths.length < 3 && cmpWeight.length > 0 && (
                         <button 
                           onClick={() => {
                             const minSelected = Math.min(...selectedMonths);
@@ -1031,7 +1088,7 @@ export default function ClientDashboard({ user, onLogout }) {
                             if (!selectedMonths.includes(nextToAdd)) {
                                 setSelectedMonths([...selectedMonths, nextToAdd]);
                             } else {
-                                const available = weightHistory.map((_, i) => i).filter(i => !selectedMonths.includes(i));
+                                const available = cmpWeight.map((_, i) => i).filter(i => !selectedMonths.includes(i));
                                 if (available.length > 0) setSelectedMonths([...selectedMonths, available[available.length - 1]]);
                             }
                           }}
@@ -1050,7 +1107,7 @@ export default function ClientDashboard({ user, onLogout }) {
                           <th style={{ padding: '12px', textAlign: 'left' }}>Métrica</th>
                           {selectedMonths.map((m, i) => (
                             <Fragment key={i}>
-                              <th style={{ padding: '12px' }}>{m === weightHistory.length - 1 ? 'Actual' : (progressDates[m] ? progressDates[m] : `${timeScaleLabel} ${m + 1}`)}</th>
+                              <th style={{ padding: '12px' }}>{m === cmpWeight.length - 1 ? 'Actual' : (measurementDates[m] ? measurementDates[m] : `${timeScaleLabel} ${m + 1}`)}</th>
                               {i < selectedMonths.length - 1 && (
                                 <th style={{ padding: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Dif.</th>
                               )}
@@ -1060,7 +1117,7 @@ export default function ClientDashboard({ user, onLogout }) {
                       </thead>
                       <tbody>
                         {[
-                          { label: 'Peso Corpor.', key: 'weight', data: weightHistory, unit: 'kg', lowerIsBetter: clientData?.goal === 'Pérdida de Grasa' },
+                          { label: 'Peso Corpor.', key: 'weight', data: cmpWeight, unit: 'kg', lowerIsBetter: clientData?.goal === 'Pérdida de Grasa' },
                           { label: 'Cintura', key: 'waist', data: waistHistory, unit: 'cm', lowerIsBetter: true },
                           { label: 'Cadera', key: 'cadera', data: caderaHistory, unit: 'cm', lowerIsBetter: true },
                           { label: 'Cuello', key: 'cuello', data: cuelloHistory, unit: 'cm', lowerIsBetter: false },
@@ -1268,240 +1325,19 @@ export default function ClientDashboard({ user, onLogout }) {
 
             {/* Pestaña: REVISIÓN */}
             {activeTab === 'review' && (
-              <div className="fade-in">
-                {clientData?.pendingReviewData && !isModifyingReview ? (
-                  <>
-                    <div style={{ background: 'rgba(224, 248, 0, 0.1)', border: '1px solid var(--accent-primary)', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
-                      <h3 style={{ color: 'var(--accent-primary)', marginBottom: '5px' }}>✅ Revisión {timeScaleLabel} Enviada</h3>
-                      <p style={{ color: 'var(--text-main)', fontSize: '0.9rem' }}>Tu entrenador está evaluando tus progresos. Recibirás una notificación cuando haya terminado.</p>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '20px' }}>
-                      {['front', 'left', 'right', 'back'].map(view => {
-                        const photoUrl = clientData.pendingReviewData.photos?.[view];
-                        const labels = { front: 'Frontal', left: 'Lat. Izq.', right: 'Lat. Der.', back: 'Espalda' };
-                        return photoUrl ? (
-                          <div key={view} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                            <div 
-                              onClick={() => {
-                                setLargePhotoView(view);
-                                setToggledPhoto(false);
-                                setLargePhotoSource('pending');
-                              }}
-                              style={{ aspectRatio: '3/4', background: `url(${photoUrl}) center/cover`, borderRadius: '8px', cursor: 'pointer' }} 
-                            />
-                            <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{labels[view]}</div>
-                          </div>
-                        ) : null;
-                      })}
-                    </div>
-                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
-                      <p style={{ margin: 0 }}><strong>Peso:</strong> {clientData.pendingReviewData.weight}kg | <strong>Cintura:</strong> {clientData.pendingReviewData.waist}cm</p>
-                      <p style={{ margin: '5px 0 0 0', fontStyle: 'italic', fontSize: '0.9rem', color: 'var(--text-muted)' }}>"{clientData.pendingReviewData.comments}"</p>
-                    </div>
-                    <button 
-                      className="btn-primary" 
-                      style={{ width: '100%', padding: '15px', fontSize: '1.1rem', background: 'transparent', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }}
-                      onClick={() => {
-                        setReviewData(clientData.pendingReviewData);
-                        setIsModifyingReview(true);
-                      }}
-                    >
-                      ✏️ Modificar Envío
-                    </button>
-                  </>
-                ) : clientData?.lastCompletedReview && isMeasurementsLocked ? (
-                  <>
-                    <div style={{ background: 'rgba(0, 230, 118, 0.1)', border: '1px solid #00e676', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
-                      <h3 style={{ color: '#00e676', marginBottom: '5px' }}>✅ Evaluación Recibida</h3>
-                      <p style={{ color: 'var(--text-main)', fontSize: '0.9rem' }}>Tu entrenador ha analizado tu última revisión. Revisa el feedback a continuación.</p>
-                    </div>
-                    <div className="glass-panel" style={{ padding: '20px', marginBottom: '20px' }}>
-                      <h4 style={{ color: 'var(--accent-primary)', marginBottom: '10px' }}>💬 Comentario Global</h4>
-                      <p style={{ fontStyle: 'italic', lineHeight: '1.5' }}>"{clientData.lastCompletedReview.globalFeedback}"</p>
-                    </div>
+              <ReviewTab onLockChange={setIsReviewLocked} />
+            )}
 
-                    <h4 style={{ marginBottom: '10px' }}>📊 Progreso de Medidas</h4>
-                    <div className="glass-panel" style={{ padding: '15px', marginBottom: '20px' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px' }}>
-                        {(() => {
-                          const getReviewDiff = (key, dataHistory) => {
-                            const current = clientData.lastCompletedReview[key];
-                            if (current === undefined || !dataHistory || dataHistory.length < 2) return { current };
-                            const previous = dataHistory[dataHistory.length - 2]; // assuming the last is the current one
-                            const diff = current - previous;
-                            return { current, diff: diff.toFixed(1) };
-                          };
-                          const weightData = getReviewDiff('weight', clientData.weightHistory);
-                          const waistData = getReviewDiff('waist', clientData.waistHistory);
-                          const caderaData = getReviewDiff('cadera', clientData.caderaHistory);
-                          const cuelloData = getReviewDiff('cuello', clientData.cuelloHistory);
-                          const bicepsData = getReviewDiff('biceps', clientData.bicepsHistory);
-                          const piernaData = getReviewDiff('pierna', clientData.piernaHistory);
-                          
-                          const renderCard = (label, data, unit, lowerIsBetter) => {
-                            if (!data || data.current === undefined) return null;
-                            const isGood = lowerIsBetter ? data.diff < 0 : data.diff > 0;
-                            const diffColor = data.diff == 0 ? 'var(--text-muted)' : (isGood ? '#00e676' : '#ff1744');
-                            const diffSymbol = data.diff < 0 ? '▼' : (data.diff > 0 ? '▲' : '=');
-                            
-                            return (
-                              <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '8px' }}>
-                                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{label}</div>
-                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{data.current} {unit}</div>
-                                {data.diff !== undefined && (
-                                  <div style={{ fontSize: '0.8rem', color: diffColor, marginTop: '5px' }}>
-                                    {diffSymbol} {Math.abs(data.diff)} {unit}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          };
-                          
-                          return (
-                            <>
-                              {renderCard('Peso', weightData, 'kg', true)}
-                              {renderCard('Cintura', waistData, 'cm', true)}
-                              {renderCard('Cadera', caderaData, 'cm', true)}
-                              {renderCard('Cuello', cuelloData, 'cm', true)}
-                              {renderCard('Bíceps', bicepsData, 'cm', false)}
-                              {renderCard('Pierna', piernaData, 'cm', false)}
-                            </>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                    <h4 style={{ marginBottom: '10px' }}>📸 Tus Fotos Evaluadas</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '20px' }}>
-                      {['front', 'left', 'right', 'back'].map(view => {
-                        const photoUrl = clientData.lastCompletedReview.photos?.[view];
-                        const hasDrawing = !!clientData.lastCompletedReview.drawings?.[view];
-                        const labels = { front: 'Frontal', left: 'Lat. Izq.', right: 'Lat. Der.', back: 'Espalda' };
-                        return photoUrl ? (
-                          <div key={view} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                            <div 
-                              onClick={() => {
-                                setLargePhotoView(view);
-                                setToggledPhoto(false);
-                                setLargePhotoSource('completed');
-                              }}
-                              style={{ 
-                                aspectRatio: '3/4', 
-                                background: hasDrawing ? `url(${clientData.lastCompletedReview.drawings[view]}) center/cover no-repeat, url(${photoUrl}) center/cover no-repeat` : `url(${photoUrl}) center/cover no-repeat`, 
-                                borderRadius: '8px', 
-                                cursor: 'pointer', 
-                                border: hasDrawing ? '2px solid #ffaa00' : 'none' 
-                              }} 
-                            >
-                            </div>
-                            <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{labels[view]}</div>
-                          </div>
-                        ) : null;
-                      })}
-                    </div>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '20px' }}>(Haz clic en las fotos para ver en grande y leer los comentarios específicos)</p>
-                  </>
-                ) : (
-                  <>
-                    <div style={{ background: 'rgba(224, 248, 0, 0.1)', border: '1px solid var(--accent-primary)', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
-                      <h3 style={{ color: 'var(--accent-primary)', marginBottom: '5px' }}>📝 Preparar Revisión {timeScaleLabel}</h3>
-                      <p style={{ color: 'var(--text-main)', fontSize: '0.9rem' }}>Envía tus medidas y fotos actuales a tu entrenador para que pueda evaluar tu progreso y ajustar tu próxima rutina.</p>
-                    </div>
-                    
-                    <h4 style={{ marginBottom: '10px' }}>Tus Medidas Actuales</h4>
-                    <div className="responsive-grid-2" style={{ gap: '10px' }}>
-                      <input type="number" placeholder="Peso (kg)" className="input-field" style={{ margin: 0 }} value={reviewData.weight} onChange={e => setReviewData({...reviewData, weight: e.target.value})} />
-                      <input type="number" placeholder="Cintura (cm)" className="input-field" style={{ margin: 0 }} value={reviewData.waist} onChange={e => setReviewData({...reviewData, waist: e.target.value})} />
-                      <input type="number" placeholder="Cadera (cm)" className="input-field" style={{ margin: 0 }} value={reviewData.cadera} onChange={e => setReviewData({...reviewData, cadera: e.target.value})} />
-                      <input type="number" placeholder="Cuello (cm)" className="input-field" style={{ margin: 0 }} value={reviewData.cuello} onChange={e => setReviewData({...reviewData, cuello: e.target.value})} />
-                      <input type="number" placeholder="Bíceps (cm)" className="input-field" style={{ margin: 0 }} value={reviewData.biceps} onChange={e => setReviewData({...reviewData, biceps: e.target.value})} />
-                      <input type="number" placeholder="Pierna (cm)" className="input-field" style={{ margin: 0 }} value={reviewData.pierna} onChange={e => setReviewData({...reviewData, pierna: e.target.value})} />
-                    </div>
-
-                <h4 style={{ margin: '20px 0 10px 0' }}>Tus Fotos (Haz clic para subir)</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px', marginBottom: '20px' }}>
-                  {['front', 'left', 'right', 'back'].map(view => {
-                    const labels = { front: 'Frontal', left: 'Lateral Izq.', right: 'Lateral Der.', back: 'Espalda' };
-                    return (
-                      <div 
-                        key={view}
-                        onClick={() => handlePhotoUpload(view)}
-                        style={{
-                          aspectRatio: '3/4',
-                          background: reviewData.photos[view] ? `url(${reviewData.photos[view]}) center/cover` : 'rgba(255,255,255,0.05)',
-                          border: '2px dashed var(--border-light)',
-                          borderRadius: '8px',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          cursor: 'pointer',
-                          color: 'var(--text-muted)'
-                        }}
-                      >
-                        {!reviewData.photos[view] && labels[view]}
-                      </div>
-                    )
-                  })}
-                </div>
-
-                <h4 style={{ marginBottom: '10px' }}>Comentarios adicionales</h4>
-                <textarea 
-                  className="input-field" 
-                  style={{ width: '100%', minHeight: '100px', resize: 'vertical' }} 
-                  placeholder="¿Cómo te has sentido esta semana? ¿Alguna molestia o sugerencia?"
-                  value={reviewData.comments}
-                  onChange={e => setReviewData({...reviewData, comments: e.target.value})}
-                ></textarea>
-
-                <button 
-                  className="btn-primary" 
-                  style={{ width: '100%', padding: '15px', marginTop: '10px', fontSize: '1.1rem' }}
-                  onClick={() => {
-                    const requiredFields = ['weight', 'waist', 'cadera', 'cuello', 'biceps', 'pierna'];
-                    const isFormValid = requiredFields.every(field => reviewData[field] !== undefined && reviewData[field] !== '');
-                    if (!isFormValid) {
-                      alert('Por favor, rellena todas las medidas requeridas (Peso, Cintura, Cadera, Cuello, Bíceps, Pierna) antes de enviar la revisión.');
-                      return;
-                    }
-                    
-                    alert('¡Revisión enviada a tu entrenador con éxito!');
-                    setClientData({ ...clientData, pendingReviewData: { ...reviewData } });
-                    setIsModifyingReview(false);
-                    setActiveTab('workout');
-                  }}
-                >
-                  📤 Enviar Revisión
-                </button>
-                {isModifyingReview && (
-                  <button 
-                    style={{ width: '100%', padding: '15px', marginTop: '10px', fontSize: '1.1rem', background: 'transparent', border: '1px solid #ff4500', color: '#ff4500', borderRadius: '8px', cursor: 'pointer' }}
-                    onClick={() => setIsModifyingReview(false)}
-                  >
-                    Cancelar Edición
-                  </button>
-                )}
-                </>
-              )}
-
-                {/* Revisiones Anteriores */}
-                {clientData?.lastCompletedReview && (
-                  <div style={{ marginTop: '30px', borderTop: '1px solid var(--border-light)', paddingTop: '20px' }}>
-                    <h3 style={{ fontSize: '1.4rem', fontWeight: '800', marginBottom: '15px' }}>📅 Historial de Revisiones</h3>
-                    <div className="glass-panel" style={{ padding: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setShowEvaluationModal(true)}>
-                      <div>
-                        <h4 style={{ color: '#fff', marginBottom: '5px' }}>Revisión del {clientData.lastCompletedReview.reviewDate}</h4>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Evaluada por tu entrenador</p>
-                      </div>
-                      <div style={{ color: 'var(--accent-primary)', fontSize: '1.5rem' }}>👁️</div>
-                    </div>
-                  </div>
-                )}
-
-              </div>
+            {/* Pestaña: GALERÍA */}
+            {activeTab === 'gallery' && (
+              <GalleryTab />
             )}
           </div>
         )}
       </div>
 
       {/* Bottom Mobile Navigation */}
-      {hasCompletedOnboarding && (
+      {!(clientData && clientData.onboardingCompleted === false) && (
         <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px', background: 'rgba(10, 10, 12, 0.95)', backdropFilter: 'blur(20px)', borderTop: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-around', alignItems: 'center', zIndex: 500 }}>
           <button onClick={() => setActiveTab('workout')} style={{ background: 'transparent', border: 'none', color: activeTab === 'workout' ? 'var(--accent-primary)' : 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
             <span style={{ fontSize: '1.5rem' }}>🏋️</span>
@@ -1518,6 +1354,10 @@ export default function ClientDashboard({ user, onLogout }) {
           <button onClick={() => setActiveTab('review')} style={{ background: 'transparent', border: 'none', color: activeTab === 'review' ? 'var(--accent-primary)' : 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
             <span style={{ fontSize: '1.5rem' }}>📷</span>
             <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>Revisión</span>
+          </button>
+          <button onClick={() => setActiveTab('gallery')} style={{ background: 'transparent', border: 'none', color: activeTab === 'gallery' ? 'var(--accent-primary)' : 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+            <span style={{ fontSize: '1.5rem' }}>🖼️</span>
+            <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>Galería</span>
           </button>
           {hasNextRoutine && (
             <button onClick={() => setActiveTab('next_workout')} style={{ background: 'transparent', border: 'none', color: activeTab === 'next_workout' ? 'var(--accent-primary)' : 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>

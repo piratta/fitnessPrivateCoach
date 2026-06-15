@@ -6,7 +6,8 @@ import java.util.UUID;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
-@Table(name = "progress_logs")
+@Table(name = "progress_logs",
+       uniqueConstraints = @UniqueConstraint(name = "uk_progress_client_date", columnNames = {"client_id", "logDate"}))
 public class ProgressLog {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

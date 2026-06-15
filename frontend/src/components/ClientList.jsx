@@ -3,11 +3,15 @@ import { createPortal } from 'react-dom';
 import { MOCK_ROUTINES } from '../utils/mockRoutines';
 import { getChatMessages, addChatMessage, connectWebSocket, disconnectWebSocket, sendWebSocketMessage } from '../utils/chatStore';
 import { getClientBillingStatus } from '../utils/statusUtils';
+import { usersApi } from '../utils/api';
+import { useDialog } from './ui/Dialog';
 import { API_BASE_URL } from '../config';
 import '../index.css';
 
 export default function ClientList({ clients, setClients, billingPlans, onPlanRoutine, isChatMode }) {
+  const dialog = useDialog();
   const [selectedClient, setSelectedClient] = useState(null);
+  const [editingClient, setEditingClient] = useState(null); // { name, email }
   const [isAddingClient, setIsAddingClient] = useState(false);
   const [newClient, setNewClient] = useState({ name: '', email: '', goal: 'Hipertrofia', reviewFrequency: 'Semanal', billingPlanId: 'bp1' });
   const [searchTerm, setSearchTerm] = useState('');
@@ -272,9 +276,44 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
     }
   };
 
+  const handleSaveClientEdits = async () => {
+    if (!editingClient) return;
+    const name = (editingClient.name || '').trim();
+    const email = (editingClient.email || '').trim();
+    if (name.split(/\s+/).length < 3) {
+      await dialog.alert('Indica nombre y ambos apellidos.', { title: 'Datos incompletos' });
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      await dialog.alert('Introduce un email válido.', { title: 'Email inválido' });
+      return;
+    }
+    try {
+      const updated = await usersApi.updateClient(selectedClient.id, { name, email });
+      setSelectedClient(prev => ({ ...prev, name: updated.name, email: updated.email }));
+      setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, name: updated.name, email: updated.email } : c));
+      setEditingClient(null);
+      dialog.toast('Datos del cliente actualizados', { variant: 'success' });
+    } catch (e) {
+      await dialog.alert(e.message || 'No se pudo actualizar el cliente.', { title: 'Error' });
+    }
+  };
+
+  const handleResetPassword = async () => {
+    const ok = await dialog.confirm(`Se generará una nueva contraseña temporal para ${selectedClient.name}. La actual dejará de funcionar. ¿Continuar?`, { danger: true, confirmText: 'Regenerar' });
+    if (!ok) return;
+    try {
+      const creds = await usersApi.resetClientPassword(selectedClient.id);
+      setCreatedClientInfo({ ...creds, isReset: true });
+    } catch (e) {
+      await dialog.alert(e.message || 'No se pudo regenerar la contraseña.', { title: 'Error' });
+    }
+  };
+
   const handleCopyCredentials = () => {
     if (!createdClientInfo) return;
-    const textToCopy = `Nombre: ${createdClientInfo.name}\nEmail: ${createdClientInfo.email}\nUsuario: ${createdClientInfo.username}\nContraseña: ${createdClientInfo.username}`;
+    const pwd = createdClientInfo.password || createdClientInfo.username;
+    const textToCopy = `Nombre: ${createdClientInfo.name}\nEmail: ${createdClientInfo.email}\nUsuario: ${createdClientInfo.username}\nContraseña: ${pwd}`;
     navigator.clipboard.writeText(textToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -624,7 +663,33 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
               </div>
               <button onClick={() => setSelectedClient(null)} style={{ background: 'transparent', border: '1px solid var(--border-light)', borderRadius: '50%', width: '40px', height: '40px', color: 'var(--text-main)', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
             </div>
-            
+
+            {/* Edición de datos del cliente */}
+            {editingClient ? (
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--accent-primary)', borderRadius: '12px', padding: '20px', marginBottom: '25px' }}>
+                <h4 style={{ color: 'var(--accent-primary)', marginBottom: '15px' }}>Editar datos</h4>
+                <div className="responsive-grid-2" style={{ gap: '12px', marginBottom: '15px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Nombre y apellidos</label>
+                    <input className="input-field" style={{ margin: 0, width: '100%' }} value={editingClient.name} onChange={e => setEditingClient({ ...editingClient, name: e.target.value })} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Email</label>
+                    <input type="email" className="input-field" style={{ margin: 0, width: '100%' }} value={editingClient.email} onChange={e => setEditingClient({ ...editingClient, email: e.target.value })} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button onClick={() => setEditingClient(null)} style={{ flex: 1, padding: '10px', background: 'transparent', border: '1px solid var(--border-light)', color: '#fff', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Cancelar</button>
+                  <button onClick={handleSaveClientEdits} style={{ flex: 2, padding: '10px', background: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>💾 Guardar</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '25px' }}>
+                <button onClick={() => setEditingClient({ name: selectedClient.name, email: selectedClient.email })} style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-light)', color: '#fff', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}>✏️ Editar nombre / email</button>
+                <button onClick={handleResetPassword} style={{ padding: '8px 16px', background: 'rgba(255,170,0,0.1)', border: '1px solid #ffaa00', color: '#ffaa00', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}>🔑 Regenerar contraseña</button>
+              </div>
+            )}
+
             {/* Tarjetas de Estadísticas */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '40px' }}>
               <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '20px', borderRadius: '12px', textAlign: 'center' }}>
