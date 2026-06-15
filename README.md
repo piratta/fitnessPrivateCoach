@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # PrivateFitness App - Tu Entrenador Personal en el Bolsillo
 
 Bienvenido a **PrivateFitness**, la plataforma premium diseñada para transformar la manera en la que los entrenadores gestionan a sus clientes, y la manera en la que los clientes experimentan sus entrenamientos. Olvídate de los excels anticuados y los mensajes de WhatsApp perdidos; aquí todo es profesional, rápido y claro.
