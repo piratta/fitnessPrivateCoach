@@ -3,6 +3,7 @@ package com.example.fitnessapp.model;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.util.UUID;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "progress_logs")
@@ -13,6 +14,7 @@ public class ProgressLog {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "client_id", nullable = false)
+    @JsonIgnore
     private User client;
 
     @Column(nullable = false)

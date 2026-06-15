@@ -21,43 +21,68 @@ export default function ClientDashboard({ user, onLogout }) {
   const [hasAcceptedEvaluation, setHasAcceptedEvaluation] = useState(false);
   const [expandedChart, setExpandedChart] = useState(null);
 
-  useEffect(() => {
-    // For demo purposes, we fetch the updated mock client
-    if (user?.email) {
-      const mockUser = MOCK_CLIENTS.find(c => c.email === user.email);
-      if (mockUser) {
-        setClientData(mockUser);
-        if (mockUser.weightHistory?.length) {
-          setSelectedMonths([Math.max(0, mockUser.weightHistory.length - 1)]);
+  const [progressHistory, setProgressHistory] = useState([]);
+  const [showLogModal, setShowLogModal] = useState(false);
+  const [logForm, setLogForm] = useState({
+    logDate: new Date().toISOString().split('T')[0],
+    weight: '',
+    waist: '',
+    hip: '',
+    neck: '',
+    biceps: '',
+    leg: ''
+  });
+
+  const fetchProfile = () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    fetch(`${API_BASE_URL}/api/users/me`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(res => res.json())
+    .then(data => {
+      let parsedRoutine = null;
+      if (data.routineJson) {
+        try {
+          parsedRoutine = JSON.parse(data.routineJson);
+        } catch (e) {
+          console.error("Error parsing routineJson", e);
         }
+      }
+      const hasRoutine = !!(parsedRoutine && Object.keys(parsedRoutine).some(day => parsedRoutine[day] && parsedRoutine[day].length > 0));
+      
+      setClientData(prev => ({
+        ...prev,
+        ...data,
+        routine: parsedRoutine,
+        hasRoutine: hasRoutine
+      }));
+    })
+    .catch(err => console.error("Error fetching profile", err));
+  };
+
+  const fetchProgressHistory = () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    fetch(`${API_BASE_URL}/api/progress/history`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(res => res.json())
+    .then(data => {
+      setProgressHistory(data);
+      if (data.length > 0) {
+        setSelectedMonths([Math.max(0, data.length - 1)]);
       } else {
-        setClientData({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          username: user.username,
-          status: user.status || 'Activo',
-          weight: 'N/A',
-          goal: user.goal || 'Hipertrofia',
-          billingPlanId: user.billingPlanId || 'bp1',
-          completion: 0,
-          nextReview: 'Pendiente',
-          weightHistory: [0],
-          adherenceHistory: [0],
-          waistHistory: [0],
-          caderaHistory: [0],
-          cuelloHistory: [0],
-          bicepsHistory: [0],
-          piernaHistory: [0],
-          volumeHistory: [0],
-          messages: [],
-          hasRoutine: false,
-          reviewFrequency: user.reviewFrequency || 'Semanal'
-        });
         setSelectedMonths([0]);
       }
-    }
-  }, [user, activeTab]); // re-fetch if tab changes to simulate "polling" or refreshing 
+    })
+    .catch(err => console.error("Error fetching progress history", err));
+  };
+
+  useEffect(() => {
+    fetchProfile();
+    fetchProgressHistory();
+  }, [user, activeTab]);
 
   const getTimeScaleLabel = () => {
     if (!clientData?.reviewFrequency) return 'Mes';
@@ -136,29 +161,47 @@ export default function ClientDashboard({ user, onLogout }) {
   };
 
   // Workout Tracker States
-  const routineDays = Object.keys(MOCK_ROUTINES);
-  const [selectedDay, setSelectedDay] = useState(routineDays[0]);
+  const routineDays = clientData?.routine ? Object.keys(clientData.routine) : [];
+  const [selectedDay, setSelectedDay] = useState('');
   const [skippedDays, setSkippedDays] = useState({});
 
   const [comments, setComments] = useState({}); // { [day_exIdx]: string }
   const [videoLinks, setVideoLinks] = useState({});
-  const [logs, setLogs] = useState(() => {
-    const initialLogs = {};
-    routineDays.forEach(day => {
-      initialLogs[day] = {};
-      const sorted = [...MOCK_ROUTINES[day]].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
-      sorted.forEach((ex, exIdx) => {
-        const match = ex.reps.match(/(\d+)x(.*)/);
-        const setsCount = match ? parseInt(match[1]) : 3;
-        const targetReps = match ? match[2].trim() : ex.reps;
-        initialLogs[day][exIdx] = Array.from({ length: setsCount }).map(() => ({ weight: '', reps: targetReps, completed: false, skipped: false }));
-      });
-    });
-    return initialLogs;
-  });
+  const [logs, setLogs] = useState({});
 
-  const activeWorkout = [...MOCK_ROUTINES[selectedDay]].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
-  const currentLogs = logs[selectedDay];
+  // Initialize selectedDay when routine is loaded
+  useEffect(() => {
+    if (clientData?.routine) {
+      const days = Object.keys(clientData.routine);
+      if (days.length > 0 && !selectedDay) {
+        setSelectedDay(days[0]);
+      }
+    }
+  }, [clientData?.routine]);
+
+  // Initialize logs dynamically when routine changes
+  useEffect(() => {
+    if (clientData?.routine) {
+      const initialLogs = {};
+      Object.keys(clientData.routine).forEach(day => {
+        initialLogs[day] = {};
+        const exercises = clientData.routine[day] || [];
+        const sorted = [...exercises].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
+        sorted.forEach((ex, exIdx) => {
+          const match = ex.reps ? ex.reps.match(/(\d+)x(.*)/) : null;
+          const setsCount = match ? parseInt(match[1]) : 3;
+          const targetReps = match ? match[2].trim() : (ex.reps || '10');
+          initialLogs[day][exIdx] = Array.from({ length: setsCount }).map(() => ({ weight: '', reps: targetReps, completed: false, skipped: false }));
+        });
+      });
+      setLogs(initialLogs);
+    }
+  }, [clientData?.routine]);
+
+  const activeWorkout = (clientData?.routine && selectedDay && clientData.routine[selectedDay])
+    ? [...clientData.routine[selectedDay]].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1))
+    : [];
+  const currentLogs = (logs && selectedDay) ? logs[selectedDay] : null;
   const isDaySkipped = skippedDays[selectedDay];
   
   // Inline Editing State for Locked Workouts
@@ -384,6 +427,57 @@ export default function ClientDashboard({ user, onLogout }) {
     }
   };
 
+  const handleSaveProgress = async (e) => {
+    if (e) e.preventDefault();
+    if (!logForm.logDate) {
+      alert("Por favor, selecciona una fecha.");
+      return;
+    }
+    if (!logForm.weight || logForm.weight.toString().trim() === '') {
+      alert("Por favor, introduce al menos el peso.");
+      return;
+    }
+    
+    const token = localStorage.getItem('token');
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/progress`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          logDate: logForm.logDate,
+          weight: logForm.weight ? parseFloat(logForm.weight) : null,
+          waist: logForm.waist ? parseFloat(logForm.waist) : null,
+          hip: logForm.hip ? parseFloat(logForm.hip) : null,
+          neck: logForm.neck ? parseFloat(logForm.neck) : null,
+          biceps: logForm.biceps ? parseFloat(logForm.biceps) : null,
+          leg: logForm.leg ? parseFloat(logForm.leg) : null
+        })
+      });
+      if (response.ok) {
+        alert("Medición registrada con éxito.");
+        setShowLogModal(false);
+        setLogForm({
+          logDate: new Date().toISOString().split('T')[0],
+          weight: '',
+          waist: '',
+          hip: '',
+          neck: '',
+          biceps: '',
+          leg: ''
+        });
+        fetchProgressHistory();
+      } else {
+        alert("Error al registrar la medición.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error de red.");
+    }
+  };
+
   const handleStartWorkout = () => {
     if (hasFinishedSession) {
       if (!window.confirm("Ya has completado un entrenamiento en esta sesión. ¿Estás seguro de que quieres volver a empezar?")) {
@@ -396,6 +490,24 @@ export default function ClientDashboard({ user, onLogout }) {
     setIsWorkoutStarted(true);
   };
 
+  const progressDates = progressHistory.map(l => {
+    if (!l.logDate) return '';
+    const parts = l.logDate.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}`;
+    }
+    return l.logDate;
+  });
+
+  const weightHistory = progressHistory.length > 0 ? progressHistory.map(l => l.weight || 0) : (clientData?.weightHistory || [0]);
+  const waistHistory = progressHistory.length > 0 ? progressHistory.map(l => l.waist || 0) : (clientData?.waistHistory || [0]);
+  const caderaHistory = progressHistory.length > 0 ? progressHistory.map(l => l.hip || 0) : (clientData?.caderaHistory || [0]);
+  const cuelloHistory = progressHistory.length > 0 ? progressHistory.map(l => l.neck || 0) : (clientData?.cuelloHistory || [0]);
+  const bicepsHistory = progressHistory.length > 0 ? progressHistory.map(l => l.biceps || 0) : (clientData?.bicepsHistory || [0]);
+  const piernaHistory = progressHistory.length > 0 ? progressHistory.map(l => l.leg || 0) : (clientData?.piernaHistory || [0]);
+  const volumeHistory = clientData?.volumeHistory || [4500, 4800, 5200, 5500, 5800, 6000, 6500, 7000, 7500, 7800, 8200, 8500];
+  const adherenceHistory = clientData?.adherenceHistory || [90, 85, 95, 90, 100, 80, 95, 90, 100, 100, 95, 95];
+
   const renderChart = (type = chartType) => {
     let history = [];
     let color = 'var(--accent-primary)';
@@ -403,41 +515,41 @@ export default function ClientDashboard({ user, onLogout }) {
     let title = '';
 
     if (type === 'weight') {
-      history = clientData?.weightHistory;
+      history = weightHistory;
       unit = 'kg';
       title = 'Evolución del Peso Corporal';
     } else if (type === 'adherence') {
-      history = clientData?.adherenceHistory;
+      history = adherenceHistory;
       unit = '%';
       title = 'Cumplimiento de Rutina';
       color = '#00f2fe'; // Azul Neón
     } else if (type === 'waist') {
-      history = clientData?.waistHistory;
+      history = waistHistory;
       unit = 'cm';
       title = 'Perímetro de Cintura';
       color = '#ff0844'; // Rojo Neón
     } else if (type === 'cadera') {
-      history = clientData?.caderaHistory;
+      history = caderaHistory;
       unit = 'cm';
       title = 'Perímetro de Cadera';
       color = '#bb00ff'; // Morado Neón
     } else if (type === 'cuello') {
-      history = clientData?.cuelloHistory;
+      history = cuelloHistory;
       unit = 'cm';
       title = 'Perímetro de Cuello';
       color = '#00ff88'; // Verde Neón
     } else if (type === 'biceps') {
-      history = clientData?.bicepsHistory;
+      history = bicepsHistory;
       unit = 'cm';
       title = 'Perímetro de Bíceps';
       color = '#ff00aa'; // Rosa Neón
     } else if (type === 'pierna') {
-      history = clientData?.piernaHistory;
+      history = piernaHistory;
       unit = 'cm';
       title = 'Perímetro de Pierna';
       color = '#00d2ff'; // Cian Oscuro Neón
     } else if (type === 'volume') {
-      history = clientData?.volumeHistory;
+      history = volumeHistory;
       unit = 'kg';
       title = 'Volumen Total Levantado';
       color = '#ffaa00'; // Naranja
@@ -484,13 +596,22 @@ export default function ClientDashboard({ user, onLogout }) {
             <polyline points={points} fill="none" stroke={color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" style={{ filter: `drop-shadow(0px 8px 12px ${color}40)` }} />
             
             {/* Points and Labels */}
-            {history.map((val, index) => (
-              <g key={index} style={{ transition: 'all 0.3s' }}>
-                <circle cx={getX(index)} cy={getY(val)} r="8" fill="#0a0a0c" stroke={color} strokeWidth="3" style={{ cursor: 'pointer' }} />
-                <text x={getX(index)} y={getY(val) - 20} fill={color} fontSize="16" fontWeight="800" textAnchor="middle" fontFamily="Outfit" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>{val}{unit}</text>
-                <text x={getX(index)} y={svgHeight - 5} fill="var(--text-muted)" fontSize="13" fontWeight="600" textAnchor="middle" textTransform="uppercase" fontFamily="Outfit" letterSpacing="1px">Mes {index + 1}</text>
-              </g>
-            ))}
+            {history.map((val, index) => {
+              let label = `Mes ${index + 1}`;
+              if (type !== 'adherence' && type !== 'volume' && progressDates[index]) {
+                label = progressDates[index];
+              } else if ((type === 'adherence' || type === 'volume') && clientData?.reviewFrequency) {
+                const labelType = clientData.reviewFrequency.toLowerCase().includes('semana') ? 'Semana' : 'Mes';
+                label = `${labelType} ${index + 1}`;
+              }
+              return (
+                <g key={index} style={{ transition: 'all 0.3s' }}>
+                  <circle cx={getX(index)} cy={getY(val)} r="8" fill="#0a0a0c" stroke={color} strokeWidth="3" style={{ cursor: 'pointer' }} />
+                  <text x={getX(index)} y={getY(val) - 20} fill={color} fontSize="16" fontWeight="800" textAnchor="middle" fontFamily="Outfit" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>{val}{unit}</text>
+                  <text x={getX(index)} y={svgHeight - 5} fill="var(--text-muted)" fontSize="13" fontWeight="600" textAnchor="middle" textTransform="uppercase" fontFamily="Outfit" letterSpacing="1px">{label}</text>
+                </g>
+              );
+            })}
           </svg>
         </div>
       </div>
@@ -569,7 +690,19 @@ export default function ClientDashboard({ user, onLogout }) {
             
             {/* Pestaña: ENTRENAR */}
             {activeTab === 'workout' && (
-              <div>
+              !clientData?.hasRoutine ? (
+                <div className="glass-panel fade-in" style={{ padding: '60px 20px', textAlign: 'center', marginTop: '20px', borderTop: '4px solid var(--accent-primary)' }}>
+                  <div style={{ fontSize: '4rem', marginBottom: '20px' }}>🏋️‍♂️</div>
+                  <h3 style={{ fontSize: '1.8rem', fontWeight: '800', marginBottom: '10px', color: '#fff' }}>Sin Rutina Asignada</h3>
+                  <p style={{ color: 'var(--text-muted)', maxWidth: '400px', margin: '0 auto 20px auto', lineHeight: '1.6' }}>
+                    Tu entrenador aún está preparando tu plan de entrenamiento personalizado. ¡Te notificaremos tan pronto como esté listo!
+                  </p>
+                  <div style={{ display: 'inline-block', padding: '10px 20px', background: 'rgba(224, 248, 0, 0.1)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                    Frecuencia de revisión: {clientData?.reviewFrequency || 'Semanal'}
+                  </div>
+                </div>
+              ) : (
+                <div>
                 
                 {/* Estrategia asignada */}
                 <div style={{ background: 'rgba(224, 248, 0, 0.05)', border: '1px dashed var(--accent-primary)', padding: '10px 15px', borderRadius: '8px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -781,6 +914,7 @@ export default function ClientDashboard({ user, onLogout }) {
                   </div>
                 )}
               </div>
+              )
             )}
 
             {/* Pestaña: PROGRESO */}
@@ -790,11 +924,54 @@ export default function ClientDashboard({ user, onLogout }) {
 
                 <div className="glass-panel" style={{ padding: '25px', marginBottom: '25px' }}>
                   <h4 style={{ color: 'var(--accent-primary)', marginBottom: '15px' }}>⚖️ Registro Diario</h4>
-                  <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <input type="number" step="0.1" value={dailyWeight} onChange={(e) => setDailyWeight(e.target.value)} style={{ width: '100px', padding: '15px', fontSize: '1.5rem', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '8px', color: '#fff', textAlign: 'center' }} />
                     <span style={{ fontSize: '1.2rem', color: 'var(--text-muted)' }}>kg</span>
-                    <button style={{ marginLeft: 'auto', padding: '12px 20px', background: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '6px', fontWeight: 'bold' }}>Guardar Peso</button>
+                    <button 
+                      onClick={async () => {
+                        if (!dailyWeight || dailyWeight.toString().trim() === '') {
+                          alert("Por favor, introduce un peso válido.");
+                          return;
+                        }
+                        const token = localStorage.getItem('token');
+                        try {
+                          const response = await fetch(`${API_BASE_URL}/api/progress`, {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify({
+                              logDate: new Date().toISOString().split('T')[0],
+                              weight: parseFloat(dailyWeight)
+                            })
+                          });
+                          if (response.ok) {
+                            alert("Peso diario guardado con éxito.");
+                            fetchProgressHistory();
+                          } else {
+                            alert("Error al guardar el peso.");
+                          }
+                        } catch (err) {
+                          console.error(err);
+                          alert("Error de red.");
+                        }
+                      }}
+                      style={{ marginLeft: 'auto', padding: '12px 20px', background: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}
+                    >
+                      Guardar Peso
+                    </button>
                   </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '15px', marginBottom: '25px' }}>
+                  <button 
+                    onClick={() => setShowLogModal(true)} 
+                    className="btn-primary" 
+                    style={{ flex: 1, padding: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', fontWeight: 'bold' }}
+                  >
+                    📅 Registrar Medidas Históricas / Pasadas
+                  </button>
                 </div>
 
 
@@ -815,8 +992,8 @@ export default function ClientDashboard({ user, onLogout }) {
                               setSelectedMonths(newMonths);
                             }}
                           >
-                            {clientData?.weightHistory?.map((_, idx) => (
-                              <option key={idx} value={idx}>{idx === clientData.weightHistory.length - 1 ? 'Actual' : `${timeScaleLabel} ${idx + 1}`}</option>
+                            {weightHistory.map((_, idx) => (
+                              <option key={idx} value={idx}>{idx === weightHistory.length - 1 ? 'Actual' : (progressDates[idx] ? progressDates[idx] : `${timeScaleLabel} ${idx + 1}`)}</option>
                             ))}
                           </select>
                           {selectedMonths.length > 2 && (
@@ -827,7 +1004,7 @@ export default function ClientDashboard({ user, onLogout }) {
                           )}
                         </div>
                       ))}
-                      {selectedMonths.length < 3 && clientData?.weightHistory && (
+                      {selectedMonths.length < 3 && weightHistory.length > 0 && (
                         <button 
                           onClick={() => {
                             const minSelected = Math.min(...selectedMonths);
@@ -835,8 +1012,7 @@ export default function ClientDashboard({ user, onLogout }) {
                             if (!selectedMonths.includes(nextToAdd)) {
                                 setSelectedMonths([...selectedMonths, nextToAdd]);
                             } else {
-                                // Fallback just in case minSelected-1 is already added (shouldn't happen with standard usage)
-                                const available = clientData.weightHistory.map((_, i) => i).filter(i => !selectedMonths.includes(i));
+                                const available = weightHistory.map((_, i) => i).filter(i => !selectedMonths.includes(i));
                                 if (available.length > 0) setSelectedMonths([...selectedMonths, available[available.length - 1]]);
                             }
                           }}
@@ -855,7 +1031,7 @@ export default function ClientDashboard({ user, onLogout }) {
                           <th style={{ padding: '12px', textAlign: 'left' }}>Métrica</th>
                           {selectedMonths.map((m, i) => (
                             <Fragment key={i}>
-                              <th style={{ padding: '12px' }}>{m === clientData.weightHistory.length - 1 ? 'Actual' : `${timeScaleLabel} ${m + 1}`}</th>
+                              <th style={{ padding: '12px' }}>{m === weightHistory.length - 1 ? 'Actual' : (progressDates[m] ? progressDates[m] : `${timeScaleLabel} ${m + 1}`)}</th>
                               {i < selectedMonths.length - 1 && (
                                 <th style={{ padding: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Dif.</th>
                               )}
@@ -865,12 +1041,12 @@ export default function ClientDashboard({ user, onLogout }) {
                       </thead>
                       <tbody>
                         {[
-                          { label: 'Peso Corpor.', key: 'weight', data: clientData?.weightHistory || [], unit: 'kg', lowerIsBetter: clientData?.goal === 'Pérdida de Grasa' },
-                          { label: 'Cintura', key: 'waist', data: clientData?.waistHistory || [], unit: 'cm', lowerIsBetter: true },
-                          { label: 'Cadera', key: 'cadera', data: clientData?.caderaHistory || [], unit: 'cm', lowerIsBetter: true },
-                          { label: 'Cuello', key: 'cuello', data: clientData?.cuelloHistory || [], unit: 'cm', lowerIsBetter: false },
-                          { label: 'Bíceps', key: 'biceps', data: clientData?.bicepsHistory || [], unit: 'cm', lowerIsBetter: false },
-                          { label: 'Pierna', key: 'pierna', data: clientData?.piernaHistory || [], unit: 'cm', lowerIsBetter: false },
+                          { label: 'Peso Corpor.', key: 'weight', data: weightHistory, unit: 'kg', lowerIsBetter: clientData?.goal === 'Pérdida de Grasa' },
+                          { label: 'Cintura', key: 'waist', data: waistHistory, unit: 'cm', lowerIsBetter: true },
+                          { label: 'Cadera', key: 'cadera', data: caderaHistory, unit: 'cm', lowerIsBetter: true },
+                          { label: 'Cuello', key: 'cuello', data: cuelloHistory, unit: 'cm', lowerIsBetter: false },
+                          { label: 'Bíceps', key: 'biceps', data: bicepsHistory, unit: 'cm', lowerIsBetter: false },
+                          { label: 'Pierna', key: 'pierna', data: piernaHistory, unit: 'cm', lowerIsBetter: false },
                         ].map((row, idx) => (
                           <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                             <td style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>{row.label}</td>
@@ -1523,6 +1699,58 @@ export default function ClientDashboard({ user, onLogout }) {
             </div>
           );
         })(), document.body
+      )}
+
+      {/* Modal Registrar Medidas Pasadas */}
+      {showLogModal && createPortal(
+        <div className="fade-in" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
+          <form onSubmit={handleSaveProgress} className="glass-panel" style={{ width: '100%', maxWidth: '500px', display: 'flex', flexDirection: 'column', padding: '30px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border-light)', paddingBottom: '15px' }}>
+              <h3 style={{ fontSize: '1.4rem', fontWeight: 'bold', color: 'var(--accent-primary)' }}>Registrar Medidas Pasadas</h3>
+              <button type="button" onClick={() => setShowLogModal(false)} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '1.5rem', cursor: 'pointer' }}>✖</button>
+            </div>
+            
+            <div style={{ overflowY: 'auto', flex: 1, paddingRight: '5px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Fecha de la Medición</label>
+                <input type="date" required value={logForm.logDate} onChange={e => setLogForm({...logForm, logDate: e.target.value})} className="input-field" style={{ colorScheme: 'dark', margin: 0, width: '100%' }} />
+              </div>
+
+              <div className="responsive-grid-2" style={{ gap: '15px' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Peso (kg) *</label>
+                  <input type="number" step="0.1" required placeholder="Ej. 78.5" value={logForm.weight} onChange={e => setLogForm({...logForm, weight: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Cintura (cm)</label>
+                  <input type="number" step="0.1" placeholder="Ej. 84.0" value={logForm.waist} onChange={e => setLogForm({...logForm, waist: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Cadera (cm)</label>
+                  <input type="number" step="0.1" placeholder="Ej. 98.0" value={logForm.hip} onChange={e => setLogForm({...logForm, hip: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Cuello (cm)</label>
+                  <input type="number" step="0.1" placeholder="Ej. 38.0" value={logForm.neck} onChange={e => setLogForm({...logForm, neck: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Bíceps (cm)</label>
+                  <input type="number" step="0.1" placeholder="Ej. 36.5" value={logForm.biceps} onChange={e => setLogForm({...logForm, biceps: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Pierna (cm)</label>
+                  <input type="number" step="0.1" placeholder="Ej. 58.0" value={logForm.leg} onChange={e => setLogForm({...logForm, leg: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: '20px', display: 'flex', gap: '15px' }}>
+              <button type="button" onClick={() => setShowLogModal(false)} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid var(--border-light)', color: '#fff', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Cancelar</button>
+              <button type="submit" style={{ flex: 2, padding: '12px', background: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Guardar Medidas</button>
+            </div>
+          </form>
+        </div>,
+        document.body
       )}
 
     </div>

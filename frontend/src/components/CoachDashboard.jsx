@@ -26,9 +26,57 @@ export default function CoachDashboard({ user, onLogout }) {
     Domingo: []
   };
 
+  const davidRoutine = {
+    Lunes: [
+      { name: 'Press banca plano con mancuerna', reps: '3x6', intensity: 'RIR 2', notes: 'Peso: 25 KG', isOptional: false },
+      { name: 'Contractor (peck deck)', reps: '3x12', intensity: 'Al fallo', notes: 'Peso: 54 KG (2 series x 12-14 reps + 1 serie x 5-7 reps)', isOptional: false },
+      { name: 'Aperturas en polea media sentado', reps: '3x12-14', intensity: 'Al fallo', notes: 'Peso: 10 KG. Banco inclinado', isOptional: false },
+      { name: 'Elevación lateral unilateral en banco inclinado', reps: '5xFallo', intensity: 'Al fallo', notes: 'Peso: 7.5 KG', isOptional: false },
+      { name: 'Extensión tríceps katana en banco scott invertido', reps: '3x12-14', intensity: 'Al fallo', notes: '', isOptional: false },
+      { name: 'Extensión tríceps polea alta', reps: '4x12-14', intensity: 'Al fallo', notes: 'Peso: 20 KG', isOptional: false },
+      { name: 'Plancha abdominal', reps: '3x1\'', intensity: 'Al fallo', notes: '', isOptional: false }
+    ],
+    Martes: [
+      { name: 'Remo dorian', reps: '3x10', intensity: 'Al fallo', notes: 'Peso: 40 KG', isOptional: false },
+      { name: 'Jalón al pecho unilateral', reps: '2x12-14', intensity: 'Al fallo', notes: 'Peso: 27.5 KG', isOptional: false },
+      { name: 'Dominadas', reps: '3xFallo', intensity: 'Al fallo', notes: 'Peso: 8 / 7 / 8 KG', isOptional: false },
+      { name: 'Remo gironda unilateral', reps: '2x10-12', intensity: 'Al fallo', notes: 'Peso: 42.5 KG', isOptional: false },
+      { name: 'Pájaro posterior unilateral en polea media (muñequera)', reps: '3x12-14', intensity: 'Al fallo', notes: 'Peso: 12.5 KG', isOptional: false },
+      { name: 'Curl bíceps bayesian', reps: '3x10', intensity: 'Al fallo', notes: 'Peso: 12.5 KG', isOptional: false },
+      { name: 'Curl bíceps mancuerna unilateral', reps: '3x10', intensity: 'Al fallo', notes: 'Peso: 10 / 10 / 7.5 KG', isOptional: false }
+    ],
+    Miércoles: [
+      { name: 'BELT SQ / globet sq tempo 600', reps: '3x5', intensity: 'RPE 9', notes: 'Peso: 20 KG. Tempo: 6 (Globet con rusa)', isOptional: false },
+      { name: 'Extensión de cuadriceps unilateral', reps: '2x12-14', intensity: 'Al fallo', notes: 'Peso: 25 KG. Por lado', isOptional: false },
+      { name: 'Prensa horizontal', reps: '3x10', intensity: 'Al fallo', notes: 'Peso: 95 / 125 / 125 KG. Ko técnico, ayuda al final', isOptional: false },
+      { name: 'Aductor en máquina', reps: '3x10-15', intensity: 'Al fallo', notes: 'Peso: 153 KG', isOptional: false },
+      { name: 'Sentadilla búlgara', reps: '2x12-14', intensity: 'Al fallo', notes: '', isOptional: false },
+      { name: 'Curl femoral tumbado unilateral', reps: '2x10-15', intensity: 'Al fallo', notes: '', isOptional: false }
+    ],
+    Jueves: [
+      { name: 'Press banca declinado', reps: '3x7', intensity: 'RPE 9', notes: 'Peso: 20/20 KG', isOptional: true },
+      { name: 'Cruces de polea', reps: '3x12-14', intensity: 'Al fallo', notes: 'Peso: 45/45 KG. Altura media', isOptional: true },
+      { name: 'Egyptian lateral raises (polea)', reps: '3x10-12', intensity: 'Al fallo', notes: 'Peso: 20 o 25 / 30 KG', isOptional: true },
+      { name: 'Press militar en máquina unilateral', reps: '3x6-8', intensity: 'RPE 9', notes: '', isOptional: true },
+      { name: 'Press francés', reps: '2x12-14', intensity: 'Al fallo', notes: 'Peso: 17.5 KG', isOptional: true },
+      { name: 'Flexiones de diamante', reps: '2x10', intensity: 'Al fallo', notes: '', isOptional: true },
+      { name: 'Plancha lateral', reps: '2x30"', intensity: 'Al fallo', notes: '', isOptional: true }
+    ],
+    Viernes: [
+      { name: 'Pull over', reps: '3x12-14', intensity: 'Al fallo', notes: '', isOptional: true },
+      { name: 'Remo alto en máquina', reps: '3x10', intensity: 'Al fallo', notes: '', isOptional: true },
+      { name: 'Seal row', reps: '2x10', intensity: 'Al fallo', notes: '', isOptional: true },
+      { name: 'Curl bíceps barra en polea alta', reps: '2x12-14', intensity: 'Al fallo', notes: '', isOptional: true },
+      { name: 'Curl bíceps barra romana', reps: '3x10-12', intensity: 'Al fallo', notes: '', isOptional: true }
+    ],
+    Sábado: [],
+    Domingo: []
+  };
+
   const [templates, setTemplates] = useState([
     { id: 't1', title: 'Hipertrofia 4 Días (Torso/Pierna)', description: 'Rutina clásica de hipertrofia con frecuencia 2.', routine: sampleRoutine },
-    { id: 't2', title: 'Fuerza 3 Días (Full Body)', description: 'Rutina de fuerza enfocada en los básicos.', routine: sampleRoutine }
+    { id: 't2', title: 'Fuerza 3 Días (Full Body)', description: 'Rutina de fuerza enfocada en los básicos.', routine: sampleRoutine },
+    { id: 't3', title: 'rutina david', description: 'Rutina David (Bloque 1) - Frecuencia 2 y Pierna.', routine: davidRoutine }
   ]);
 
   const [billingPlans, setBillingPlans] = useState([
@@ -75,7 +123,10 @@ export default function CoachDashboard({ user, onLogout }) {
           piernaHistory: existingMock ? existingMock.piernaHistory : [0],
           volumeHistory: existingMock ? existingMock.volumeHistory : [0],
           messages: [],
-          hasRoutine: existingMock ? existingMock.hasRoutine : false,
+          hasRoutine: u.routineJson ? true : (existingMock ? existingMock.hasRoutine : false),
+          routineJson: u.routineJson,
+          routine: u.routineJson ? JSON.parse(u.routineJson) : null,
+          progressionStrategy: u.progressionStrategy || 'Sobrecarga Progresiva (Subir peso)',
           reviewFrequency: u.reviewFrequency || 'Semanal'
         };
       });

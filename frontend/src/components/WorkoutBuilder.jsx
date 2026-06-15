@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import SearchableExerciseSelect from './SearchableExerciseSelect';
+import { API_BASE_URL } from '../config';
 import '../index.css';
 
 const DAYS_OF_WEEK = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -328,7 +329,7 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
         <button type="button" onClick={exportToExcel} style={{ flex: 1, background: '#107c41', color: '#fff', border: 'none', padding: '14px', borderRadius: '8px', cursor: 'pointer', fontWeight: '800', transition: 'all 0.3s' }}>
           📊 Exportar a Excel (CSV)
         </button>
-        <button type="button" className="btn-primary" style={{ flex: 2 }} onClick={() => {
+        <button type="button" className="btn-primary" style={{ flex: 2 }} onClick={async () => {
           if (isTemplateMode) {
             alert("Plantilla maestra guardada con éxito.");
           } else {
@@ -336,12 +337,35 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
               alert("Por favor, selecciona un cliente primero.");
               return;
             }
-            if (setClients) {
-              setClients(prev => prev.map(c => 
-                c.name === selectedClient ? { ...c, hasRoutine: true, routine: JSON.parse(JSON.stringify(weeklyRoutine)) } : c
-              ));
+            const clientObj = clients.find(c => c.name === selectedClient);
+            if (!clientObj) {
+              alert("Cliente no encontrado.");
+              return;
             }
-            alert(`Rutina asignada y guardada con éxito para ${selectedClient}.`);
+            const token = localStorage.getItem('token');
+            const routineStr = JSON.stringify(weeklyRoutine);
+            try {
+              const response = await fetch(`${API_BASE_URL}/api/users/clients/${clientObj.id}`, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ routineJson: routineStr })
+              });
+              if (response.ok) {
+                if (setClients) {
+                  setClients(prev => prev.map(c => 
+                    c.id === clientObj.id ? { ...c, hasRoutine: true, routineJson: routineStr, routine: JSON.parse(routineStr) } : c
+                  ));
+                }
+                alert(`Rutina asignada y guardada con éxito para ${selectedClient}.`);
+              } else {
+                alert("Error al guardar la rutina en el servidor.");
+              }
+            } catch (err) {
+              alert("Error de red al guardar la rutina.");
+            }
           }
         }}>
           {isTemplateMode ? '💾 Guardar Plantilla Maestra' : '💾 Guardar Rutina'}

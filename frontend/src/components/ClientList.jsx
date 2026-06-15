@@ -86,6 +86,38 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
   const [showChartModal, setShowChartModal] = useState(false);
   const [chartType, setChartType] = useState('weight'); // 'weight', 'adherence', 'waist', 'volume'
   const [expandedChart, setExpandedChart] = useState(null);
+
+  useEffect(() => {
+    if (showChartModal && selectedClient?.email) {
+      const token = localStorage.getItem('token');
+      fetch(`${API_BASE_URL}/api/progress/history/by-email/${selectedClient.email}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      .then(res => res.ok ? res.json() : [])
+      .then(logs => {
+        if (logs && logs.length > 0) {
+          const wHist = logs.map(l => l.weight).filter(w => w !== null);
+          const waistHist = logs.map(l => l.waist).filter(w => w !== null);
+          const hipHist = logs.map(l => l.hip).filter(w => w !== null);
+          const neckHist = logs.map(l => l.neck).filter(w => w !== null);
+          const bicepsHist = logs.map(l => l.biceps).filter(w => w !== null);
+          const legHist = logs.map(l => l.leg).filter(w => w !== null);
+          
+          setSelectedClient(prev => ({
+            ...prev,
+            weightHistory: wHist.length ? wHist : [parseFloat(prev.weight) || 75.0],
+            waistHistory: waistHist.length ? waistHist : [0],
+            caderaHistory: hipHist.length ? hipHist : [0],
+            cuelloHistory: neckHist.length ? neckHist : [0],
+            bicepsHistory: bicepsHist.length ? bicepsHist : [0],
+            piernaHistory: legHist.length ? legHist : [0],
+            progressLogs: logs
+          }));
+        }
+      })
+      .catch(err => console.error("Error fetching client progress history:", err));
+    }
+  }, [showChartModal, selectedClient?.email]);
   
   const [showChatModal, setShowChatModal] = useState(false);
   const [expandedSessions, setExpandedSessions] = useState({});
@@ -344,13 +376,24 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
             <polyline points={points} fill="none" stroke={color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" style={{ filter: `drop-shadow(0px 8px 12px ${color}40)` }} />
             
             {/* Points and Labels */}
-            {history.map((val, index) => (
-              <g key={index} style={{ transition: 'all 0.3s' }}>
-                <circle cx={getX(index)} cy={getY(val)} r="8" fill="#0a0a0c" stroke={color} strokeWidth="3" style={{ cursor: 'pointer' }} />
-                <text x={getX(index)} y={getY(val) - 20} fill={color} fontSize="16" fontWeight="800" textAnchor="middle" fontFamily="Outfit" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>{val}{unit}</text>
-                <text x={getX(index)} y={svgHeight - 5} fill="var(--text-muted)" fontSize="13" fontWeight="600" textAnchor="middle" textTransform="uppercase" fontFamily="Outfit" letterSpacing="1px">Mes {index + 1}</text>
-              </g>
-            ))}
+            {history.map((val, index) => {
+              const getLabel = () => {
+                if (type === 'adherence') return `Seman. ${index + 1}`;
+                if (selectedClient.progressLogs && selectedClient.progressLogs[index]) {
+                  const dateStr = selectedClient.progressLogs[index].logDate;
+                  const parts = dateStr.split('-');
+                  if (parts.length === 3) return `${parts[2]}/${parts[1]}`;
+                }
+                return `Mes ${index + 1}`;
+              };
+              return (
+                <g key={index} style={{ transition: 'all 0.3s' }}>
+                  <circle cx={getX(index)} cy={getY(val)} r="8" fill="#0a0a0c" stroke={color} strokeWidth="3" style={{ cursor: 'pointer' }} />
+                  <text x={getX(index)} y={getY(val) - 20} fill={color} fontSize="16" fontWeight="800" textAnchor="middle" fontFamily="Outfit" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>{val}{unit}</text>
+                  <text x={getX(index)} y={svgHeight - 5} fill="var(--text-muted)" fontSize="13" fontWeight="600" textAnchor="middle" textTransform="uppercase" fontFamily="Outfit" letterSpacing="1px">{getLabel()}</text>
+                </g>
+              );
+            })}
           </svg>
         </div>
       </div>
@@ -571,23 +614,77 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
 
             {/* Estrategia de Progresión */}
             <h4 style={{ marginBottom: '10px', color: 'var(--text-muted)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Estrategia de Progresión (Pesos)</h4>
-            <div style={{ marginBottom: '25px' }}>
+            <div style={{ marginBottom: '15px' }}>
               <select 
                 className="input-field" 
                 value={selectedClient.progressionStrategy || "Sobrecarga Progresiva (Subir peso)"}
-                onChange={(e) => {
+                onChange={async (e) => {
                   const newStrategy = e.target.value;
-                  setSelectedClient(prev => ({ ...prev, progressionStrategy: newStrategy }));
-                  setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, progressionStrategy: newStrategy } : c));
-                  alert("Estrategia actualizada a: " + newStrategy);
+                  const token = localStorage.getItem('token');
+                  try {
+                    const response = await fetch(`${API_BASE_URL}/api/users/clients/${selectedClient.id}`, {
+                      method: 'PUT',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                      },
+                      body: JSON.stringify({ progressionStrategy: newStrategy })
+                    });
+                    if (response.ok) {
+                      setSelectedClient(prev => ({ ...prev, progressionStrategy: newStrategy }));
+                      setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, progressionStrategy: newStrategy } : c));
+                    } else {
+                      alert("Error al guardar la estrategia de progresión en el servidor.");
+                    }
+                  } catch (err) {
+                    alert("Error de red al guardar la estrategia.");
+                  }
                 }}
-                style={{ width: '100%' }}
+                style={{ width: '100%', marginBottom: 0 }}
               >
                 <option value="Sobrecarga Progresiva (Subir peso)">Sobrecarga Progresiva (Subir peso)</option>
                 <option value="Aumentar Repeticiones (Mantener peso)">Aumentar Repeticiones (Mantener peso)</option>
                 <option value="Mantenimiento (Mismo peso y reps)">Mantenimiento (Mismo peso y reps)</option>
                 <option value="Semana de Descarga (Bajar peso/volumen)">Semana de Descarga (Bajar peso/volumen)</option>
                 <option value="Foco en Técnica (Bajar peso)">Foco en Técnica (Bajar peso)</option>
+              </select>
+            </div>
+
+            {/* Periodicidad de Revisiones */}
+            <h4 style={{ marginBottom: '10px', color: 'var(--text-muted)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Periodicidad de Revisiones</h4>
+            <div style={{ marginBottom: '25px' }}>
+              <select 
+                className="input-field" 
+                value={selectedClient.reviewFrequency || "Semanal"}
+                onChange={async (e) => {
+                  const newFrequency = e.target.value;
+                  const token = localStorage.getItem('token');
+                  try {
+                    const response = await fetch(`${API_BASE_URL}/api/users/clients/${selectedClient.id}`, {
+                      method: 'PUT',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                      },
+                      body: JSON.stringify({ reviewFrequency: newFrequency })
+                    });
+                    if (response.ok) {
+                      setSelectedClient(prev => ({ ...prev, reviewFrequency: newFrequency }));
+                      setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, reviewFrequency: newFrequency } : c));
+                    } else {
+                      alert("Error al guardar la periodicidad de revisiones en el servidor.");
+                    }
+                  } catch (err) {
+                    alert("Error de red al guardar la periodicidad.");
+                  }
+                }}
+                style={{ width: '100%', marginBottom: 0 }}
+              >
+                <option value="Semanal">Semanal (1 semana)</option>
+                <option value="Bisemanal">Bisemanal (2 semanas)</option>
+                <option value="3 Semanas">Cada 3 Semanas</option>
+                <option value="Mensual">Mensual (4 semanas)</option>
+                <option value="Bimensual">Bimensual (8 semanas)</option>
               </select>
             </div>
 

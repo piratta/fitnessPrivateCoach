@@ -15,6 +15,7 @@ public class UserDto {
     private boolean mustChangePassword;
     private String reviewFrequency;
     private String billingPlanId;
+    private String routineJson;
 
     public UserDto() {
     }
@@ -30,6 +31,7 @@ public class UserDto {
         this.username = user.getUsername();
         this.mustChangePassword = user.isMustChangePassword();
         this.reviewFrequency = user.getReviewFrequency();
+        this.routineJson = user.getRoutineJson();
     }
 
     public UUID getId() { return id; }
@@ -64,4 +66,7 @@ public class UserDto {
 
     public String getBillingPlanId() { return billingPlanId; }
     public void setBillingPlanId(String billingPlanId) { this.billingPlanId = billingPlanId; }
+
+    public String getRoutineJson() { return routineJson; }
+    public void setRoutineJson(String routineJson) { this.routineJson = routineJson; }
 }

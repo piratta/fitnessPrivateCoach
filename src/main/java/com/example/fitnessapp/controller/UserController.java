@@ -22,6 +22,14 @@ public class UserController {
     @Autowired
     private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
+    @GetMapping("/me")
+    public ResponseEntity<UserDto> getMe() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String email = auth.getName();
+        User user = userRepository.findByEmail(email).orElseThrow();
+        return ResponseEntity.ok(new UserDto(user));
+    }
+
     @GetMapping("/clients")
     public ResponseEntity<List<UserDto>> getMyClients() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -127,5 +135,38 @@ public class UserController {
         }
         
         return username;
+    }
+
+    @PutMapping("/clients/{clientId}")
+    public ResponseEntity<?> updateClient(@PathVariable java.util.UUID clientId, @RequestBody UserDto clientDto) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String currentPrincipalName = auth.getName(); // coach email
+        User coach = userRepository.findByEmail(currentPrincipalName).orElseThrow();
+        
+        User client = userRepository.findById(clientId)
+                .orElseThrow(() -> new RuntimeException("Client not found"));
+                
+        if (client.getCoach() == null || !client.getCoach().getId().equals(coach.getId())) {
+            return ResponseEntity.status(403).body("No tienes permisos para modificar este cliente.");
+        }
+        
+        if (clientDto.getReviewFrequency() != null) {
+            client.setReviewFrequency(clientDto.getReviewFrequency());
+        }
+        if (clientDto.getProgressionStrategy() != null) {
+            client.setProgressionStrategy(clientDto.getProgressionStrategy());
+        }
+        if (clientDto.getGoal() != null) {
+            client.setGoal(clientDto.getGoal());
+        }
+        if (clientDto.getStatus() != null) {
+            client.setStatus(clientDto.getStatus());
+        }
+        if (clientDto.getRoutineJson() != null) {
+            client.setRoutineJson(clientDto.getRoutineJson());
+        }
+        
+        userRepository.save(client);
+        return ResponseEntity.ok(new UserDto(client));
     }
 }

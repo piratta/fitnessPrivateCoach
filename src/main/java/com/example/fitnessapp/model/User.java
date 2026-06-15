@@ -42,6 +42,9 @@ public class User {
     private String reviewFrequency = "Semanal"; // Semanal, Bisemanal, 3 Semanas, Mensual, Bimensual
     private String progressionStrategy = "Sobrecarga Progresiva (Subir peso)"; // Mantenimiento, Descarga, Subir reps, etc.
 
+    @Column(columnDefinition = "TEXT")
+    private String routineJson;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -97,4 +100,7 @@ public class User {
 
     public boolean isMustChangePassword() { return mustChangePassword; }
     public void setMustChangePassword(boolean mustChangePassword) { this.mustChangePassword = mustChangePassword; }
+
+    public String getRoutineJson() { return routineJson; }
+    public void setRoutineJson(String routineJson) { this.routineJson = routineJson; }
 }
