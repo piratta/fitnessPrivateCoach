@@ -11,6 +11,10 @@ public class UserDto {
     private String status;
     private String goal;
     private String progressionStrategy;
+    private String username;
+    private boolean mustChangePassword;
+    private String reviewFrequency;
+    private String billingPlanId;
 
     public UserDto(User user) {
         this.id = user.getId();
@@ -20,6 +24,9 @@ public class UserDto {
         this.status = user.getStatus();
         this.goal = user.getGoal();
         this.progressionStrategy = user.getProgressionStrategy();
+        this.username = user.getUsername();
+        this.mustChangePassword = user.isMustChangePassword();
+        this.reviewFrequency = user.getReviewFrequency();
     }
 
     public UUID getId() { return id; }
@@ -39,4 +46,19 @@ public class UserDto {
 
     public String getGoal() { return goal; }
     public void setGoal(String goal) { this.goal = goal; }
+
+    public String getProgressionStrategy() { return progressionStrategy; }
+    public void setProgressionStrategy(String progressionStrategy) { this.progressionStrategy = progressionStrategy; }
+
+    public String getUsername() { return username; }
+    public void setUsername(String username) { this.username = username; }
+
+    public boolean isMustChangePassword() { return mustChangePassword; }
+    public void setMustChangePassword(boolean mustChangePassword) { this.mustChangePassword = mustChangePassword; }
+
+    public String getReviewFrequency() { return reviewFrequency; }
+    public void setReviewFrequency(String reviewFrequency) { this.reviewFrequency = reviewFrequency; }
+
+    public String getBillingPlanId() { return billingPlanId; }
+    public void setBillingPlanId(String billingPlanId) { this.billingPlanId = billingPlanId; }
 }

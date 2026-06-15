@@ -1,32 +1,42 @@
-<<<<<<< HEAD
 # PrivateFitness App - Tu Entrenador Personal en el Bolsillo
 
-Bienvenido a **PrivateFitness**, la plataforma premium diseñada para transformar la manera en la que los entrenadores gestionan a sus clientes, y la manera en la que los clientes experimentan sus entrenamientos. Olvídate de los excels anticuados y los mensajes de WhatsApp perdidos; aquí todo es profesional, rápido y claro.
+Bienvenido a **PrivateFitness**, la plataforma que transformará la forma en la que entrenas y te comunicas con tu entrenador. Olvídate de los excels, los PDFs confusos y los mensajes perdidos por WhatsApp. Aquí tendrás todo tu progreso, tus rutinas y tu entrenador personal en un solo lugar, accesible desde tu móvil u ordenador.
 
 ---
 
-## 👨‍🏫 Funcionalidades para el Entrenador (Coach)
+## 🌟 ¿Qué vas a encontrar en PrivateFitness?
 
-Si eres un profesional del fitness, esta herramienta está diseñada para ahorrarte horas de gestión y darle un servicio exclusivo y VIP a tus clientes.
+Hemos diseñado esta aplicación pensando en ti, para que sea increíblemente fácil de usar pero a la vez muy potente.
 
-- **Panel de Control Centralizado**: Todo tu negocio organizado de un vistazo (resumen de clientes activos, mensajes sin leer y revisiones pendientes).
-- **Gestión de Clientes Inteligente**: Fichas detalladas de cada cliente. Filtra rápidamente quién está "Al Día", quién tiene pagos "Pendientes" o quién está "Inactivo".
-- **Creador de Rutinas Potente**: Asigna entrenamientos de forma rápida. Busca ejercicios en la base de datos, marca intensidades (RIR/RPE), deja notas específicas de técnica y añade ejercicios opcionales.
-- **Sistema de Plantillas (Rutinas Maestras)**: ¿Tienes estructuras de entrenamiento ganadoras? Guárdalas como plantillas maestras y asígnalas a un nuevo cliente en menos de 1 segundo.
-- **Mensajería Directa y en Tiempo Real**: Habla con tus clientes sin salir de la plataforma. Recibirás un globo rojo de notificación al instante en cuanto un cliente te escriba o te envíe un vídeo.
-- **Comparativas de Progreso Profesionales**: Se acabó cruzar datos a mano. En el apartado de revisiones podrás cargar hasta 4 meses distintos de un cliente al mismo tiempo. El sistema generará una tabla dinámica que te mostrará exactamente las diferencias (en kilos y centímetros) entre un mes y el siguiente.
-- **Gestor de Facturación Integrado**: Controla las fechas de pago, crea planes (mensual, trimestral, anual) y otorga periodos de gracia o días de prueba con un par de clics.
+### 1. 🏋️‍♂️ Tus Entrenamientos, Día a Día
+- **Rutinas Claras**: Cada día verás exactamente qué ejercicios te tocan, cuántas series (rondas) y cuántas repeticiones debes hacer.
+- **Interactivo**: Mientras estás en el gimnasio, podrás apuntar los kilos que levantas en cada serie con un simple toque. ¡Se acabó llevar una libreta!
+- **Descansos Automáticos**: Al completar una serie, aparecerá un cronómetro inteligente para avisarte cuándo debes volver a levantar la barra.
+- **Flexibilidad Total**: ¿Ese día la máquina está ocupada o te duele algo? Pulsa el botón "Omitir" y el sistema lo registrará sin penalizarte, para que tu entrenador lo tenga en cuenta.
+
+### 2. 💬 Chat Directo y Privado
+- **Habla con tu Entrenador**: Tienes un chat estilo WhatsApp directamente integrado en la aplicación.
+- **Notificaciones Inmediatas**: Verás una burbuja roja cuando tu entrenador te responda. 
+- **Sube Vídeos**: Si tienes dudas sobre si estás haciendo bien un ejercicio, pásale un link de vídeo por el chat y él te corregirá.
+
+### 3. 📸 Evaluaciones y Progresos Visuales
+- **Tus Cambios Físicos**: Cada vez que te toque revisión, podrás enviar tus medidas (peso, cintura, brazo...) y tus fotos.
+- **Feedback Gráfico**: Tu entrenador podrá dibujar por encima de tus fotos para señalarte áreas de mejora (ej. "Baja un poco más la cadera aquí") y te dejará comentarios de voz o texto.
+- **Comparativas del "Antes y Después"**: Podrás poner tus fotos del mes pasado junto a las de hoy para ver tu progreso real. El sistema calculará automáticamente si has perdido centímetros de cintura o si has ganado masa muscular.
+
+### 4. 📈 Gráficas de Evolución
+- **Mide tu Éxito**: Observa con gráficas muy visuales (con colores y líneas de tendencia) cómo vas mejorando mes a mes en diferentes aspectos:
+  - **Peso Corporal**: Si tu objetivo es perder grasa o ganar volumen.
+  - **Fuerza (Volumen Total)**: ¡Mira cuántos miles de kilos eres capaz de mover ahora comparado con tu primer día!
+  - **Adherencia**: Un porcentaje de lo fiel que has sido a tu dieta y a tus entrenamientos.
+
+### 5. 🎯 Onboarding Personalizado
+- **Punto de Partida**: Nada más entrar por primera vez, la aplicación te hará unas preguntas rápidas (peso actual, cómo duermes, nivel de estrés) para que tu entrenador pueda adaptar el plan 100% a ti.
 
 ---
 
-## 🏋️‍♂️ Funcionalidades para el Cliente Premium
+## 🚀 ¿Cómo empezar?
 
-Si eres cliente, esta es tu zona personal de trabajo. Tu evolución, tus datos y la comunicación directa con tu entrenador, todo centralizado y fácil de usar en el gimnasio.
-
-- **Entorno Exclusivo y Privado**: Un espacio digital moderno desde donde controlar todo tu plan físico.
-- **Punto de Partida (Onboarding)**: Al entrar por primera vez, rellenarás un formulario rápido pero completo sobre tus medidas iniciales, peso, calidad del sueño y estrés. Así el entrenador sabrá por dónde empezar.
-- **Tu Entreno Diario e Interactivo**: Podrás ver qué te toca entrenar cada día. Olvídate del papel y el boli; anota los kilos que levantas y las repeticiones que logras directamente en tu móvil durante el entrenamiento.
-- **Revisión de Técnica y Feedback**: ¿Tienes dudas sobre si haces bien una sentadilla? Pega el link de tu vídeo en la aplicación mientras entrenas. Tu entrenador lo verá y te dejará comentarios técnicos que aparecerán destacados la próxima vez que veas tu historial.
-- **Flexibilidad**: Si un día una máquina está ocupada o tienes molestias, podrás marcar el ejercicio como "Omitido" con un botón para que el entrenador lo tenga en cuenta en la planificación de la siguiente semana.
-- **Comunicación Abierta (Chat)**: Un chat privado solo para ti y tu entrenador. Resuelve dudas al momento y recibe consejos sin mezclar tus entrenamientos con tus redes sociales personales.
-- **Historial y Gráficas**: Observa tu propio progreso con gráficas de rendimiento visuales y repasa entrenamientos pasados para superarte a ti mismo.
+1. Pídele a tu entrenador tus datos de acceso (correo y contraseña provisional).
+2. Entra en la plataforma desde el navegador de tu móvil (puedes guardarla en la pantalla de inicio para que funcione como una App).
+3. ¡Sigue las instrucciones de bienvenida y prepárate para tu mejor versión!

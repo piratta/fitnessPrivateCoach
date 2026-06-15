@@ -29,6 +29,11 @@ public class User {
     @JoinColumn(name = "coach_id")
     private User coach;
 
+    @Column(unique = true)
+    private String username;
+
+    private boolean mustChangePassword = false;
+
     // --- New Fields for Fitness App ---
     private String goal; 
     private String status = "Activo"; 
@@ -86,4 +91,10 @@ public class User {
     public void setProgressionStrategy(String progressionStrategy) { this.progressionStrategy = progressionStrategy; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
+
+    public String getUsername() { return username; }
+    public void setUsername(String username) { this.username = username; }
+
+    public boolean isMustChangePassword() { return mustChangePassword; }
+    public void setMustChangePassword(boolean mustChangePassword) { this.mustChangePassword = mustChangePassword; }
 }

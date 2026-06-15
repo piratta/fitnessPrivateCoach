@@ -27,16 +27,22 @@ public class DataSeeder implements CommandLineRunner {
 
             // Create Coach
             User coach = new User("antonio@test.com", encodedPassword, "Antonio Entrenador", Role.COACH);
+            coach.setUsername("antonio");
+            coach.setMustChangePassword(false);
             coach = userRepository.save(coach);
 
             // Create Client
             User carlos = new User("carlos@test.com", encodedPassword, "Carlos Cliente", Role.PREMIUM_CLIENT);
+            carlos.setUsername("carlos");
+            carlos.setMustChangePassword(false);
             carlos.setCoach(coach);
             carlos.setStatus("Activo");
             carlos = userRepository.save(carlos);
 
             // Create another client
             User laura = new User("laura@test.com", encodedPassword, "Laura Martínez", Role.PREMIUM_CLIENT);
+            laura.setUsername("laura");
+            laura.setMustChangePassword(false);
             laura.setCoach(coach);
             laura.setStatus("Activo");
             userRepository.save(laura);
@@ -63,7 +69,18 @@ public class DataSeeder implements CommandLineRunner {
             workoutSessionRepository.save(session1);
             workoutSessionRepository.save(session2);
 
-            System.out.println("✅ Data seeded: antonio@test.com and carlos@test.com with password '1234'");
+            System.out.println("✅ Data seeded: antonio@test.com (antonio) and carlos@test.com (carlos) with password '1234'");
+        }
+
+        // Repair phase: assign username to any pre-existing user that has username = null
+        for (User u : userRepository.findAll()) {
+            if (u.getUsername() == null) {
+                String baseUsername = u.getEmail().split("@")[0];
+                u.setUsername(baseUsername);
+                u.setMustChangePassword(false);
+                userRepository.save(u);
+                System.out.println("🔧 Assigned username '" + baseUsername + "' to existing user: " + u.getEmail());
+            }
         }
     }
 }

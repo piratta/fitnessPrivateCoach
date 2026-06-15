@@ -298,6 +298,15 @@ export default function ReviewManager({ clients, setClients }) {
                     const len = client.weightHistory.length;
                     setSelectedMonths(len >= 2 ? [len - 2, len - 1] : [0, Math.max(0, len - 1)]);
                     setToggledPhotos({ front: false, left: false, right: false, back: false });
+                    setGlobalFeedback('');
+                    setPhotoComments({ front: '', left: '', right: '', back: '' });
+                    setDrawings({ front: null, left: null, right: null, back: null });
+                    setEditMode(false);
+                    if (client.reviewFrequency?.toLowerCase().includes('semana')) {
+                      setTimeScale('Semanas');
+                    } else {
+                      setTimeScale('Meses');
+                    }
                   }}
                   style={{ background: 'transparent', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer' }}
                 >
@@ -324,49 +333,52 @@ export default function ReviewManager({ clients, setClients }) {
               <button onClick={() => setSelectedClientForReview(null)} style={{ background: 'transparent', border: 'none', color: '#ff4500', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
             </div>
 
-            {selectedClientForReview.pendingReviewData && (
-              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-light)', marginBottom: '20px' }}>
-                <h4 style={{ color: 'var(--accent-primary)', marginBottom: '15px' }}>📋 Datos Enviados por el Cliente</h4>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '20px' }}>
-                  {['front', 'left', 'right', 'back'].map(view => {
-                    const labels = { front: 'Frontal', left: 'Lateral Izq.', right: 'Lateral Der.', back: 'Espalda' };
-                    const isToggled = toggledPhotos[view];
-                    const photoUrl = isToggled 
-                      ? selectedClientForReview.pendingReviewData.pastPhotos?.[view] 
-                      : selectedClientForReview.pendingReviewData.photos?.[view];
-                      
-                    return (
-                      <div key={view} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                        <div 
-                          onClick={() => setLargePhotoView(view)}
-                          style={{
-                            aspectRatio: '3/4',
-                            background: photoUrl ? `url(${photoUrl}) center/cover` : 'rgba(255,255,255,0.05)',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            border: isToggled ? '2px solid #ffaa00' : '2px solid transparent',
-                            transition: 'all 0.3s'
-                          }}
-                        />
-                        <div style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                          {labels[view]} {isToggled ? '(Anterior)' : '(Actual)'}
-                        </div>
+            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-light)', marginBottom: '20px' }}>
+              <h4 style={{ color: 'var(--accent-primary)', marginBottom: '15px' }}>
+                {selectedClientForReview.pendingReviewData ? '📋 Datos Enviados por el Cliente' : (selectedClientForReview.lastCompletedReview ? '📋 Última Revisión Completada' : '📋 Sin Datos de Revisión Previos')}
+              </h4>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '20px' }}>
+                {['front', 'left', 'right', 'back'].map(view => {
+                  const labels = { front: 'Frontal', left: 'Lateral Izq.', right: 'Lateral Der.', back: 'Espalda' };
+                  const isToggled = toggledPhotos[view];
+                  const reviewData = selectedClientForReview.pendingReviewData || selectedClientForReview.lastCompletedReview || {};
+                  const photoUrl = isToggled ? reviewData.pastPhotos?.[view] : reviewData.photos?.[view];
+                    
+                  return (
+                    <div key={view} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <div 
+                        onClick={() => setLargePhotoView(view)}
+                        style={{
+                          aspectRatio: '3/4',
+                          background: photoUrl ? `url(${photoUrl}) center/cover` : 'rgba(255,255,255,0.05)',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          border: isToggled ? '2px solid #ffaa00' : '2px solid transparent',
+                          transition: 'all 0.3s'
+                        }}
+                      >
+                        {!photoUrl && <div style={{width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.2)'}}>Sin Foto</div>}
                       </div>
-                    )
-                  })}
-                </div>
-                
-                <div style={{ display: 'flex', gap: '20px' }}>
-                  <div style={{ flex: 1 }}>
-                    <h5 style={{ marginBottom: '10px' }}>Comentarios de la revisión:</h5>
-                    <div style={{ background: 'rgba(0,0,0,0.3)', padding: '15px', borderRadius: '6px', fontSize: '0.9rem', fontStyle: 'italic', minHeight: '80px' }}>
-                      "{selectedClientForReview.pendingReviewData.comments}"
+                      <div style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        {labels[view]} {isToggled ? '(Anterior)' : '(Actual)'}
+                      </div>
                     </div>
+                  )
+                })}
+              </div>
+              
+              <div style={{ display: 'flex', gap: '20px' }}>
+                <div style={{ flex: 1 }}>
+                  <h5 style={{ marginBottom: '10px' }}>Comentarios de la revisión:</h5>
+                  <div style={{ background: 'rgba(0,0,0,0.3)', padding: '15px', borderRadius: '6px', fontSize: '0.9rem', fontStyle: 'italic', minHeight: '80px' }}>
+                    {(selectedClientForReview.pendingReviewData || selectedClientForReview.lastCompletedReview) 
+                      ? `"${(selectedClientForReview.pendingReviewData || selectedClientForReview.lastCompletedReview).comments || (selectedClientForReview.pendingReviewData || selectedClientForReview.lastCompletedReview).globalFeedback || 'Sin comentarios.'}"` 
+                      : "El cliente aún no ha enviado comentarios de revisión."}
                   </div>
                 </div>
               </div>
-            )}
+            </div>
 
             <div style={{ marginBottom: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -502,7 +514,7 @@ export default function ReviewManager({ clients, setClients }) {
               </table>
             </div>
 
-            {selectedClientForReview.pendingReviewData && (
+            {selectedClientForReview && (
               <div style={{ marginTop: '30px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
                 <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-light)', paddingTop: '20px' }}>
                   <h4 style={{ marginBottom: '10px' }}>💬 Comentario Global para el Cliente</h4>
@@ -519,7 +531,7 @@ export default function ReviewManager({ clients, setClients }) {
                     style={{ width: '100%', padding: '15px', fontSize: '1.2rem', marginTop: '10px' }}
                     onClick={() => {
                       const reviewDataToSave = {
-                        ...selectedClientForReview.pendingReviewData,
+                        ...(selectedClientForReview.pendingReviewData || selectedClientForReview.lastCompletedReview || {}),
                         drawings,
                         photoComments,
                         globalFeedback,
@@ -593,10 +605,11 @@ export default function ReviewManager({ clients, setClients }) {
 
           <div style={{ flex: 1, width: '100%', maxWidth: '600px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             {(() => {
+              const reviewData = selectedClientForReview.pendingReviewData || selectedClientForReview.lastCompletedReview || {};
               const isToggled = toggledPhotos[largePhotoView];
               const photoUrl = isToggled 
-                ? selectedClientForReview.pendingReviewData.pastPhotos?.[largePhotoView] 
-                : selectedClientForReview.pendingReviewData.photos?.[largePhotoView];
+                ? reviewData.pastPhotos?.[largePhotoView] 
+                : reviewData.photos?.[largePhotoView];
               
               return (
                 <>

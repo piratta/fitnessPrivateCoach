@@ -28,6 +28,9 @@ public class AuthController {
     @Autowired
     private JwtTokenProvider tokenProvider;
 
+    @Autowired
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
 
@@ -42,8 +45,23 @@ public class AuthController {
 
         String jwt = tokenProvider.generateToken(authentication);
 
-        User user = userRepository.findByEmail(loginRequest.getEmail()).orElseThrow();
+        User user = userRepository.findByUsername(loginRequest.getEmail())
+                .or(() -> userRepository.findByEmail(loginRequest.getEmail()))
+                .orElseThrow();
         
         return ResponseEntity.ok(new JwtAuthenticationResponse(jwt, new UserDto(user)));
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(@Valid @RequestBody com.example.fitnessapp.dto.ChangePasswordRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String email = auth.getName();
+        
+        User user = userRepository.findByEmail(email).orElseThrow();
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        user.setMustChangePassword(false);
+        userRepository.save(user);
+        
+        return ResponseEntity.ok("Contraseña actualizada correctamente");
     }
 }

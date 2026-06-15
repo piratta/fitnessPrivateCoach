@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { MOCK_ROUTINES } from '../utils/mockRoutines';
 import { getChatMessages, addChatMessage } from '../utils/chatStore';
 import { getClientBillingStatus } from '../utils/statusUtils';
+import { API_BASE_URL } from '../config';
 import '../index.css';
 
 export default function ClientList({ clients, setClients, billingPlans, onPlanRoutine, isChatMode }) {
@@ -113,45 +114,99 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
     return () => { window.activeChatEmail = null; };
   }, [showChatModal, selectedClient]);
 
+  // Fetch initial messages and set up polling when a chat is open
   useEffect(() => {
-    const handleChatUpdate = (e) => {
-      const { clientEmail, sender } = e.detail;
-      if (sender === 'client' && showChatModal && selectedClient?.email === clientEmail) {
-        // We are currently viewing this chat! Refresh messages and zero out unread immediately
-        const msgs = getChatMessages(clientEmail);
+    let interval;
+    if (showChatModal && selectedClient?.email) {
+      // Fetch immediately
+      getChatMessages(selectedClient.email).then(msgs => {
         setSelectedClient(prev => ({ ...prev, messages: msgs }));
-        setClients(prev => prev.map(c => c.email === clientEmail ? { ...c, unreadMessages: 0 } : c));
-      }
+        setClients(prev => prev.map(c => c.email === selectedClient.email ? { ...c, unreadMessages: 0 } : c));
+      });
+
+      // Poll every 3 seconds
+      interval = setInterval(() => {
+        getChatMessages(selectedClient.email).then(newMsgs => {
+          setSelectedClient(prev => {
+             // Only update if there are new messages to avoid unnecessary renders
+             if (prev && newMsgs.length > prev.messages.length) {
+                return { ...prev, messages: newMsgs };
+             }
+             return prev;
+          });
+          // Keep unread messages at 0 since chat is open
+          setClients(prev => prev.map(c => c.email === selectedClient.email ? { ...c, unreadMessages: 0 } : c));
+        });
+      }, 3000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
     };
-    window.addEventListener('chatUpdated', handleChatUpdate);
-    return () => window.removeEventListener('chatUpdated', handleChatUpdate);
   }, [showChatModal, selectedClient?.email, setClients]);
 
-  const handleAddClient = () => {
+  const handleAddClient = async () => {
     if (!newClient.name || !newClient.email) return;
-    setClients([...clients, {
-      id: Date.now(),
-      name: newClient.name,
-      email: newClient.email,
-      status: 'Activo',
-      weight: newClient.weight || 'N/A',
-      goal: newClient.goal,
-      billingPlanId: newClient.billingPlanId,
-      completion: 0,
-      nextReview: 'En 1 mes',
-      weightHistory: [parseFloat(newClient.weight) || 0],
-      adherenceHistory: [0],
-      waistHistory: [0],
-      caderaHistory: [0],
-      cuelloHistory: [0],
-      bicepsHistory: [0],
-      piernaHistory: [0],
-      volumeHistory: [0],
-      messages: [],
-      hasRoutine: false
-    }]);
-    setIsAddingClient(false);
-    setNewClient({ name: '', email: '', weight: '', goal: 'Hipertrofia', reviewFrequency: 'Semanal', billingPlanId: billingPlans?.[0]?.id || 'bp1' });
+    
+    const parts = newClient.name.trim().split(/\s+/);
+    if (parts.length < 3) {
+      alert("Se requiere el nombre y ambos apellidos (ej. Ana Gómez Pérez) para generar el usuario.");
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/users/create-client`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: newClient.name,
+          email: newClient.email,
+          goal: newClient.goal,
+          reviewFrequency: newClient.reviewFrequency
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        alert("Error al registrar cliente: " + errorText);
+        return;
+      }
+
+      const createdUser = await response.json();
+
+      setClients([...clients, {
+        id: createdUser.id,
+        name: createdUser.name,
+        email: createdUser.email,
+        username: createdUser.username,
+        status: 'Activo',
+        weight: newClient.weight || 'N/A',
+        goal: newClient.goal,
+        billingPlanId: newClient.billingPlanId,
+        completion: 0,
+        nextReview: 'En 1 mes',
+        weightHistory: [parseFloat(newClient.weight) || 0],
+        adherenceHistory: [0],
+        waistHistory: [0],
+        caderaHistory: [0],
+        cuelloHistory: [0],
+        bicepsHistory: [0],
+        piernaHistory: [0],
+        volumeHistory: [0],
+        messages: [],
+        hasRoutine: false
+      }]);
+
+      alert(`Cliente registrado con éxito en el sistema.\nUsuario y contraseña inicial: ${createdUser.username}`);
+      setIsAddingClient(false);
+      setNewClient({ name: '', email: '', weight: '', goal: 'Hipertrofia', reviewFrequency: 'Semanal', billingPlanId: billingPlans?.[0]?.id || 'bp1' });
+    } catch (err) {
+      console.error(err);
+      alert("Error de red al crear el cliente en el servidor.");
+    }
   };
 
   const handleToggleStatus = () => {
@@ -170,19 +225,21 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
     if (onPlanRoutine) onPlanRoutine(clientToEdit);
   };
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
-    
-    const updatedMessages = addChatMessage(selectedClient.email, 'coach', chatInput);
-    
-    setClients(clients.map(c => {
-      if (c.id === selectedClient.id) return { ...c, messages: updatedMessages };
-      return c;
-    }));
-    
-    setSelectedClient({ ...selectedClient, messages: updatedMessages });
+    const input = chatInput;
     setChatInput('');
+    
+    const updatedMessages = await addChatMessage(selectedClient.email, input);
+    
+    if (updatedMessages) {
+      setClients(clients.map(c => {
+        if (c.id === selectedClient.id) return { ...c, messages: updatedMessages };
+        return c;
+      }));
+      setSelectedClient({ ...selectedClient, messages: updatedMessages });
+    }
   };
 
   const renderChart = (type = chartType) => {
@@ -419,8 +476,8 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
             
             <div style={{ display: 'grid', gap: '20px', flex: 1, overflowY: 'auto' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 'bold' }}>Nombre Completo</label>
-                <input type="text" className="input-field" value={newClient.name} onChange={e => setNewClient({...newClient, name: e.target.value})} placeholder="Ej. Ana Gómez" />
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 'bold' }}>Nombre y Ambos Apellidos (Obligatorio)</label>
+                <input type="text" className="input-field" value={newClient.name} onChange={e => setNewClient({...newClient, name: e.target.value})} placeholder="Ej. Ana Gómez Pérez" />
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 'bold' }}>Correo Electrónico</label>
@@ -566,7 +623,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
                 setShowHistoryModal(true);
                 setIsLoadingHistory(true);
                 const token = localStorage.getItem('token');
-                fetch(`http://localhost:8080/api/workouts/history/by-email/${selectedClient.email}`, {
+                fetch(`${API_BASE_URL}/api/workouts/history/by-email/${selectedClient.email}`, {
                   headers: { 'Authorization': `Bearer ${token}` }
                 })
                 .then(res => res.json())
@@ -825,7 +882,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
                                             // Save to backend
                                             const s = clientHistoryData.find(s => s.id === session.id);
                                             const token = localStorage.getItem('token');
-                                            fetch(`http://localhost:8080/api/workouts/update/${session.id}`, {
+                                            fetch(`${API_BASE_URL}/api/workouts/update/${session.id}`, {
                                               method: 'PUT',
                                               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                                               body: JSON.stringify({ dayName: s.dayName, durationSeconds: s.durationSeconds, totalVolume: s.totalVolume, completedSets: s.completedSets, completionPercentage: s.completionPercentage, logsJson: s.logsJson, commentsJson: s.commentsJson, videoLinksJson: s.videoLinksJson })
@@ -875,7 +932,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
                                         setTrainerEditingExtras({...trainerEditingExtras, [sessionEditKey]: false});
                                         const s = clientHistoryData.find(s => s.id === session.id);
                                         const token = localStorage.getItem('token');
-                                        fetch(`http://localhost:8080/api/workouts/update/${session.id}`, {
+                                        fetch(`${API_BASE_URL}/api/workouts/update/${session.id}`, {
                                           method: 'PUT',
                                           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                                           body: JSON.stringify({ dayName: s.dayName, durationSeconds: s.durationSeconds, totalVolume: s.totalVolume, completedSets: s.completedSets, completionPercentage: s.completionPercentage, logsJson: s.logsJson, commentsJson: s.commentsJson, videoLinksJson: s.videoLinksJson })

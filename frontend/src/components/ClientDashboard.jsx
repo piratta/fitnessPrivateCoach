@@ -4,6 +4,7 @@ import InitialQuestionnaire from './InitialQuestionnaire';
 import { MOCK_ROUTINES } from '../utils/mockRoutines';
 import { getChatMessages, addChatMessage } from '../utils/chatStore';
 import { MOCK_CLIENTS } from '../utils/mockClients';
+import { API_BASE_URL } from '../config';
 import '../index.css';
 
 export default function ClientDashboard({ user, onLogout }) {
@@ -73,7 +74,7 @@ export default function ClientDashboard({ user, onLogout }) {
     if (activeTab === 'history') {
       setIsLoadingHistory(true);
       const token = localStorage.getItem('token');
-      fetch('http://localhost:8080/api/workouts/history/me', {
+      fetch(`${API_BASE_URL}/api/workouts/history/me`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       .then(res => res.json())
@@ -142,29 +143,40 @@ export default function ClientDashboard({ user, onLogout }) {
   const [showChatModal, setShowChatModal] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const chatEndRef = useRef(null);
-  const [messages, setMessages] = useState(() => getChatMessages(user?.email));
+  const [messages, setMessages] = useState([]);
   const [unreadMessages, setUnreadMessages] = useState(0);
 
+  // Fetch initial messages
   useEffect(() => {
-    if (showChatModal) {
-      setMessages(getChatMessages(user?.email));
-      setUnreadMessages(0);
+    if (user?.email) {
+      getChatMessages(user.email).then(msgs => setMessages(msgs));
     }
-  }, [showChatModal, user?.email]);
+  }, [user?.email]);
 
+  // Polling for new messages every 3 seconds
   useEffect(() => {
-    const handleChatUpdate = (e) => {
-      const { clientEmail, sender } = e.detail;
-      if (clientEmail === user?.email && sender === 'coach') {
-        if (showChatModal) {
-          setMessages(getChatMessages(user?.email));
-        } else {
-          setUnreadMessages(prev => prev + 1);
-        }
-      }
-    };
-    window.addEventListener('chatUpdated', handleChatUpdate);
-    return () => window.removeEventListener('chatUpdated', handleChatUpdate);
+    if (!user?.email) return;
+    const interval = setInterval(() => {
+      getChatMessages(user.email).then(newMsgs => {
+        setMessages(prev => {
+          // If there are more messages than before, and modal is closed, increment unread
+          if (!showChatModal && newMsgs.length > prev.length) {
+             const added = newMsgs.length - prev.length;
+             setUnreadMessages(unread => unread + added);
+          }
+          return newMsgs;
+        });
+      });
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [user?.email, showChatModal]);
+
+  // When opening modal, reset unread and fetch immediately
+  useEffect(() => {
+    if (showChatModal && user?.email) {
+      setUnreadMessages(0);
+      getChatMessages(user.email).then(msgs => setMessages(msgs));
+    }
   }, [showChatModal, user?.email]);
 
   useEffect(() => {
@@ -240,11 +252,15 @@ export default function ClientDashboard({ user, onLogout }) {
     setSkippedDays({ ...skippedDays, [selectedDay]: !isDaySkipped });
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!chatInput.trim()) return;
-    const updatedMessages = addChatMessage(user.email, 'client', chatInput);
-    setMessages(updatedMessages);
+    const input = chatInput;
     setChatInput('');
+    // Optimistic UI update could be added here, but we'll await the real response
+    const updatedMessages = await addChatMessage(user.email, input);
+    if (updatedMessages) {
+      setMessages(prev => [...prev, updatedMessages]);
+    }
   };
 
   const progress = isDaySkipped ? 100 : (Math.round((Object.values(currentLogs).flat().filter(s => s.completed || s.skipped).length / Object.values(currentLogs).flat().length) * 100) || 0);
@@ -270,7 +286,7 @@ export default function ClientDashboard({ user, onLogout }) {
 
     try {
       const token = localStorage.getItem('token');
-      const url = activeSessionId ? `http://localhost:8080/api/workouts/update/${activeSessionId}` : 'http://localhost:8080/api/workouts/finish';
+      const url = activeSessionId ? `${API_BASE_URL}/api/workouts/update/${activeSessionId}` : `${API_BASE_URL}/api/workouts/finish`;
       const method = activeSessionId ? 'PUT' : 'POST';
       
       const res = await fetch(url, {
@@ -314,7 +330,7 @@ export default function ClientDashboard({ user, onLogout }) {
       const completionPercentage = Math.round((completedSets.length / totalSets) * 100) || 0;
 
       const token = localStorage.getItem('token');
-      await fetch(`http://localhost:8080/api/workouts/update/${activeSessionId}`, {
+      await fetch(`${API_BASE_URL}/api/workouts/update/${activeSessionId}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
