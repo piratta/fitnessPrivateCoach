@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Fitness Application</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Fitness Admin Panel</h1>
+            <p>Manage your fitness application</p>
+        </div>
+
+        <div id="userInfo" class="card">
+            <!-- User info will be populated by JavaScript -->
+        </div>
+
+        <div class="card">
+            <h2>Dashboard Overview</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                <div class="exercise-card">
+                    <h3>Total Users</h3>
+                    <p style="font-size: 24px; font-weight: bold; color: #667eea;">1,247</p>
+                    <p>active members</p>
+                </div>
+                <div class="exercise-card">
+                    <h3>Active Plans</h3>
+                    <p style="font-size: 24px; font-weight: bold; color: #667eea;">89</p>
+                    <p>current training plans</p>
+                </div>
+                <div class="exercise-card">
+                    <h3>Exercises</h3>
+                    <p style="font-size: 24px; font-weight: bold; color: #667eea;">312</p>
+                    <p>available exercises</p>
+                </div>
+                <div class="exercise-card">
+                    <h3>Trainers</h3>
+                    <p style="font-size: 24px; font-weight: bold; color: #667eea;">24</p>
+                    <p>active trainers</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Quick Actions</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px;">
+                <a href="#users" class="btn" style="text-decoration: none; text-align: center;">Manage Users</a>
+                <a href="#plans" class="btn" style="text-decoration: none; text-align: center;">Training Plans</a>
+                <a href="#exercises" class="btn" style="text-decoration: none; text-align: center;">Exercises</a>
+                <a href="#reports" class="btn" style="text-decoration: none; text-align: center;">Reports</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Recent Activity</h2>
+            <div style="margin-top: 20px;">
+                <div style="display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee;">
+                    <div style="width: 40px; height: 40px; background: #667eea; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; margin-right: 15px;">+</div>
+                    <div>
+                        <p><strong>New user registered</strong></p>
+                        <p style="color: #666; font-size: 14px;">John Smith joined today</p>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee;">
+                    <div style="width: 40px; height: 40px; background: #667eea; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; margin-right: 15px;">✓</div>
+                    <div>
+                        <p><strong>Plan completed</strong></p>
+                        <p style="color: #666; font-size: 14px;">Sarah Johnson finished Beginner Plan</p>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; padding: 10px;">
+                    <div style="width: 40px; height: 40px; background: #667eea; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; margin-right: 15px;">✎</div>
+                    <div>
+                        <p><strong>Exercise added</strong></p>
+                        <p style="color: #666; font-size: 14px;">New exercise "Burpees" added to library</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>System Status</h2>
+            <div style="margin-top: 20px;">
+                <div style="display: flex; justify-content: space-between; padding: 15px; border-bottom: 1px solid #eee;">
+                    <div>
+                        <p><strong>Database Connection</strong></p>
+                        <p style="color: #2e7d32;">Connected to H2 Database</p>
+                    </div>
+                    <span style="background: #e8f5e9; padding: 5px 10px; border-radius: 20px;">Active</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 15px; border-bottom: 1px solid #eee;">
+                    <div>
+                        <p><strong>Server Status</strong></p>
+                        <p style="color: #2e7d32;">Running normally</p>
+                    </div>
+                    <span style="background: #e8f5e9; padding: 5px 10px; border-radius: 20px;">Online</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 15px;">
+                    <div>
+                        <p><strong>Cache Status</strong></p>
+                        <p style="color: #2e7d32;">Memory cache active</p>
+                    </div>
+                    <span style="background: #e8f5e9; padding: 5px 10px; border-radius: 20px;">Active</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        // Initialize the admin panel
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Fitness Admin Panel loaded');
+            
+            // Simulate user data for demonstration
+            const userData = {
+                username: 'AdminUser',
+                type: 'trainer',
+                loggedIn: true
+            };
+            
+            // Update user info in header
+            const userInfo = document.getElementById('userInfo');
+            if (userInfo) {
+                userInfo.innerHTML = `
+                    <div class="user-info">
+                        <div class="user-avatar">${userData.username.charAt(0).toUpperCase()}</div>
+                        <div>
+                            <h3>Welcome, ${userData.username}!</h3>
+                            <p>Administrator Panel</p>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>

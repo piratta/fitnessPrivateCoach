@@ -1,0 +1,208 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
+
+:root {
+  --bg-dark: #0a0a0c;
+  --bg-panel: rgba(20, 20, 24, 0.6);
+  --accent-primary: #e0f800; /* Neon Yellow/Green */
+  --accent-hover: #ccdf00;
+  --text-main: #ffffff;
+  --text-muted: #888890;
+  --border-light: rgba(255, 255, 255, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Outfit', sans-serif;
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  background-image: 
+    radial-gradient(circle at 15% 50%, rgba(224, 248, 0, 0.03), transparent 25%),
+    radial-gradient(circle at 85% 30%, rgba(224, 248, 0, 0.04), transparent 25%);
+}
+
+.glass-panel {
+  background: var(--bg-panel);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-light);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+/* Form Elements */
+.input-field {
+  width: 100%;
+  padding: 14px 16px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  color: var(--text-main);
+  font-size: 1rem;
+  font-family: 'Outfit', sans-serif;
+  transition: all 0.3s ease;
+  margin-bottom: 16px;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(224, 248, 0, 0.1);
+}
+
+.input-field::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+select option {
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 14px;
+  background: var(--accent-primary);
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: 'Outfit', sans-serif;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(224, 248, 0, 0.2);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.6s ease-out forwards;
+}
+
+/* Print Styles */
+@media print {
+  body {
+    background: white;
+    color: black;
+    background-image: none;
+  }
+  .glass-panel {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: black;
+  }
+  .no-print, button, select {
+    display: none !important;
+  }
+  .input-field {
+    border: none !important;
+    background: transparent !important;
+    color: black !important;
+    padding: 4px !important;
+    margin-bottom: 4px !important;
+  }
+  h3, h4, p, label {
+    color: black !important;
+  }
+}
+
+/* Responsive Utilities */
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.scrollable-tabs {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding-bottom: 10px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.scrollable-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+.scrollable-tabs::-webkit-scrollbar-thumb {
+  background: var(--accent-primary);
+  border-radius: 4px;
+}
+
+/* Base Responsive Grids */
+.responsive-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .responsive-grid-2 {
+    grid-template-columns: 1fr;
+  }
+  
+  .glass-panel {
+    padding: 15px !important;
+  }
+  
+  /* Make header stack */
+  .mobile-header {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 15px;
+  }
+  
+  .mobile-header-actions {
+    width: 100%;
+    justify-content: space-between !important;
+    flex-wrap: wrap;
+  }
+  
+  /* Tracker adjustments */
+  .tracker-grid {
+    grid-template-columns: 35px 1fr 1fr 85px !important;
+    font-size: 0.8rem;
+    padding: 10px 5px !important;
+    gap: 5px !important;
+  }
+  
+  .tracker-input {
+    padding: 8px !important;
+    font-size: 0.9rem !important;
+  }
+  
+  /* Coach Layout */
+  .coach-layout {
+    grid-template-columns: 1fr !important;
+  }
+  .coach-sidebar {
+    height: auto !important;
+    padding: 15px !important;
+    position: relative !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border-light);
+  }
+}
