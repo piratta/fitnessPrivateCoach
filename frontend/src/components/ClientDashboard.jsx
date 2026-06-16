@@ -17,7 +17,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   const [hasActiveReview, setHasActiveReview] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
-  const [activeTab, setActiveTab] = useState('workout'); 
+  const [activeTab, setActiveTab] = useState('workout');
   const [clientData, setClientData] = useState(null);
   const [showRoutineTable, setShowRoutineTable] = useState(false);
   const [showEvaluationModal, setShowEvaluationModal] = useState(false);
@@ -40,29 +40,47 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   const fetchProfile = () => {
     const token = localStorage.getItem('token');
     if (!token) return;
+
+    console.log("🟦 [API] Llamando a /api/users/me...");
+
     fetch(`${API_BASE_URL}/api/users/me`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
-    .then(res => res.json())
-    .then(data => {
-      let parsedRoutine = null;
-      if (data.routineJson) {
-        try {
-          parsedRoutine = JSON.parse(data.routineJson);
-        } catch (e) {
-          console.error("Error parsing routineJson", e);
-        }
-      }
-      const hasRoutine = !!(parsedRoutine && Object.keys(parsedRoutine).some(day => parsedRoutine[day] && parsedRoutine[day].length > 0));
-      
-      setClientData(prev => ({
-        ...prev,
-        ...data,
-        routine: parsedRoutine,
-        hasRoutine: hasRoutine
-      }));
-    })
-    .catch(err => console.error("Error fetching profile", err));
+        .then(res => {
+          console.log(`🟦 [API] Respuesta /users/me HTTP Status: ${res.status}`);
+          return res.ok ? res.json() : null;
+        })
+        .then(data => {
+          console.log("🟦 [API] Datos crudos (Raw Data) recibidos de /users/me:", data);
+          if (!data) return;
+
+          // Extraemos el usuario si viene envuelto
+          const actualUser = data.user ? data.user : data;
+          console.log("🟦 [STATE] Usuario extraído (actualUser):", actualUser);
+
+          let parsedRoutine = null;
+          if (actualUser.routineJson) {
+            try {
+              parsedRoutine = JSON.parse(actualUser.routineJson);
+              console.log("🟦 [STATE] Rutina parseada correctamente:", parsedRoutine);
+            } catch (e) {
+              console.error("❌ [ERROR] Fallo al hacer JSON.parse de routineJson", e);
+              console.log("❌ [ERROR] Contenido problemático de routineJson:", actualUser.routineJson);
+            }
+          } else {
+            console.log("🟦 [STATE] El usuario no tiene routineJson asignada.");
+          }
+
+          const hasRoutine = !!(parsedRoutine && Object.keys(parsedRoutine).some(day => parsedRoutine[day] && parsedRoutine[day].length > 0));
+
+          setClientData(prev => ({
+            ...prev,
+            ...actualUser,
+            routine: parsedRoutine,
+            hasRoutine: hasRoutine
+          }));
+        })
+        .catch(err => console.error("❌ [ERROR CRÍTICO] Error en fetchProfile:", err));
   };
 
   const handleCompleteOnboarding = async (formData, photos) => {
@@ -108,24 +126,35 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   const fetchProgressHistory = () => {
     const token = localStorage.getItem('token');
     if (!token) return;
+
+    console.log("🟩 [API] Llamando a /api/progress/history...");
+
     fetch(`${API_BASE_URL}/api/progress/history`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
-    .then(res => res.json())
-    .then(data => {
-      setProgressHistory(data);
-      // Default the comparison selector to the latest day that has body measurements.
-      const measureCount = data.filter(l =>
-        [l.waist, l.hip, l.neck, l.biceps, l.leg].some(v => v !== null && v !== undefined)).length;
-      setSelectedMonths([Math.max(0, measureCount - 1)]);
-    })
-    .catch(err => console.error("Error fetching progress history", err));
-  };
+        .then(res => {
+          console.log(`🟩 [API] Respuesta /progress/history HTTP Status: ${res.status}`);
+          return res.ok ? res.json() : [];
+        })
+        .then(data => {
+          console.log("🟩 [API] Datos crudos (Raw Data) recibidos de /progress/history:", data);
 
-  useEffect(() => {
-    fetchProfile();
-    fetchProgressHistory();
-  }, [user, activeTab]);
+          // Asegurar que siempre sea un Array
+          const validData = Array.isArray(data) ? data : (data.data && Array.isArray(data.data) ? data.data : []);
+          console.log("🟩 [STATE] Historial de progreso procesado (Debe ser un Array):", validData);
+
+          setProgressHistory(validData);
+
+          if (validData.length > 0) {
+            const measureCount = validData.filter(l =>
+                [l.waist, l.hip, l.neck, l.biceps, l.leg].some(v => v !== null && v !== undefined)).length;
+            setSelectedMonths([Math.max(0, measureCount - 1)]);
+          } else {
+            console.log("🟩 [STATE] El array de historial de progreso está vacío.");
+          }
+        })
+        .catch(err => console.error("❌ [ERROR CRÍTICO] Error en fetchProgressHistory:", err));
+  };
 
   // Drive the review-tab badge from the backend so it never shows "1" while the lock is still
   // closed. We refresh on mount and whenever the user navigates back to the review tab.
@@ -190,19 +219,39 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   const fetchHistory = () => {
     const token = localStorage.getItem('token');
     if (!token) return Promise.resolve([]);
+
+    console.log("🟧 [API] Llamando a /api/workouts/history/me...");
     setIsLoadingHistory(true);
+
     return fetch(`${API_BASE_URL}/api/workouts/history/me`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
-      .then(res => res.ok ? res.json() : [])
-      .then(data => { setHistoryData(data); return data; })
-      .catch(err => { console.error(err); return []; })
-      .finally(() => setIsLoadingHistory(false));
+        .then(res => {
+          console.log(`🟧 [API] Respuesta /workouts/history/me HTTP Status: ${res.status}`);
+          return res.ok ? res.json() : [];
+        })
+        .then(data => {
+          console.log("🟧 [API] Datos crudos (Raw Data) de workouts/history/me:", data);
+
+          const validData = Array.isArray(data) ? data : [];
+          console.log("🟧 [STATE] Historial de entrenamientos procesado (Debe ser Array):", validData);
+
+          setHistoryData(validData);
+          return validData;
+        })
+        .catch(err => {
+          console.error("❌ [ERROR CRÍTICO] Error en fetchHistory:", err);
+          return [];
+        })
+        .finally(() => {
+          console.log("🟧 [API] Finalizada la carga de historial de entrenamientos.");
+          setIsLoadingHistory(false);
+        });
   };
 
   useEffect(() => {
-    if (activeTab === 'history') fetchHistory();
-  }, [activeTab]);
+    console.log("🔄 [RENDER] Estado actual de clientData:", clientData);
+  }, [clientData]);
 
   // Once the routine is known, build a map of dayName → session for sessions completed TODAY.
   // We never use sessions from previous days here so the locked/completed view does not bleed
@@ -331,7 +380,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     : [];
   const currentLogs = (logs && selectedDay) ? logs[selectedDay] : null;
   const isDaySkipped = skippedDays[selectedDay];
-  
+
   // Inline Editing State for Locked Workouts
   const [editingSets, setEditingSets] = useState({});
   const [editingExtras, setEditingExtras] = useState({});
@@ -403,7 +452,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     if (last) setDailyWeight(String(last.weight));
   }, [progressHistory]);
   const [chartType, setChartType] = useState('weight');
-  const lastReviewDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000); 
+  const lastReviewDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
   const daysSinceReview = Math.floor((Date.now() - lastReviewDate) / (1000 * 60 * 60 * 24));
   const daysUntilNext = 7 - daysSinceReview;
   const isMeasurementsLocked = daysUntilNext > 0;
@@ -428,7 +477,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   const toggleComplete = (exIdx, setIdx) => {
     const newLogs = { ...logs };
     const currentSet = newLogs[selectedDay][exIdx][setIdx];
-    
+
     // Prevent completing if weight is empty
     if (!currentSet.completed && (!currentSet.weight || currentSet.weight.toString().trim() === '')) {
       dialog.toast("Introduce el peso levantado antes de completar la serie", { variant: 'error' });
@@ -438,7 +487,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     const isNowCompleted = !currentSet.completed;
     currentSet.completed = isNowCompleted;
     setLogs(newLogs);
-    
+
     if (isNowCompleted && isWorkoutStarted) {
       setRestSeconds(90); // 90 seconds rest timer
     }
@@ -471,7 +520,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     if (!chatInput.trim()) return;
     const input = chatInput;
     setChatInput('');
-    
+
     // Try sending via WebSocket
     const sent = sendWebSocketMessage(user.email, input);
     if (!sent) {
@@ -524,7 +573,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     if (!currentLogs) return;
     const totalSets = Object.values(currentLogs).flat().length;
     const completedSets = Object.values(currentLogs).flat().filter(s => s.completed);
-    
+
     if (completedSets.length === 0) {
       // Offer two ways out: keep going or wipe the session locally (no backend call so we do
       // not pollute history with an empty workout).
@@ -576,7 +625,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
 
     const totalVolume = completedSets.reduce((sum, set) => sum + (parseFloat(set.weight) || 0) * (parseInt(set.reps) || 0), 0);
     const completionPercentage = Math.round((completedSets.length / totalSets) * 100);
-    
+
     setWorkoutSummary({
       time: formatTime(workoutSeconds),
       volume: totalVolume,
@@ -588,10 +637,10 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
       const token = localStorage.getItem('token');
       const url = activeSessionId ? `${API_BASE_URL}/api/workouts/update/${activeSessionId}` : `${API_BASE_URL}/api/workouts/finish`;
       const method = activeSessionId ? 'PUT' : 'POST';
-      
+
       const res = await fetch(url, {
         method: method,
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
@@ -607,7 +656,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
           videoLinksJson: JSON.stringify(videoLinks)
         })
       });
-      
+
       if (!activeSessionId && res.ok) {
         const newId = await res.text();
         setActiveSessionId(newId.replace(/"/g, ''));
@@ -651,7 +700,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
       const token = localStorage.getItem('token');
       await fetch(`${API_BASE_URL}/api/workouts/update/${activeSessionId}`, {
         method: 'PUT',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
@@ -666,7 +715,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
           videoLinksJson: JSON.stringify(currentLinksToSave)
         })
       });
-      
+
       setWorkoutSummary(prev => ({
         ...prev,
         volume: totalVolume,
@@ -690,7 +739,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
       await dialog.alert("Introduce al menos una medida.", { title: 'Faltan datos' });
       return;
     }
-    
+
     const token = localStorage.getItem('token');
     try {
       const response = await fetch(`${API_BASE_URL}/api/progress`, {
@@ -983,7 +1032,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     const svgHeight = 220;
     const paddingY = 40;
     const paddingX = 40;
-    
+
     const getX = (index) => paddingX + (index / (history.length - 1)) * (svgWidth - paddingX * 2);
     const getY = (val) => svgHeight - paddingY - ((val - min) / range) * (svgHeight - paddingY * 2);
 
@@ -1001,7 +1050,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                 <stop offset="100%" stopColor={color} stopOpacity="0.0" />
               </linearGradient>
             </defs>
-            
+
             {/* Grid Lines */}
             {[0, 0.25, 0.5, 0.75, 1].map(factor => {
                const y = svgHeight - paddingY - factor * (svgHeight - paddingY * 2);
@@ -1011,7 +1060,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
             {/* Area and Line */}
             <path d={areaPath} fill={`url(#grad-client-${type})`} />
             <polyline points={points} fill="none" stroke={color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" style={{ filter: `drop-shadow(0px 8px 12px ${color}40)` }} />
-            
+
             {/* Points and Labels */}
             {history.map((val, index) => {
               let label = `Mes ${index + 1}`;
@@ -1047,7 +1096,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
 
   return (
       <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', paddingBottom: '90px' }}>
-      
+
       {/* Header Cliente */}
       <header className="glass-panel no-print mobile-header" style={{ position: 'sticky', top: '10px', zIndex: 1000, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 30px', margin: '10px 20px', borderRadius: '12px', backdropFilter: 'blur(15px)' }}>
         <div>
@@ -1098,10 +1147,10 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
 
       {/* Notificación Evaluación Recibida */}
       {clientData?.lastCompletedReview && !showEvaluationModal && !hasAcceptedEvaluation && (
-        <div 
+        <div
           onClick={() => setShowEvaluationModal(true)}
-          style={{ 
-            margin: '20px', padding: '15px', background: 'rgba(224, 248, 0, 0.15)', border: '1px solid var(--accent-primary)', 
+          style={{
+            margin: '20px', padding: '15px', background: 'rgba(224, 248, 0, 0.15)', border: '1px solid var(--accent-primary)',
             borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer',
             boxShadow: '0 4px 15px rgba(224, 248, 0, 0.1)'
           }}
@@ -1120,7 +1169,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
           <InitialQuestionnaire onComplete={handleCompleteOnboarding} />
         ) : (
           <div className="fade-in">
-            
+
             {/* Pestaña: ENTRENAR */}
             {activeTab === 'workout' && (
               !clientData?.hasRoutine ? (
@@ -1136,7 +1185,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                 </div>
               ) : (
                 <div>
-                
+
                  {/* Estrategia asignada y botón de tabla */}
                  <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
                    <div style={{ flex: 1, minWidth: '200px', background: 'rgba(224, 248, 0, 0.05)', border: '1px dashed var(--accent-primary)', padding: '10px 15px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 0 }}>
@@ -1146,8 +1195,8 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                        <div style={{ color: 'var(--accent-primary)', fontWeight: 'bold', fontSize: '0.95rem' }}>{clientData.progressionStrategy || user?.progressionStrategy || "Sobrecarga Progresiva (Subir peso)"}</div>
                      </div>
                    </div>
-                   <button 
-                     onClick={() => setShowRoutineTable(true)} 
+                   <button
+                     onClick={() => setShowRoutineTable(true)}
                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-light)', color: '#fff', padding: '10px 18px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}
                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
                      onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
@@ -1159,10 +1208,10 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                 {/* Selector de Días */}
                 <div className="scrollable-tabs" style={{ marginBottom: '15px', borderBottom: '1px solid var(--border-light)' }}>
                   {routineDays.map(day => (
-                    <button 
-                      key={day} 
+                    <button
+                      key={day}
                       onClick={() => setSelectedDay(day)}
-                      style={{ 
+                      style={{
                         padding: '10px 20px', whiteSpace: 'nowrap', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem', transition: 'all 0.3s',
                         background: selectedDay === day ? 'var(--accent-primary)' : 'transparent',
                         color: selectedDay === day ? '#000' : 'var(--text-muted)',
@@ -1258,7 +1307,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                           <div style={{ background: 'rgba(255, 170, 0, 0.1)', border: '1px solid #ffaa00', padding: '15px', borderRadius: '8px', marginBottom: '10px', textAlign: 'center' }}>
                             <span style={{ fontSize: '1.2rem', display: 'block', marginBottom: '5px' }}>🔒 Entrenamiento Completado</span>
                             <p style={{ color: 'var(--text-main)', fontSize: '0.9rem', marginBottom: '15px' }}>El tiempo ha sido registrado. Puedes modificar series individualmente usando el botón ✏️.</p>
-                            
+
                             {workoutSummary && (
                               <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '15px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
                                 <div>
@@ -1314,7 +1363,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                                 {currentLogs && currentLogs[exIdx] && currentLogs[exIdx].map((set, setIdx) => {
                                   const isEditing = editingSets[`${exIdx}-${setIdx}`];
                                   const inputDisabled = (!isEditing && (set.completed || set.skipped || isWorkoutLocked));
-                                  
+
                                   return (
                                     <div key={setIdx} className="tracker-grid" style={{ display: 'grid', gridTemplateColumns: '40px 1fr 1fr 100px', gap: '10px', padding: '12px 15px', background: set.completed ? 'rgba(224, 248, 0, 0.03)' : (set.skipped ? 'rgba(255,255,255,0.02)' : 'transparent'), opacity: set.skipped ? 0.5 : 1, transition: 'all 0.3s' }}>
                                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: set.completed ? 'var(--accent-primary)' : 'var(--text-muted)', textDecoration: set.skipped ? 'line-through' : 'none' }}>{setIdx + 1}</div>
@@ -1403,7 +1452,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                   <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <input type="number" step="0.1" value={dailyWeight} onChange={(e) => setDailyWeight(e.target.value)} style={{ width: '100px', padding: '15px', fontSize: '1.5rem', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '8px', color: '#fff', textAlign: 'center' }} />
                     <span style={{ fontSize: '1.2rem', color: 'var(--text-muted)' }}>kg</span>
-                    <button 
+                    <button
                       onClick={async () => {
                         if (!dailyWeight || dailyWeight.toString().trim() === '') {
                           await dialog.alert("Introduce un peso válido.", { title: 'Faltan datos' });
@@ -1441,9 +1490,9 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                 </div>
 
                 <div style={{ display: 'flex', gap: '15px', marginBottom: '25px' }}>
-                  <button 
-                    onClick={() => setShowLogModal(true)} 
-                    className="btn-primary" 
+                  <button
+                    onClick={() => setShowLogModal(true)}
+                    className="btn-primary"
                     style={{ flex: 1, padding: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', fontWeight: 'bold' }}
                   >
                     📅 Registrar Medidas Históricas / Pasadas
@@ -1458,8 +1507,8 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                     <div style={{ display: 'flex', gap: '10px' }}>
                       {selectedMonths.map((monthIdx, i) => (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <select 
-                            className="input-field" 
+                          <select
+                            className="input-field"
                             style={{ padding: '5px', margin: 0 }}
                             value={monthIdx}
                             onChange={(e) => {
@@ -1473,7 +1522,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                             ))}
                           </select>
                           {selectedMonths.length > 2 && (
-                            <button 
+                            <button
                               onClick={() => setSelectedMonths(selectedMonths.filter((_, filterIdx) => filterIdx !== i))}
                               style={{ background: 'transparent', border: 'none', color: '#ff4500', cursor: 'pointer' }}
                             >✕</button>
@@ -1481,7 +1530,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                         </div>
                       ))}
                       {selectedMonths.length < 3 && cmpWeight.length > 0 && (
-                        <button 
+                        <button
                           onClick={() => {
                             const minSelected = Math.min(...selectedMonths);
                             const nextToAdd = Math.max(0, minSelected - 1);
@@ -1533,10 +1582,10 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                             {selectedMonths.map((m, i) => {
                               const currentVal = row.data[m];
                               const nextVal = selectedMonths[i+1] !== undefined ? row.data[selectedMonths[i+1]] : null;
-                              
+
                               let diffColor = 'var(--text-muted)';
                               let diffText = '-';
-                              
+
                               if (currentVal !== undefined && nextVal !== undefined) {
                                 const diff = parseFloat((nextVal - currentVal).toFixed(2));
                                 if (diff > 0) {
@@ -1582,18 +1631,18 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                     ].map(tab => {
                       const isActive = chartType === tab.id;
                       return (
-                        <button 
+                        <button
                           key={tab.id}
-                          onClick={() => { setChartType(tab.id); setExpandedChart(null); }} 
-                          style={{ 
-                            padding: '8px 20px', 
-                            fontWeight: '600', 
+                          onClick={() => { setChartType(tab.id); setExpandedChart(null); }}
+                          style={{
+                            padding: '8px 20px',
+                            fontWeight: '600',
                             fontSize: '0.9rem',
-                            background: isActive ? `${tab.color}15` : 'rgba(255,255,255,0.03)', 
-                            color: isActive ? tab.color : 'var(--text-muted)', 
-                            border: `1px solid ${isActive ? tab.color : 'transparent'}`, 
-                            borderRadius: '30px', 
-                            cursor: 'pointer', 
+                            background: isActive ? `${tab.color}15` : 'rgba(255,255,255,0.03)',
+                            color: isActive ? tab.color : 'var(--text-muted)',
+                            border: `1px solid ${isActive ? tab.color : 'transparent'}`,
+                            borderRadius: '30px',
+                            cursor: 'pointer',
                             transition: 'all 0.3s ease',
                             display: 'flex',
                             alignItems: 'center',
@@ -1696,10 +1745,10 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
 
                 <div className="scrollable-tabs" style={{ marginBottom: '15px', borderBottom: '1px solid var(--border-light)' }}>
                   {routineDays.map(day => (
-                    <button 
-                      key={day} 
+                    <button
+                      key={day}
                       onClick={() => setSelectedDay(day)}
-                      style={{ 
+                      style={{
                         padding: '10px 20px', whiteSpace: 'nowrap', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem', transition: 'all 0.3s',
                         background: selectedDay === day ? '#ffaa00' : 'transparent',
                         color: selectedDay === day ? '#000' : 'var(--text-muted)',
@@ -1798,7 +1847,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
               <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Chat con Antonio (Entrenador)</h3>
               <button onClick={() => setShowChatModal(false)} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '1.5rem', cursor: 'pointer' }}>✖</button>
             </div>
-            
+
             <div className="custom-scrollbar" style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '15px' }}>
               {messages.map((msg, idx) => (
                 <div key={idx} style={{ alignSelf: msg.sender === 'client' ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
@@ -1830,7 +1879,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
             <p style={{ color: 'var(--text-main)', fontSize: '1.2rem', marginBottom: '5px' }}>
               Has completado el {workoutSummary?.percentage}% de tu {selectedDay}.
             </p>
-            
+
             {workoutSummary && (
               <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '12px', padding: '20px', display: 'flex', justifyContent: 'space-around', margin: '20px 0' }}>
                 <div>
@@ -1860,7 +1909,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
         <div className="fade-in" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', zIndex: 3000, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px', overflowY: 'auto' }}>
           <div className="glass-panel" style={{ width: '100%', maxWidth: '600px', background: 'rgba(20,20,24,0.98)', padding: '25px', position: 'relative' }}>
             <button onClick={() => setShowEvaluationModal(false)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'transparent', border: 'none', color: '#ff4500', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
-            
+
             <h2 style={{ color: 'var(--accent-primary)', marginBottom: '20px' }}>Resultados de la Evaluación</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '20px' }}>Fecha: {clientData.lastCompletedReview.reviewDate}</p>
 
@@ -1884,16 +1933,16 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                 return (
                   <div key={view} style={{ background: 'rgba(0,0,0,0.4)', borderRadius: '12px', padding: '15px', display: 'flex', gap: '15px', flexDirection: 'column' }}>
                     <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
-                      <div 
+                      <div
                         onClick={() => {
                           setLargePhotoView(view);
                           setToggledPhoto(false);
                           setLargePhotoSource('completed');
                         }}
-                        style={{ 
-                          width: '120px', height: '160px', 
+                        style={{
+                          width: '120px', height: '160px',
                           background: originalUrl ? `url(${originalUrl}) center/contain no-repeat` : 'rgba(255,255,255,0.05)',
-                          borderRadius: '8px', position: 'relative', cursor: 'pointer' 
+                          borderRadius: '8px', position: 'relative', cursor: 'pointer'
                         }}
                       >
                         {/* Overlay drawing if it exists */}
@@ -1915,8 +1964,8 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
               })}
             </div>
 
-            <button 
-              className="btn-primary" 
+            <button
+              className="btn-primary"
               style={{ width: '100%', marginTop: '30px', padding: '15px', fontSize: '1.1rem' }}
               onClick={() => {
                 setShowEvaluationModal(false);
@@ -1928,7 +1977,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
           </div>
         </div>, document.body
       )}
-      
+
       {/* Modal Visor de Foto (Cliente) */}
       {largePhotoView && createPortal(
         (() => {
@@ -1944,15 +1993,15 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
               zIndex: 4000, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '20px'
             }}>
               <button onClick={() => setLargePhotoView(null)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'transparent', border: 'none', color: '#ff4500', fontSize: '2rem', cursor: 'pointer', zIndex: 4001 }}>✕</button>
-              
+
               <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', zIndex: 4001 }}>
-                <button 
+                <button
                   onClick={() => setToggledPhoto(false)}
                   style={{ background: !toggledPhoto ? 'var(--accent-primary)' : 'rgba(255,255,255,0.1)', color: !toggledPhoto ? '#000' : '#fff', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.3s' }}
                 >
                   Foto Actual
                 </button>
-                <button 
+                <button
                   onClick={() => setToggledPhoto(true)}
                   disabled={!pastPhotoUrl}
                   style={{ background: toggledPhoto ? '#ffaa00' : 'rgba(255,255,255,0.1)', color: toggledPhoto ? '#000' : 'rgba(255,255,255,0.3)', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: pastPhotoUrl ? 'pointer' : 'not-allowed', transition: 'all 0.3s' }}
@@ -1973,7 +2022,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                   </div>
                 )}
               </div>
-              
+
               <div style={{ marginTop: '20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
                 Estás viendo: {toggledPhoto ? 'Mes Anterior' : 'Mes Actual'}
               </div>
@@ -1990,7 +2039,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
               <h3 style={{ fontSize: '1.4rem', fontWeight: 'bold', color: 'var(--accent-primary)' }}>Registrar Medidas Pasadas</h3>
               <button type="button" onClick={() => setShowLogModal(false)} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '1.5rem', cursor: 'pointer' }}>✖</button>
             </div>
-            
+
             <div style={{ overflowY: 'auto', flex: 1, paddingRight: '5px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <div>
                 <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Fecha de la Medición</label>
@@ -2065,7 +2114,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
               </div>
               <button onClick={() => setShowRoutineTable(false)} style={{ background: 'transparent', border: 'none', color: '#ff4500', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
             </div>
-            
+
             <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gap: '25px', paddingRight: '5px' }}>
               {Object.keys(clientData.routine).map(day => {
                 const exercises = clientData.routine[day] || [];
