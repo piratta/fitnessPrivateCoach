@@ -15,6 +15,7 @@ export default function Login({ onLogin }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log("[LOG] Intentando login para:", username); // Verifica que los inputs capturan el valor
     setError('');
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
@@ -23,22 +24,28 @@ export default function Login({ onLogin }) {
         body: JSON.stringify({ email: username, password })
       });
 
+      console.log("[LOG] Estado de respuesta:", response.status); // Verifica si es 200, 401, 500
+
       if (!response.ok) {
         throw new Error('Credenciales inválidas');
       }
 
       const data = await response.json();
+      console.log("[LOG] Datos recibidos del servidor:", data); // Verifica que 'data.user' existe
+
       localStorage.setItem('token', data.accessToken);
 
-      if (data.user.mustChangePassword) {
-        // Force password change before accessing dashboard
+      if (data.user && data.user.mustChangePassword) {
+        console.log("[LOG] Password debe cambiarse, redirigiendo a modo cambio...");
         setTempUser(data.user);
         setMustChange(true);
       } else {
+        console.log("[LOG] Login exitoso, llamando a onLogin...");
         onLogin(data.user);
       }
     } catch (err) {
-      setError('Credenciales inválidas. Verifica tu correo y contraseña.');
+      console.error("[LOG] Error capturado:", err); // Si hay un error, aquí saldrá el motivo
+      setError('Credenciales inválidas o error de conexión.');
     }
   };
 

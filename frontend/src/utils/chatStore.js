@@ -95,9 +95,11 @@ export function connectWebSocket(onMessage) {
     }, 3000);
   };
 
-  socket.onerror = (err) => {
-    console.error("WebSocket error:", err);
-    socket.close();
+  socket.onerror = (error) => {
+    console.error("WebSocket error:", error);
+    if (socket) {
+      socket.close(); // ✅ Ahora es seguro
+    }
   };
 
   return socket;

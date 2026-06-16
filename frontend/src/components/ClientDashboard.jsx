@@ -37,50 +37,60 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     chest: '', calf: '', forearm: '', back: ''
   });
 
-  const fetchProfile = () => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
+  // Workout Tracker States
+  const routineDays = clientData?.routine ? Object.keys(clientData.routine) : [];
+  const [selectedDay, setSelectedDay] = useState('');
+  const [skippedDays, setSkippedDays] = useState({});
 
-    console.log("🟦 [API] Llamando a /api/users/me...");
+  const [comments, setComments] = useState({}); // { [day_exIdx]: string }
+  const [videoLinks, setVideoLinks] = useState({});
+  const [logs, setLogs] = useState({});
+
+  const fetchProfile = () => {
+    console.log("👉 1. Arranca fetchProfile");
+
+    const token = localStorage.getItem('token');
+    console.log("👉 2. Token encontrado en el navegador:", token ? "SÍ HAY TOKEN" : "VACÍO / NULL");
+
+    if (!token) {
+      console.error("❌ 3. Abortando: No hay token guardado. El usuario no está logueado correctamente.");
+      return;
+    }
+
+    console.log("👉 4. Llamando al backend (Spring Boot)...");
 
     fetch(`${API_BASE_URL}/api/users/me`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
         .then(res => {
-          console.log(`🟦 [API] Respuesta /users/me HTTP Status: ${res.status}`);
-          return res.ok ? res.json() : null;
+          console.log("👉 5. El backend ha respondido. Status:", res.status);
+          if (!res.ok) throw new Error("Error HTTP " + res.status);
+          return res.json();
         })
         .then(data => {
-          console.log("🟦 [API] Datos crudos (Raw Data) recibidos de /users/me:", data);
-          if (!data) return;
-
-          // Extraemos el usuario si viene envuelto
-          const actualUser = data.user ? data.user : data;
-          console.log("🟦 [STATE] Usuario extraído (actualUser):", actualUser);
+          console.log("👉 6. Datos recibidos del backend:", data);
 
           let parsedRoutine = null;
-          if (actualUser.routineJson) {
+          if (data.routineJson) {
             try {
-              parsedRoutine = JSON.parse(actualUser.routineJson);
-              console.log("🟦 [STATE] Rutina parseada correctamente:", parsedRoutine);
+              parsedRoutine = JSON.parse(data.routineJson);
             } catch (e) {
-              console.error("❌ [ERROR] Fallo al hacer JSON.parse de routineJson", e);
-              console.log("❌ [ERROR] Contenido problemático de routineJson:", actualUser.routineJson);
+              console.error("Error al parsear la rutina", e);
             }
-          } else {
-            console.log("🟦 [STATE] El usuario no tiene routineJson asignada.");
           }
-
           const hasRoutine = !!(parsedRoutine && Object.keys(parsedRoutine).some(day => parsedRoutine[day] && parsedRoutine[day].length > 0));
 
           setClientData(prev => ({
             ...prev,
-            ...actualUser,
+            ...data,
             routine: parsedRoutine,
             hasRoutine: hasRoutine
           }));
         })
-        .catch(err => console.error("❌ [ERROR CRÍTICO] Error en fetchProfile:", err));
+        .catch(err => {
+          console.error("❌ 7. Error en la petición (Red o Servidor):", err.message);
+          setTimeout(() => fetchProfile(), 1000);
+        });
   };
 
   const handleCompleteOnboarding = async (formData, photos) => {
@@ -171,8 +181,11 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
       setIsReviewLocked(null);
     }
   };
-  useEffect(() => { refreshReviewBadge(); /* eslint-disable-next-line */ }, [user]);
-  useEffect(() => { if (activeTab !== 'review') refreshReviewBadge(); /* eslint-disable-next-line */ }, [activeTab]);
+  useEffect(() => {
+    fetchProfile();
+    fetchProgressHistory();
+  }, [user, activeTab]);
+
 
   const getTimeScaleLabel = () => {
     if (!clientData?.reviewFrequency) return 'Mes';
@@ -337,14 +350,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     return h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
   };
 
-  // Workout Tracker States
-  const routineDays = clientData?.routine ? Object.keys(clientData.routine) : [];
-  const [selectedDay, setSelectedDay] = useState('');
-  const [skippedDays, setSkippedDays] = useState({});
 
-  const [comments, setComments] = useState({}); // { [day_exIdx]: string }
-  const [videoLinks, setVideoLinks] = useState({});
-  const [logs, setLogs] = useState({});
 
   // Initialize selectedDay when routine is loaded
   useEffect(() => {
@@ -541,7 +547,8 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   // whose logs have no completed sets recorded yet. We only highlight it when the user has
   // navigated to it and is not in the middle of training another day.
   const dayLogs = (logs && selectedDay) ? logs[selectedDay] : null;
-  const dayHasProgress = dayLogs && Object.values(dayLogs).flat().some(s => s.completed || s.skipped);
+// Añadimos (dayLogs || {}) para que nunca falle
+  const dayHasProgress = dayLogs ? Object.values(dayLogs || {}).flat().some(s => s.completed || s.skipped) : false;
   const isPastPendingDay = !!(selectedDay && selectedDay !== todayWeekday
     && !isWorkoutLocked && !isWorkoutStarted && !dayHasProgress);
 
@@ -551,6 +558,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
       `Vamos a mover los ejercicios de "${selectedDay}" al día de hoy (${todayWeekday}). El cambio es solo visual en tu planificador.`,
       { title: 'Hacer hoy', confirmText: 'Mover a hoy' }
     );
+    const logsFlat = currentLogs ? Object.values(currentLogs || {}).flat() : [];
     if (!ok) return;
     const newRoutine = { ...clientData.routine };
     const targetExisting = newRoutine[todayWeekday] || [];
@@ -571,8 +579,8 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
 
   const handleFinishWorkout = async () => {
     if (!currentLogs) return;
-    const totalSets = Object.values(currentLogs).flat().length;
-    const completedSets = Object.values(currentLogs).flat().filter(s => s.completed);
+    const totalSets = Object.values(currentLogs || {}).flat().length;
+    const completedSets = Object.values(currentLogs || {}).flat().filter(s => s.completed);
 
     if (completedSets.length === 0) {
       // Offer two ways out: keep going or wipe the session locally (no backend call so we do
