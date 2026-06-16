@@ -1036,8 +1036,17 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     );
   };
 
+  if (!clientData) {
+    return (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', gap: '15px' }}>
+          <div style={{ color: 'var(--accent-primary)', fontSize: '2rem' }}>⏳</div>
+          <h3 style={{ color: '#fff', fontFamily: 'Outfit' }}>Cargando tu panel...</h3>
+        </div>
+    );
+  }
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', paddingBottom: '90px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', paddingBottom: '90px' }}>
       
       {/* Header Cliente */}
       <header className="glass-panel no-print mobile-header" style={{ position: 'sticky', top: '10px', zIndex: 1000, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 30px', margin: '10px 20px', borderRadius: '12px', backdropFilter: 'blur(15px)' }}>
@@ -1060,12 +1069,12 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
             </div>
           )}
           <button
-            onClick={() => setShowProfile(true)}
-            title="Mi perfil"
-            style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', cursor: 'pointer', textAlign: 'right', padding: 0 }}
+              onClick={() => setShowProfile(true)}
+              title="Mi perfil"
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', cursor: 'pointer', textAlign: 'right', padding: 0 }}
           >
             <p style={{ fontWeight: '600', fontSize: '0.9rem', textDecoration: 'underline dotted', textUnderlineOffset: '3px' }}>
-              {user.name.split(' ')[0]}
+              {user?.name ? user.name.split(' ')[0] : 'Perfil'}
             </p>
           </button>
           <button onClick={() => { setShowChatModal(true); setUnreadMessages(0); }} style={{ position: 'relative', background: 'var(--accent-primary)', border: 'none', color: '#000', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '1.2rem', boxShadow: '0 0 10px rgba(224,248,0,0.3)' }}>
@@ -1134,7 +1143,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                      <span style={{ fontSize: '1.5rem' }}>🎯</span>
                      <div>
                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '2px' }}>Objetivo de Pesos Semanal</div>
-                       <div style={{ color: 'var(--accent-primary)', fontWeight: 'bold', fontSize: '0.95rem' }}>{clientData.progressionStrategy || user.progressionStrategy || "Sobrecarga Progresiva (Subir peso)"}</div>
+                       <div style={{ color: 'var(--accent-primary)', fontWeight: 'bold', fontSize: '0.95rem' }}>{clientData.progressionStrategy || user?.progressionStrategy || "Sobrecarga Progresiva (Subir peso)"}</div>
                      </div>
                    </div>
                    <button 
