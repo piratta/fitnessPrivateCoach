@@ -30,15 +30,20 @@ public class ReviewService {
     @Autowired private ReviewImageRepository reviewImageRepository;
     @Autowired private UserRepository userRepository;
 
-    /** Computes when the next review is allowed, based on the client's configured frequency. */
+    /**
+     * Computes when the next review is allowed, based on the client's configured frequency.
+     * The result is always at 00:00 of the target day — the hour of the previous review is
+     * irrelevant, so a weekly review made on day 1 unlocks on day 8 at 00:00, not 24h later.
+     */
     public LocalDateTime computeNextReviewAt(User client, LocalDateTime from) {
         String freq = client.getReviewFrequency() == null ? "" : client.getReviewFrequency().toLowerCase();
-        if (freq.contains("bisemanal")) return from.plusWeeks(2);
-        if (freq.contains("3 semana")) return from.plusWeeks(3);
-        if (freq.contains("bimensual")) return from.plusMonths(2);
-        if (freq.contains("mensual")) return from.plusMonths(1);
-        // Default: weekly.
-        return from.plusWeeks(1);
+        LocalDateTime base;
+        if (freq.contains("bisemanal")) base = from.plusWeeks(2);
+        else if (freq.contains("3 semana")) base = from.plusWeeks(3);
+        else if (freq.contains("bimensual")) base = from.plusMonths(2);
+        else if (freq.contains("mensual")) base = from.plusMonths(1);
+        else base = from.plusWeeks(1); // Default: weekly.
+        return base.toLocalDate().atStartOfDay();
     }
 
     public boolean isLocked(User client) {
@@ -74,6 +79,10 @@ public class ReviewService {
         review.setNeck(payload.getNeck());
         review.setBiceps(payload.getBiceps());
         review.setLeg(payload.getLeg());
+        review.setChest(payload.getChest());
+        review.setCalf(payload.getCalf());
+        review.setForearm(payload.getForearm());
+        review.setBack(payload.getBack());
         review.setClientComments(payload.getClientComments());
         return reviewRepository.save(review);
     }
@@ -86,6 +95,19 @@ public class ReviewService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "No se pueden añadir fotos a una revisión ya enviada.");
         }
+        return persistImage(client, review, view, file);
+    }
+
+    /**
+     * Stand-alone photo (no review attached). Used by the onboarding flow so the initial
+     * pictures appear in the client's gallery and act as baseline references.
+     */
+    @Transactional
+    public ReviewImage addStandaloneImage(User client, String view, MultipartFile file) {
+        return persistImage(client, null, view, file);
+    }
+
+    private ReviewImage persistImage(User client, Review review, String view, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Archivo vacío.");
         }

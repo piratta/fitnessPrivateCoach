@@ -71,6 +71,10 @@ public class ProgressLogController {
         if (log.getNeck() != null)   entity.setNeck(log.getNeck());
         if (log.getBiceps() != null) entity.setBiceps(log.getBiceps());
         if (log.getLeg() != null)    entity.setLeg(log.getLeg());
+        if (log.getChest() != null)   entity.setChest(log.getChest());
+        if (log.getCalf() != null)    entity.setCalf(log.getCalf());
+        if (log.getForearm() != null) entity.setForearm(log.getForearm());
+        if (log.getBack() != null)    entity.setBack(log.getBack());
 
         ProgressLog saved = progressLogRepository.save(entity);
         return ResponseEntity.ok(saved);

@@ -316,12 +316,20 @@ public class UserController {
             Double neck   = readDouble(body.get("neck"));
             Double biceps = readDouble(body.get("biceps"));
             Double leg    = readDouble(body.get("leg"));
+            Double chest   = readDouble(body.get("chest"));
+            Double calf    = readDouble(body.get("calf"));
+            Double forearm = readDouble(body.get("forearm"));
+            Double back    = readDouble(body.get("back"));
             if (weight != null) log.setWeight(weight);
             if (waist != null)  log.setWaist(waist);
             if (hip != null)    log.setHip(hip);
             if (neck != null)   log.setNeck(neck);
             if (biceps != null) log.setBiceps(biceps);
             if (leg != null)    log.setLeg(leg);
+            if (chest != null)   log.setChest(chest);
+            if (calf != null)    log.setCalf(calf);
+            if (forearm != null) log.setForearm(forearm);
+            if (back != null)    log.setBack(back);
         }
         progressLogRepository.save(log);
 
@@ -340,6 +348,29 @@ public class UserController {
         String s = value.toString().trim();
         if (s.isEmpty()) return null;
         try { return Double.parseDouble(s.replace(',', '.')); } catch (NumberFormatException e) { return null; }
+    }
+
+    /**
+     * Uploads one of the four onboarding pictures (front/left/right/back). They are stored as
+     * standalone images (no review attached) and show up in the gallery + future review
+     * comparisons as baseline references.
+     */
+    @PostMapping(value = "/me/initial-photo", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadInitialPhoto(@org.springframework.web.bind.annotation.RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+                                                @org.springframework.web.bind.annotation.RequestParam(value = "view", required = false) String view) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getName() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Sesión expirada.");
+        }
+        String principal = auth.getName();
+        User user = userRepository.findByEmail(principal)
+                .or(() -> userRepository.findByUsername(principal))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no encontrado."));
+        com.example.fitnessapp.model.ReviewImage saved = reviewService.addStandaloneImage(user, view, file);
+        Map<String, Object> body = new HashMap<>();
+        body.put("id", saved.getId());
+        body.put("view", saved.getView());
+        return ResponseEntity.ok(body);
     }
 
     private String generateTempPassword() {

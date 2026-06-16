@@ -29,12 +29,8 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   const [showLogModal, setShowLogModal] = useState(false);
   const [logForm, setLogForm] = useState({
     logDate: new Date().toISOString().split('T')[0],
-    weight: '',
-    waist: '',
-    hip: '',
-    neck: '',
-    biceps: '',
-    leg: ''
+    weight: '', waist: '', hip: '', neck: '', biceps: '', leg: '',
+    chest: '', calf: '', forearm: '', back: ''
   });
 
   const fetchProfile = () => {
@@ -65,18 +61,30 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     .catch(err => console.error("Error fetching profile", err));
   };
 
-  const handleCompleteOnboarding = async (formData) => {
+  const handleCompleteOnboarding = async (formData, photos) => {
     // Map the questionnaire fields to the ProgressLog shape persisted by the backend.
+    const num = (v) => (v !== '' && v !== null && v !== undefined) ? parseFloat(v) : null;
     const measurements = {
-      weight: formData.peso ? parseFloat(formData.peso) : null,
-      waist: formData.cintura ? parseFloat(formData.cintura) : null,
-      hip: formData.cadera ? parseFloat(formData.cadera) : null,
-      neck: formData.cuello ? parseFloat(formData.cuello) : null,
-      biceps: formData.biceps ? parseFloat(formData.biceps) : null,
-      leg: formData.pierna ? parseFloat(formData.pierna) : null,
+      weight: num(formData.peso),
+      waist: num(formData.cintura),
+      hip: num(formData.cadera),
+      neck: num(formData.cuello),
+      biceps: num(formData.biceps),
+      leg: num(formData.pierna),
+      chest: num(formData.pecho),
+      calf: num(formData.gemelo),
+      forearm: num(formData.antebrazo),
+      back: num(formData.espalda),
     };
     try {
       await usersApi.completeOnboarding(measurements);
+      // Upload each initial photo sequentially; failures here should not block onboarding.
+      if (photos) {
+        for (const [view, staged] of Object.entries(photos)) {
+          try { await usersApi.uploadInitialPhoto(staged.file, view); }
+          catch (photoErr) { console.warn(`Foto inicial ${view} no se pudo subir`, photoErr); }
+        }
+      }
       dialog.toast('¡Bienvenido! Datos iniciales guardados', { variant: 'success' });
       fetchProfile();
       fetchProgressHistory();
@@ -298,8 +306,13 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     }
   }, [showChatModal, messages]);
 
-  // Progress States
-  const [dailyWeight, setDailyWeight] = useState(78.5);
+  // Progress States — seeded with the latest logged weight so the quick-entry field shows
+  // the user's most recent value instead of an outdated mock.
+  const [dailyWeight, setDailyWeight] = useState('');
+  useEffect(() => {
+    const last = [...progressHistory].reverse().find((l) => l.weight != null);
+    if (last) setDailyWeight(String(last.weight));
+  }, [progressHistory]);
   const [chartType, setChartType] = useState('weight');
   const lastReviewDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000); 
   const daysSinceReview = Math.floor((Date.now() - lastReviewDate) / (1000 * 60 * 60 * 24));
@@ -484,8 +497,10 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
       await dialog.alert("Selecciona una fecha.", { title: 'Faltan datos' });
       return;
     }
-    if (!logForm.weight || logForm.weight.toString().trim() === '') {
-      await dialog.alert("Introduce al menos el peso.", { title: 'Faltan datos' });
+    const anyMeasure = ['weight','waist','hip','neck','biceps','leg','chest','calf','forearm','back']
+      .some(k => logForm[k] && logForm[k].toString().trim() !== '');
+    if (!anyMeasure) {
+      await dialog.alert("Introduce al menos una medida.", { title: 'Faltan datos' });
       return;
     }
     
@@ -504,7 +519,11 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
           hip: logForm.hip ? parseFloat(logForm.hip) : null,
           neck: logForm.neck ? parseFloat(logForm.neck) : null,
           biceps: logForm.biceps ? parseFloat(logForm.biceps) : null,
-          leg: logForm.leg ? parseFloat(logForm.leg) : null
+          leg: logForm.leg ? parseFloat(logForm.leg) : null,
+          chest: logForm.chest ? parseFloat(logForm.chest) : null,
+          calf: logForm.calf ? parseFloat(logForm.calf) : null,
+          forearm: logForm.forearm ? parseFloat(logForm.forearm) : null,
+          back: logForm.back ? parseFloat(logForm.back) : null
         })
       });
       if (response.ok) {
@@ -701,7 +720,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   // A weight-only quick entry must NOT create a new column in the measurement comparison, so the
   // comparison table and body-measurement charts only use days that recorded a body measurement.
   const measurementLogs = progressHistory.filter(l =>
-    [l.waist, l.hip, l.neck, l.biceps, l.leg].some(v => v !== null && v !== undefined));
+    [l.waist, l.hip, l.neck, l.biceps, l.leg, l.chest, l.calf, l.forearm, l.back].some(v => v !== null && v !== undefined));
   const measurementDates = measurementLogs.map(fmtLogDate);
   const cmpWeight = measurementLogs.length > 0 ? measurementLogs.map(l => l.weight || 0) : [0];
   const waistHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.waist || 0) : (clientData?.waistHistory || [0]);
@@ -709,6 +728,10 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   const cuelloHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.neck || 0) : (clientData?.cuelloHistory || [0]);
   const bicepsHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.biceps || 0) : (clientData?.bicepsHistory || [0]);
   const piernaHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.leg || 0) : (clientData?.piernaHistory || [0]);
+  const pechoHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.chest || 0) : [0];
+  const gemeloHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.calf || 0) : [0];
+  const antebrazoHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.forearm || 0) : [0];
+  const espaldaHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.back || 0) : [0];
   const volumeHistory = clientData?.volumeHistory || [4500, 4800, 5200, 5500, 5800, 6000, 6500, 7000, 7500, 7800, 8200, 8500];
   const adherenceHistory = clientData?.adherenceHistory || [90, 85, 95, 90, 100, 80, 95, 90, 100, 100, 95, 95];
 
@@ -997,7 +1020,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                         {/* Previsualización solo-lectura de los ejercicios del día */}
                         <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--border-light)', borderRadius: '8px', padding: '12px 15px', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <span style={{ fontSize: '1.2rem' }}>👁️</span>
-                          <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Vista previa de lo que te toca hoy (solo lectura). Empieza el entrenamiento para registrar tus marcas.</span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Vista previa del entrenamiento. Empieza el entrenamiento para registrar tus marcas.</span>
                         </div>
                         <div style={{ display: 'grid', gap: '12px' }}>
                           {activeWorkout.map((ex, exIdx) => (
@@ -1288,7 +1311,11 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                           { label: 'Cadera', key: 'cadera', data: caderaHistory, unit: 'cm', lowerIsBetter: true },
                           { label: 'Cuello', key: 'cuello', data: cuelloHistory, unit: 'cm', lowerIsBetter: false },
                           { label: 'Bíceps', key: 'biceps', data: bicepsHistory, unit: 'cm', lowerIsBetter: false },
+                          { label: 'Antebrazo', key: 'antebrazo', data: antebrazoHistory, unit: 'cm', lowerIsBetter: false },
+                          { label: 'Pecho', key: 'pecho', data: pechoHistory, unit: 'cm', lowerIsBetter: false },
+                          { label: 'Espalda', key: 'espalda', data: espaldaHistory, unit: 'cm', lowerIsBetter: false },
                           { label: 'Pierna', key: 'pierna', data: piernaHistory, unit: 'cm', lowerIsBetter: false },
+                          { label: 'Gemelo', key: 'gemelo', data: gemeloHistory, unit: 'cm', lowerIsBetter: false },
                         ].map((row, idx) => (
                           <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                             <td style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>{row.label}</td>
@@ -1517,8 +1544,19 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
             <span style={{ fontSize: '1.5rem' }}>📅</span>
             <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>Historial</span>
           </button>
-          <button onClick={() => setActiveTab('review')} style={{ background: 'transparent', border: 'none', color: activeTab === 'review' ? 'var(--accent-primary)' : 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
-            <span style={{ fontSize: '1.5rem' }}>📷</span>
+          <button onClick={() => setActiveTab('review')} style={{ background: 'transparent', border: 'none', color: activeTab === 'review' ? 'var(--accent-primary)' : 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', cursor: 'pointer', position: 'relative' }}>
+            <span style={{ fontSize: '1.5rem', position: 'relative' }}>
+              📷
+              {isReviewLocked === false && (
+                <span style={{
+                  position: 'absolute', top: '-6px', right: '-12px',
+                  background: '#ff4500', color: '#fff', fontSize: '0.65rem', fontWeight: 'bold',
+                  borderRadius: '50%', width: '16px', height: '16px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.4)'
+                }}>1</span>
+              )}
+            </span>
             <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>Revisión</span>
           </button>
           <button onClick={() => setActiveTab('gallery')} style={{ background: 'transparent', border: 'none', color: activeTab === 'gallery' ? 'var(--accent-primary)' : 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
@@ -1743,8 +1781,8 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
 
               <div className="responsive-grid-2" style={{ gap: '15px' }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Peso (kg) *</label>
-                  <input type="number" step="0.1" required placeholder="Ej. 78.5" value={logForm.weight} onChange={e => setLogForm({...logForm, weight: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Peso (kg)</label>
+                  <input type="number" step="0.1" placeholder="Ej. 78.5" value={logForm.weight} onChange={e => setLogForm({...logForm, weight: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Cintura (cm)</label>
@@ -1765,6 +1803,22 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                 <div>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Pierna (cm)</label>
                   <input type="number" step="0.1" placeholder="Ej. 58.0" value={logForm.leg} onChange={e => setLogForm({...logForm, leg: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Pecho (cm)</label>
+                  <input type="number" step="0.1" placeholder="Ej. 102.0" value={logForm.chest} onChange={e => setLogForm({...logForm, chest: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Espalda (cm)</label>
+                  <input type="number" step="0.1" placeholder="Ej. 108.0" value={logForm.back} onChange={e => setLogForm({...logForm, back: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Antebrazo (cm)</label>
+                  <input type="number" step="0.1" placeholder="Ej. 30.0" value={logForm.forearm} onChange={e => setLogForm({...logForm, forearm: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Gemelo (cm)</label>
+                  <input type="number" step="0.1" placeholder="Ej. 40.0" value={logForm.calf} onChange={e => setLogForm({...logForm, calf: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
                 </div>
               </div>
             </div>

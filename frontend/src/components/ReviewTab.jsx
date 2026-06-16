@@ -16,7 +16,11 @@ const MEASURES = [
   { key: 'hip', label: 'Cadera', unit: 'cm' },
   { key: 'neck', label: 'Cuello', unit: 'cm' },
   { key: 'biceps', label: 'Bíceps', unit: 'cm' },
+  { key: 'forearm', label: 'Antebrazo', unit: 'cm' },
+  { key: 'chest', label: 'Pecho', unit: 'cm' },
+  { key: 'back', label: 'Espalda', unit: 'cm' },
   { key: 'leg', label: 'Pierna', unit: 'cm' },
+  { key: 'calf', label: 'Gemelo', unit: 'cm' },
 ];
 
 function formatCountdown(totalSeconds) {
@@ -59,7 +63,7 @@ export default function ReviewTab({ onLockChange }) {
   const [secondsLeft, setSecondsLeft] = useState(0);
 
   // Create form state
-  const [form, setForm] = useState({ weight: '', waist: '', hip: '', neck: '', biceps: '', leg: '', clientComments: '' });
+  const [form, setForm] = useState({ weight: '', waist: '', hip: '', neck: '', biceps: '', leg: '', chest: '', calf: '', forearm: '', back: '', clientComments: '' });
   const [photos, setPhotos] = useState({}); // { slot: { file, preview } }
   const fileInputs = useRef({});
 
@@ -121,8 +125,10 @@ export default function ReviewTab({ onLockChange }) {
   };
 
   const submitReview = async () => {
-    if (!form.weight || form.weight.toString().trim() === '') {
-      await dialog.alert('Introduce al menos el peso para enviar la revisión.', { title: 'Faltan datos' });
+    const anyMeasure = MEASURES.some(({ key }) => form[key] !== '' && form[key] !== null && form[key] !== undefined);
+    const anyPhoto = Object.keys(photos).length > 0;
+    if (!anyMeasure && !anyPhoto) {
+      await dialog.alert('Introduce al menos una medida o sube una foto antes de enviar la revisión.', { title: 'Faltan datos' });
       return;
     }
     setSubmitting(true);
@@ -140,7 +146,7 @@ export default function ReviewTab({ onLockChange }) {
       }
       Object.values(photos).forEach((p) => p.preview && URL.revokeObjectURL(p.preview));
       setPhotos({});
-      setForm({ weight: '', waist: '', hip: '', neck: '', biceps: '', leg: '', clientComments: '' });
+      setForm({ weight: '', waist: '', hip: '', neck: '', biceps: '', leg: '', chest: '', calf: '', forearm: '', back: '', clientComments: '' });
       dialog.toast('Revisión enviada a tu entrenador', { variant: 'success' });
       await refresh();
     } catch (e) {

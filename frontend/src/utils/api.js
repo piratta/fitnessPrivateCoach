@@ -64,6 +64,12 @@ export const reviewsApi = {
 
 export const usersApi = {
   completeOnboarding: (measurements) => request('/api/users/me/complete-onboarding', { method: 'POST', body: measurements }),
+  uploadInitialPhoto: (file, view) => {
+    const form = new FormData();
+    form.append('file', file);
+    if (view) form.append('view', view);
+    return request('/api/users/me/initial-photo', { method: 'POST', body: form, isForm: true });
+  },
   updateMe: (dto) => request('/api/users/me', { method: 'PUT', body: dto }),
   updateClient: (clientId, dto) => request(`/api/users/clients/${clientId}`, { method: 'PUT', body: dto }),
   resetClientPassword: (clientId) => request(`/api/users/clients/${clientId}/reset-password`, { method: 'POST' }),
