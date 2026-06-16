@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import InitialQuestionnaire from './InitialQuestionnaire';
 import ReviewTab from './ReviewTab';
 import GalleryTab from './GalleryTab';
+import ClientProfile from './ClientProfile';
 import { getChatMessages, addChatMessage, connectWebSocket, disconnectWebSocket, sendWebSocketMessage } from '../utils/chatStore';
 import { usersApi } from '../utils/api';
 import { useDialog } from './ui/Dialog';
@@ -12,6 +13,7 @@ import '../index.css';
 export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   const dialog = useDialog();
   const [isReviewLocked, setIsReviewLocked] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [activeTab, setActiveTab] = useState('workout'); 
   const [clientData, setClientData] = useState(null);
@@ -869,9 +871,15 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
               </div>
             </div>
           )}
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ fontWeight: '600', fontSize: '0.9rem' }}>{user.name.split(' ')[0]}</p>
-          </div>
+          <button
+            onClick={() => setShowProfile(true)}
+            title="Mi perfil"
+            style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', cursor: 'pointer', textAlign: 'right', padding: 0 }}
+          >
+            <p style={{ fontWeight: '600', fontSize: '0.9rem', textDecoration: 'underline dotted', textUnderlineOffset: '3px' }}>
+              {user.name.split(' ')[0]}
+            </p>
+          </button>
           <button onClick={() => { setShowChatModal(true); setUnreadMessages(0); }} style={{ position: 'relative', background: 'var(--accent-primary)', border: 'none', color: '#000', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '1.2rem', boxShadow: '0 0 10px rgba(224,248,0,0.3)' }}>
             💬
             {unreadMessages > 0 && (
@@ -1893,6 +1901,14 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
           </div>
         </div>,
         document.body
+      )}
+
+      {showProfile && (
+        <ClientProfile
+          user={clientData || user}
+          onClose={() => setShowProfile(false)}
+          onUpdated={() => fetchProfile()}
+        />
       )}
 
     </div>

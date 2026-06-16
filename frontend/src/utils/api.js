@@ -62,6 +62,11 @@ export const reviewsApi = {
   imageUrl: (imageId) => `${API_BASE_URL}/api/reviews/images/${imageId}`,
 };
 
+export const authApi = {
+  changePassword: (currentPassword, newPassword) =>
+    request('/api/auth/change-password', { method: 'POST', body: { currentPassword, newPassword } }),
+};
+
 export const usersApi = {
   completeOnboarding: (measurements) => request('/api/users/me/complete-onboarding', { method: 'POST', body: measurements }),
   uploadInitialPhoto: (file, view) => {
