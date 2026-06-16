@@ -181,24 +181,63 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   const [historyData, setHistoryData] = useState([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
+  // Loads the full workout history. We do it on mount (not just when the history tab opens) so
+  // we can transparently restore today's session on F5 — otherwise the user would see empty
+  // inputs after a reload even though their workout is already saved on the backend.
+  const fetchHistory = () => {
+    const token = localStorage.getItem('token');
+    if (!token) return Promise.resolve([]);
+    setIsLoadingHistory(true);
+    return fetch(`${API_BASE_URL}/api/workouts/history/me`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(res => res.ok ? res.json() : [])
+      .then(data => { setHistoryData(data); return data; })
+      .catch(err => { console.error(err); return []; })
+      .finally(() => setIsLoadingHistory(false));
+  };
+
   useEffect(() => {
-    if (activeTab === 'history') {
-      setIsLoadingHistory(true);
-      const token = localStorage.getItem('token');
-      fetch(`${API_BASE_URL}/api/workouts/history/me`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      .then(res => res.json())
-      .then(data => {
-        setHistoryData(data);
-        setIsLoadingHistory(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setIsLoadingHistory(false);
-      });
-    }
+    if (activeTab === 'history') fetchHistory();
   }, [activeTab]);
+
+  // Once the routine is known, look for a session already finished TODAY for the current day
+  // and rehydrate logs / summary / timers so a reload keeps the completed view intact.
+  useEffect(() => {
+    if (!clientData?.routine || isWorkoutLocked || isWorkoutStarted) return;
+    fetchHistory().then(list => {
+      if (!Array.isArray(list) || list.length === 0) return;
+      const today = new Date().toISOString().split('T')[0];
+      const todays = list.find(s => s.sessionDate === today);
+      if (!todays) return;
+
+      if (todays.logsJson) {
+        try {
+          const parsed = JSON.parse(todays.logsJson);
+          const isFlat = parsed && typeof parsed === 'object' && Object.keys(parsed).every(k => /^\d+$/.test(k));
+          setLogs(isFlat ? { [todays.dayName]: parsed } : parsed);
+        } catch (e) { /* ignore corrupt payload */ }
+      }
+      if (todays.commentsJson) {
+        try { setComments(JSON.parse(todays.commentsJson)); } catch (e) {}
+      }
+      if (todays.videoLinksJson) {
+        try { setVideoLinks(JSON.parse(todays.videoLinksJson)); } catch (e) {}
+      }
+      setActiveSessionId(todays.id);
+      setSelectedDay(todays.dayName);
+      setWorkoutSeconds(todays.durationSeconds || 0);
+      setWorkoutSummary({
+        time: formatTime(todays.durationSeconds || 0),
+        volume: todays.totalVolume,
+        sets: todays.completedSets,
+        percentage: todays.completionPercentage,
+      });
+      setIsWorkoutLocked(true);
+      setHasFinishedSession(true);
+    });
+    // eslint-disable-next-line
+  }, [clientData?.routine]);
 
   // Timers Effect
   useEffect(() => {
@@ -416,7 +455,42 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     }
   };
 
+  // Identify today's weekday in Spanish (matches the routine keys "Lunes", "Martes", …).
+  const todayWeekday = (() => {
+    const idx = new Date().getDay(); // Sun=0..Sat=6
+    return ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][idx];
+  })();
+  // A "pending past day" is one whose key appears earlier in the routine order than today AND
+  // whose logs have no completed sets recorded yet. We only highlight it when the user has
+  // navigated to it and is not in the middle of training another day.
+  const dayLogs = (logs && selectedDay) ? logs[selectedDay] : null;
+  const dayHasProgress = dayLogs && Object.values(dayLogs).flat().some(s => s.completed || s.skipped);
+  const isPastPendingDay = !!(selectedDay && selectedDay !== todayWeekday
+    && !isWorkoutLocked && !isWorkoutStarted && !dayHasProgress);
+
+  const moveRoutineToToday = async () => {
+    if (!clientData?.routine || selectedDay === todayWeekday) return;
+    const ok = await dialog.confirm(
+      `Vamos a mover los ejercicios de "${selectedDay}" al día de hoy (${todayWeekday}). El cambio es solo visual en tu planificador.`,
+      { title: 'Hacer hoy', confirmText: 'Mover a hoy' }
+    );
+    if (!ok) return;
+    const newRoutine = { ...clientData.routine };
+    const targetExisting = newRoutine[todayWeekday] || [];
+    newRoutine[todayWeekday] = [...targetExisting, ...(newRoutine[selectedDay] || [])];
+    newRoutine[selectedDay] = [];
+    setClientData({ ...clientData, routine: newRoutine });
+    setSelectedDay(todayWeekday);
+    dialog.toast(`Rutina movida a ${todayWeekday}`, { variant: 'success' });
+  };
+
   const progress = isDaySkipped ? 100 : (currentLogs && Object.values(currentLogs).flat().length > 0 ? (Math.round((Object.values(currentLogs).flat().filter(s => s.completed || s.skipped).length / Object.values(currentLogs).flat().length) * 100) || 0) : 0);
+  // When the workout is locked (finished/restored from history) the header must trust the
+  // summary computed at finish time, not the freshly initialised logs container — otherwise
+  // the header shows 0% right after F5 while the bottom summary still reads e.g. 85%.
+  const displayProgress = (isWorkoutLocked && workoutSummary && workoutSummary.percentage != null)
+    ? workoutSummary.percentage
+    : progress;
 
   const handleFinishWorkout = async () => {
     if (!currentLogs) return;
@@ -424,7 +498,45 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     const completedSets = Object.values(currentLogs).flat().filter(s => s.completed);
     
     if (completedSets.length === 0) {
-      await dialog.alert("No has completado ninguna serie. Registra al menos una para finalizar el entrenamiento.", { title: 'Entrenamiento incompleto' });
+      // Offer two ways out: keep going or wipe the session locally (no backend call so we do
+      // not pollute history with an empty workout).
+      const cancel = await dialog.confirm(
+        "No has completado ninguna serie. ¿Quieres cancelar este entrenamiento y empezarlo desde cero más tarde?",
+        { title: 'Entrenamiento incompleto', confirmText: 'Cancelar entreno', cancelText: 'Seguir entrenando', danger: true }
+      );
+      if (cancel) {
+        const sure = await dialog.confirm(
+          "¿Estás seguro? Se descartarán los datos no guardados de esta sesión.",
+          { title: 'Cancelar entrenamiento', confirmText: 'Sí, cancelar', cancelText: 'No', danger: true }
+        );
+        if (sure) {
+          // Reset local state only — no backend call.
+          setIsWorkoutStarted(false);
+          setIsWorkoutLocked(false);
+          setHasFinishedSession(false);
+          setIsFinished(false);
+          setWorkoutSeconds(0);
+          setRestSeconds(0);
+          setWorkoutSummary(null);
+          setActiveSessionId(null);
+          // Reinitialise the day's logs so all sets come back empty.
+          if (clientData?.routine) {
+            const fresh = {};
+            Object.keys(clientData.routine).forEach(day => {
+              fresh[day] = {};
+              const sorted = [...(clientData.routine[day] || [])].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
+              sorted.forEach((ex, exIdx) => {
+                const match = ex.reps ? ex.reps.match(/(\d+)x(.*)/) : null;
+                const setsCount = match ? parseInt(match[1]) : 3;
+                const targetReps = match ? match[2].trim() : (ex.reps || '10');
+                fresh[day][exIdx] = Array.from({ length: setsCount }).map(() => ({ weight: '', reps: targetReps, completed: false, skipped: false }));
+              });
+            });
+            setLogs(fresh);
+          }
+          dialog.toast('Entrenamiento cancelado', { variant: 'info' });
+        }
+      }
       return;
     }
 
@@ -455,7 +567,8 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
           totalVolume: totalVolume,
           completedSets: completedSets.length,
           completionPercentage: completionPercentage,
-          logsJson: JSON.stringify(currentLogs), // Enviar solo los logs de este dia para no exceder limite, o de todos. Mejor todos
+          // Persist the full per-day container so reload + history restore have a stable shape.
+          logsJson: JSON.stringify(logs),
           commentsJson: JSON.stringify(comments),
           videoLinksJson: JSON.stringify(videoLinks)
         })
@@ -577,9 +690,12 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
         return;
       }
       setHasFinishedSession(false);
-      setWorkoutSeconds(0);
-      setRestSeconds(0);
+      setActiveSessionId(null);
     }
+    // Always reset the timer when a workout starts so leftover seconds (e.g. from viewing a
+    // historic session in this same tab) never bleed into the new session.
+    setWorkoutSeconds(0);
+    setRestSeconds(0);
     setIsWorkoutStarted(true);
   };
 
@@ -997,14 +1113,20 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                   ))}
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '10px', flexWrap: 'wrap' }}>
                   <div>
                     <h3 style={{ fontSize: '1.6rem', fontWeight: '800' }}>{selectedDay}</h3>
+                    {isPastPendingDay && activeWorkout.length > 0 && (
+                      <button onClick={moveRoutineToToday}
+                        style={{ marginTop: '6px', background: 'rgba(255,170,0,0.1)', border: '1px solid #ffaa00', color: '#ffaa00', padding: '6px 12px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.75rem' }}>
+                        ⏩ Hacer hoy ({todayWeekday})
+                      </button>
+                    )}
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     {!isDaySkipped && (
                       <>
-                        <span style={{ fontSize: '1.5rem', fontWeight: '800', color: progress === 100 ? 'var(--accent-primary)' : '#fff' }}>{progress}%</span>
+                        <span style={{ fontSize: '1.5rem', fontWeight: '800', color: displayProgress === 100 ? 'var(--accent-primary)' : '#fff' }}>{displayProgress}%</span>
                         <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase' }}>Completado</p>
                       </>
                     )}
@@ -1013,12 +1135,12 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
 
                 {!isDaySkipped && (
                   <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', marginBottom: '30px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', background: 'var(--accent-primary)', width: `${progress}%`, transition: 'width 0.4s ease-out', boxShadow: '0 0 10px var(--accent-primary)' }}></div>
+                    <div style={{ height: '100%', background: 'var(--accent-primary)', width: `${displayProgress}%`, transition: 'width 0.4s ease-out', boxShadow: '0 0 10px var(--accent-primary)' }}></div>
                   </div>
                 )}
 
-                {/* Botón Saltar Día */}
-                {!isWorkoutStarted && (
+                {/* Botón Saltar Día — solo si no se ha empezado y NO está bloqueado (completado). */}
+                {!isWorkoutStarted && !isWorkoutLocked && (
                   <button onClick={toggleSkipDay} style={{ width: '100%', padding: '15px', background: isDaySkipped ? 'rgba(255,255,255,0.05)' : 'rgba(255, 69, 0, 0.1)', border: isDaySkipped ? '1px solid var(--border-light)' : '1px solid #ff4500', color: isDaySkipped ? 'var(--text-main)' : '#ff4500', borderRadius: '8px', marginBottom: '25px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer' }}>
                     {isDaySkipped ? '↩️ Deshacer Descanso y Entrenar' : '🛋️ Marcar día como Descanso'}
                   </button>
@@ -1460,7 +1582,14 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                       <div key={session.id} onClick={() => {
                         setActiveSessionId(session.id);
                         if (session.logsJson) {
-                           try { setLogs(JSON.parse(session.logsJson)); } catch(e){}
+                           try {
+                             const parsed = JSON.parse(session.logsJson);
+                             // Legacy sessions persisted only the inner per-exercise map for the
+                             // session day. Wrap it back into the {day: {exIdx: [...]}} shape so
+                             // currentLogs = logs[selectedDay] resolves correctly.
+                             const isFlat = parsed && typeof parsed === 'object' && Object.keys(parsed).every(k => /^\d+$/.test(k));
+                             setLogs(isFlat ? { [session.dayName]: parsed } : parsed);
+                           } catch(e){}
                         }
                         if (session.commentsJson) {
                            try { setComments(JSON.parse(session.commentsJson)); } catch(e){}
