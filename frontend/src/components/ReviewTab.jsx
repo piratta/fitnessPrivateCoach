@@ -45,7 +45,7 @@ function LockedView({ secondsLeft, nextReviewAt }) {
         <div style={{ fontSize: '2rem', fontWeight: 800, color: '#ffaa00', fontVariantNumeric: 'tabular-nums' }}>{formatCountdown(secondsLeft)}</div>
         {nextDate && (
           <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-            {nextDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })}
+            {nextDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })} a las 00:00
           </div>
         )}
       </div>

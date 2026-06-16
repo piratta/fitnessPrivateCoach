@@ -265,7 +265,13 @@ public class UserController {
             user.setName(dto.getName().trim());
         }
         if (dto.getLastName() != null) {
-            user.setLastName(dto.getLastName().trim());
+            String ln = dto.getLastName().trim();
+            // Treat blank or the username itself as 'no surname'.
+            if (ln.isEmpty() || ln.equalsIgnoreCase(user.getUsername())) {
+                user.setLastName(null);
+            } else {
+                user.setLastName(ln);
+            }
         }
         if (dto.getBirthDate() != null) {
             user.setBirthDate(dto.getBirthDate());

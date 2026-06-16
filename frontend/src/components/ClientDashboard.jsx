@@ -5,14 +5,16 @@ import ReviewTab from './ReviewTab';
 import GalleryTab from './GalleryTab';
 import ClientProfile from './ClientProfile';
 import { getChatMessages, addChatMessage, connectWebSocket, disconnectWebSocket, sendWebSocketMessage } from '../utils/chatStore';
-import { usersApi } from '../utils/api';
+import { usersApi, reviewsApi } from '../utils/api';
 import { useDialog } from './ui/Dialog';
 import { API_BASE_URL } from '../config';
 import '../index.css';
 
 export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   const dialog = useDialog();
-  const [isReviewLocked, setIsReviewLocked] = useState(false);
+  // null = unknown (still loading from backend). The badge only shows when explicitly false.
+  const [isReviewLocked, setIsReviewLocked] = useState(null);
+  const [hasActiveReview, setHasActiveReview] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [activeTab, setActiveTab] = useState('workout'); 
@@ -124,6 +126,24 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     fetchProfile();
     fetchProgressHistory();
   }, [user, activeTab]);
+
+  // Drive the review-tab badge from the backend so it never shows "1" while the lock is still
+  // closed. We refresh on mount and whenever the user navigates back to the review tab.
+  const refreshReviewBadge = async () => {
+    try {
+      const [lock, active] = await Promise.all([
+        reviewsApi.lockStatus(),
+        reviewsApi.active().catch(() => null),
+      ]);
+      setIsReviewLocked(!!lock?.locked);
+      setHasActiveReview(!!active);
+    } catch {
+      // Fall back to unknown so the badge stays hidden.
+      setIsReviewLocked(null);
+    }
+  };
+  useEffect(() => { refreshReviewBadge(); /* eslint-disable-next-line */ }, [user]);
+  useEffect(() => { if (activeTab !== 'review') refreshReviewBadge(); /* eslint-disable-next-line */ }, [activeTab]);
 
   const getTimeScaleLabel = () => {
     if (!clientData?.reviewFrequency) return 'Mes';
@@ -1555,7 +1575,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
           <button onClick={() => setActiveTab('review')} style={{ background: 'transparent', border: 'none', color: activeTab === 'review' ? 'var(--accent-primary)' : 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', cursor: 'pointer', position: 'relative' }}>
             <span style={{ fontSize: '1.5rem', position: 'relative' }}>
               📷
-              {isReviewLocked === false && (
+              {isReviewLocked === false && !hasActiveReview && (
                 <span style={{
                   position: 'absolute', top: '-6px', right: '-12px',
                   background: '#ff4500', color: '#fff', fontSize: '0.65rem', fontWeight: 'bold',

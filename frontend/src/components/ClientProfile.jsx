@@ -37,9 +37,12 @@ export default function ClientProfile({ user, onClose, onUpdated }) {
 
   useEffect(() => {
     if (!user) return;
+    // Defensive: avoid showing the username as a surname if a legacy row had them confused.
+    const safeLastName = user.lastName && user.lastName.toLowerCase() !== (user.username || '').toLowerCase()
+      ? user.lastName : '';
     setForm({
       name: user.name || '',
-      lastName: user.lastName || '',
+      lastName: safeLastName,
       birthDate: user.birthDate || '',
     });
   }, [user]);
@@ -105,6 +108,10 @@ export default function ClientProfile({ user, onClose, onUpdated }) {
         {/* Datos personales */}
         <h4 style={{ color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px', fontSize: '0.8rem' }}>Datos personales</h4>
         <div style={{ display: 'grid', gap: '12px', marginBottom: '14px' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Usuario (no editable)</label>
+            <input className="input-field" style={{ margin: 0, width: '100%', opacity: 0.7, cursor: 'not-allowed' }} value={user?.username || ''} disabled readOnly />
+          </div>
           <div>
             <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Nombre</label>
             <input className="input-field" style={{ margin: 0, width: '100%' }} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />

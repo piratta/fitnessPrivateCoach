@@ -32,7 +32,10 @@ public class UserDto {
         this.id = user.getId();
         this.email = user.getEmail();
         this.name = user.getName();
-        this.lastName = user.getLastName();
+        // Defensive: legacy rows had lastName accidentally populated with the username; treat
+        // that as "no surname recorded" so the profile UI does not show the login alias.
+        String ln = user.getLastName();
+        this.lastName = (ln != null && ln.equalsIgnoreCase(user.getUsername())) ? null : ln;
         this.birthDate = user.getBirthDate();
         this.role = user.getRole().name();
         this.status = user.getStatus();
