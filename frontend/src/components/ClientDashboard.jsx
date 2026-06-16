@@ -162,6 +162,9 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   const [restSeconds, setRestSeconds] = useState(0);
   const [workoutSummary, setWorkoutSummary] = useState(null);
   const [activeSessionId, setActiveSessionId] = useState(null);
+  // Sessions completed TODAY indexed by dayName. Drives the per-day "locked / completed" view
+  // so that finishing Lunes does not flag Martes (or any other day) as completed too.
+  const [todaySessionsByDay, setTodaySessionsByDay] = useState({});
 
   // Review Form State
   const [reviewData, setReviewData] = useState({
@@ -201,21 +204,39 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     if (activeTab === 'history') fetchHistory();
   }, [activeTab]);
 
-  // Once the routine is known, look for a session already finished TODAY for the current day
-  // and rehydrate logs / summary / timers so a reload keeps the completed view intact.
+  // Once the routine is known, build a map of dayName → session for sessions completed TODAY.
+  // We never use sessions from previous days here so the locked/completed view does not bleed
+  // into the next day's workout.
   useEffect(() => {
-    if (!clientData?.routine || isWorkoutLocked || isWorkoutStarted) return;
+    if (!clientData?.routine) return;
     fetchHistory().then(list => {
-      if (!Array.isArray(list) || list.length === 0) return;
+      if (!Array.isArray(list)) return;
       const today = new Date().toISOString().split('T')[0];
-      const todays = list.find(s => s.sessionDate === today);
-      if (!todays) return;
+      const byDay = {};
+      for (const s of list) {
+        if (s.sessionDate === today && s.dayName && !byDay[s.dayName]) {
+          byDay[s.dayName] = s;
+        }
+      }
+      setTodaySessionsByDay(byDay);
+    });
+    // eslint-disable-next-line
+  }, [clientData?.routine]);
 
+  // Whenever the user navigates to a different day, rehydrate the workout-state flags ONLY for
+  // that day. If the day has a session finished today we restore logs + summary; otherwise we
+  // clear the flags so the user can start a brand new workout for it.
+  useEffect(() => {
+    if (!selectedDay) return;
+    // Do not stomp on a workout that is mid-flight or being viewed live.
+    if (isWorkoutStarted) return;
+    const todays = todaySessionsByDay[selectedDay];
+    if (todays) {
       if (todays.logsJson) {
         try {
           const parsed = JSON.parse(todays.logsJson);
           const isFlat = parsed && typeof parsed === 'object' && Object.keys(parsed).every(k => /^\d+$/.test(k));
-          setLogs(isFlat ? { [todays.dayName]: parsed } : parsed);
+          setLogs(prev => ({ ...prev, ...(isFlat ? { [todays.dayName]: parsed } : parsed) }));
         } catch (e) { /* ignore corrupt payload */ }
       }
       if (todays.commentsJson) {
@@ -225,7 +246,6 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
         try { setVideoLinks(JSON.parse(todays.videoLinksJson)); } catch (e) {}
       }
       setActiveSessionId(todays.id);
-      setSelectedDay(todays.dayName);
       setWorkoutSeconds(todays.durationSeconds || 0);
       setWorkoutSummary({
         time: formatTime(todays.durationSeconds || 0),
@@ -235,9 +255,17 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
       });
       setIsWorkoutLocked(true);
       setHasFinishedSession(true);
-    });
+    } else {
+      // No session for this day today → present the fresh, ready-to-train view.
+      setActiveSessionId(null);
+      setWorkoutSeconds(0);
+      setRestSeconds(0);
+      setWorkoutSummary(null);
+      setIsWorkoutLocked(false);
+      setHasFinishedSession(false);
+    }
     // eslint-disable-next-line
-  }, [clientData?.routine]);
+  }, [selectedDay, todaySessionsByDay]);
 
   // Timers Effect
   useEffect(() => {
@@ -519,6 +547,12 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
           setRestSeconds(0);
           setWorkoutSummary(null);
           setActiveSessionId(null);
+          // Drop the "completed today" mark for this day if it had been set.
+          setTodaySessionsByDay(prev => {
+            const copy = { ...prev };
+            delete copy[selectedDay];
+            return copy;
+          });
           // Reinitialise the day's logs so all sets come back empty.
           if (clientData?.routine) {
             const fresh = {};
@@ -586,6 +620,24 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     setIsWorkoutStarted(false);
     setIsWorkoutLocked(true);
     setIsFinished(true);
+
+    // Register this day as completed today so navigating away and back keeps the locked view
+    // without re-fetching the history, and so other days do not inherit it.
+    setTodaySessionsByDay(prev => ({
+      ...prev,
+      [selectedDay]: {
+        id: activeSessionId,
+        dayName: selectedDay,
+        sessionDate: new Date().toISOString().split('T')[0],
+        durationSeconds: workoutSeconds,
+        totalVolume,
+        completedSets: completedSets.length,
+        completionPercentage,
+        logsJson: JSON.stringify(logs),
+        commentsJson: JSON.stringify(comments),
+        videoLinksJson: JSON.stringify(videoLinks),
+      }
+    }));
   };
 
   const updateBackendSession = async (currentLogsToSave, currentCommentsToSave, currentLinksToSave) => {
