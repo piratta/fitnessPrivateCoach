@@ -23,6 +23,7 @@ public class UserDto {
     private String routineJson;
     private LocalDateTime lastReviewDate;
     private LocalDateTime nextReviewAt;
+    private LocalDateTime createdAt;
 
     public UserDto() {
     }
@@ -44,6 +45,7 @@ public class UserDto {
         this.routineJson = user.getRoutineJson();
         this.lastReviewDate = user.getLastReviewDate();
         this.nextReviewAt = user.getNextReviewAt();
+        this.createdAt = user.getCreatedAt();
     }
 
     public UUID getId() { return id; }
@@ -87,6 +89,9 @@ public class UserDto {
 
     public LocalDateTime getNextReviewAt() { return nextReviewAt; }
     public void setNextReviewAt(LocalDateTime nextReviewAt) { this.nextReviewAt = nextReviewAt; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
     public String getReviewFrequency() { return reviewFrequency; }
     public void setReviewFrequency(String reviewFrequency) { this.reviewFrequency = reviewFrequency; }

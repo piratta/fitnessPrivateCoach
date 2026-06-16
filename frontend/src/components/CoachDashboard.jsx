@@ -122,8 +122,25 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
       return [];
     })
     .then(data => {
+      // Computes the upcoming payment date by stepping the creation date forward by the plan
+      // duration until it lands in the future. Keeps the table populated for clients that the
+      // backend does not (yet) track billing for.
+      const computeNextPayment = (createdAt, planId) => {
+        const plan = billingPlans.find(p => p.id === planId) || billingPlans[0];
+        const months = plan?.months || 1;
+        const base = createdAt ? new Date(createdAt) : new Date();
+        const now = new Date();
+        const date = new Date(base);
+        let guard = 0;
+        while (date <= now && guard < 240) {
+          date.setMonth(date.getMonth() + months);
+          guard++;
+        }
+        return date.toISOString().split('T')[0];
+      };
       const formattedClients = data.map(u => {
         const existingMock = MOCK_CLIENTS.find(c => c.email === u.email);
+        const billingPlanId = u.billingPlanId || 'bp1';
         return {
           id: u.id,
           name: u.name,
@@ -132,7 +149,8 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
           status: u.status || 'Activo',
           weight: existingMock ? existingMock.weight : '75kg',
           goal: u.goal || 'Hipertrofia',
-          billingPlanId: u.billingPlanId || 'bp1',
+          billingPlanId,
+          nextPaymentDate: computeNextPayment(u.createdAt, billingPlanId),
           completion: existingMock ? existingMock.completion : 0,
           nextReview: existingMock ? existingMock.nextReview : 'En 1 mes',
           weightHistory: existingMock ? existingMock.weightHistory : [75.0],
