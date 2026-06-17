@@ -6,8 +6,6 @@ import ReviewManager from './ReviewManager';
 import TemplateManager from './TemplateManager';
 import BillingManager from './BillingManager';
 import { initChatIfEmpty, connectWebSocket, disconnectWebSocket } from '../utils/chatStore';
-import { MOCK_CLIENTS } from '../utils/mockClients';
-import { MOCK_ROUTINES } from '../utils/mockRoutines';
 import { useDialog } from './ui/Dialog';
 import { API_BASE_URL } from '../config';
 import '../index.css';
