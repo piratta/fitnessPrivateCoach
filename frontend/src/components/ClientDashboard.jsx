@@ -584,12 +584,30 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   // the visible routine is empty. Fall back to the original template day so the exercises
   // appear right under the completed-summary card.
   const completedSessionToday = selectedDay ? todaySessionsByDay[selectedDay] : null;
+  // Template days that have already been trained somewhere in the current week. If the user
+  // navigates to a template day whose work was actually done on a different weekday, this
+  // pestaña should look empty (with a hint), not offer to repeat the same workout.
+  const trainedTemplateDays = new Set(
+    Object.values(todaySessionsByDay).map(s => s && s.dayName).filter(Boolean)
+  );
+  const consumedElsewhereSession = (selectedDay && !completedSessionToday)
+    ? Object.values(todaySessionsByDay).find(s => s && s.dayName === selectedDay)
+    : null;
+  const isDayConsumedElsewhere = !!consumedElsewhereSession;
+  const realExecutionDay = consumedElsewhereSession
+    ? (() => {
+        const d = new Date(consumedElsewhereSession.sessionDate);
+        return ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][d.getDay()];
+      })()
+    : null;
   const routineDayForRender = (clientData?.routine?.[selectedDay]?.length > 0)
     ? selectedDay
     : (completedSessionToday?.dayName || selectedDay);
-  const activeWorkout = (clientData?.routine && routineDayForRender && clientData.routine[routineDayForRender])
-    ? [...clientData.routine[routineDayForRender]].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1))
-    : [];
+  const activeWorkout = isDayConsumedElsewhere
+    ? []
+    : (clientData?.routine && routineDayForRender && clientData.routine[routineDayForRender])
+      ? [...clientData.routine[routineDayForRender]].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1))
+      : [];
   const currentLogs = (logs && selectedDay) ? logs[selectedDay] : null;
   const isDaySkipped = skippedDays[selectedDay];
 
@@ -1511,7 +1529,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '10px', flexWrap: 'wrap' }}>
                   <div>
                     <h3 style={{ fontSize: '1.6rem', fontWeight: '800' }}>{selectedDay}</h3>
-                    {isPastPendingDay && activeWorkout.length > 0 && (
+                    {isPastPendingDay && activeWorkout.length > 0 && !isDayConsumedElsewhere && (
                       <button onClick={moveRoutineToToday}
                         style={{ marginTop: '6px', background: 'rgba(255,170,0,0.1)', border: '1px solid #ffaa00', color: '#ffaa00', padding: '6px 12px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.75rem' }}>
                         ⏩ Hacer hoy ({todayWeekday})
@@ -1534,8 +1552,9 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                   </div>
                 )}
 
-                {/* Botón Saltar Día — solo si no se ha empezado y NO está bloqueado (completado). */}
-                {!isWorkoutStarted && !isWorkoutLocked && (
+                {/* Botón Saltar Día — solo si no se ha empezado, NO está bloqueado y NO se ha
+                    consumido en otro día. */}
+                {!isWorkoutStarted && !isWorkoutLocked && !isDayConsumedElsewhere && (
                   <button onClick={toggleSkipDay} style={{ width: '100%', padding: '15px', background: isDaySkipped ? 'rgba(255,255,255,0.05)' : 'rgba(255, 69, 0, 0.1)', border: isDaySkipped ? '1px solid var(--border-light)' : '1px solid #ff4500', color: isDaySkipped ? 'var(--text-main)' : '#ff4500', borderRadius: '8px', marginBottom: '25px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer' }}>
                     {isDaySkipped ? '↩️ Deshacer Descanso y Entrenar' : '🛋️ Marcar día como Descanso'}
                   </button>
@@ -1546,6 +1565,21 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                     <div style={{ fontSize: '4rem', marginBottom: '15px' }}>🔋</div>
                     <h3 style={{ color: '#00f2fe', marginBottom: '10px' }}>Día de Recuperación</h3>
                     <p style={{ color: 'var(--text-muted)' }}>El descanso es donde ocurre la magia. Aliméntate bien y prepárate para la próxima sesión. ¡Buen trabajo!</p>
+                  </div>
+                ) : isDayConsumedElsewhere ? (
+                  // The Lunes plan was already executed this week on another weekday — show a
+                  // placeholder instead of repeating the same exercises here.
+                  <div className="glass-panel fade-in" style={{ padding: '40px 20px', textAlign: 'center', borderTop: '4px solid var(--accent-primary)' }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '10px' }}>✅</div>
+                    <h3 style={{ marginBottom: '8px', color: '#fff' }}>Ya entrenaste este día</h3>
+                    <p style={{ color: 'var(--text-muted)', maxWidth: '380px', margin: '0 auto 18px', lineHeight: 1.5 }}>
+                      Hiciste la rutina de {selectedDay} el {realExecutionDay}. Puedes ver el detalle pulsando en esa pestaña.
+                    </p>
+                    {realExecutionDay && (
+                      <button onClick={() => setSelectedDay(realExecutionDay)} className="btn-primary" style={{ padding: '12px 24px' }}>
+                        Ver entreno del {realExecutionDay}
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div className="fade-in" style={{ display: 'grid', gap: '25px' }}>
