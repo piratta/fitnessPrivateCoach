@@ -533,7 +533,16 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   }, [isWorkoutStarted, selectedDay, logs, workoutSeconds, activeSessionId, IN_PROGRESS_KEY]);
 
   // Drop the local snapshot when the workout is no longer in progress.
+  // Skipping the first render here is critical: at mount time both flags start as false but
+  // the resume effect has not had a chance to read localStorage yet. Without this guard the
+  // snapshot was being wiped right before hydration, so refreshing while paused lost the
+  // workout entirely.
+  const cleanupGuardRef = useRef(false);
   useEffect(() => {
+    if (!cleanupGuardRef.current) {
+      cleanupGuardRef.current = true;
+      return;
+    }
     if (!isWorkoutStarted && !hasResumableWorkout) {
       try { localStorage.removeItem(IN_PROGRESS_KEY); } catch {}
     }
@@ -1756,8 +1765,9 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                         {activeWorkout.map((exercise, exIdx) => {
                           const stateKey = `${selectedDay}_${exIdx}`;
                           // Mock history string for visual demonstration
-                          const historyMocks = ["80kg x 10 (RIR 1)", "60kg x 12 (RIR 2)", "20kg x 15 (RIR 1)", "100kg x 8 (RIR 2)", "15kg x 15 (RIR 0)"];
-                          const historyMock = historyMocks[exIdx % historyMocks.length];
+                          // Mock removed: until a real "last session" lookup exists we'd rather
+                          // show nothing than fake data. The expected weight, if any, surfaces
+                          // as the placeholder of the kg input below.
                           const exerciseSets = normalizeExerciseSets(exercise);
                           const setsAreUniform = exerciseSets.length > 0
                             && exerciseSets.every(s => s.reps === exerciseSets[0].reps && (s.intensity || '') === (exerciseSets[0].intensity || ''));
@@ -1772,7 +1782,6 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                                     {exercise.isOptional && <span style={{ background: 'rgba(255, 170, 0, 0.1)', color: '#ffaa00', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>OPCIONAL</span>}
                                   </div>
                                 </div>
-                                <div style={{ fontSize: '0.8rem', color: 'var(--accent-primary)', marginTop: '5px' }}>⏱️ Última vez: {historyMock}</div>
                                 {setsAreUniform ? (
                                   <div style={{ display: 'flex', gap: '15px', marginTop: '10px', flexWrap: 'wrap' }}>
                                     <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>🎯 Objetivo: <strong style={{ color: '#fff' }}>{exerciseSets.length}x{exerciseSets[0].reps}</strong></span>
@@ -1800,7 +1809,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                                   return (
                                     <div key={setIdx} className="tracker-grid" style={{ display: 'grid', gridTemplateColumns: '40px 1fr 1fr 100px', gap: '10px', padding: '12px 15px', background: set.completed ? 'rgba(224, 248, 0, 0.03)' : (set.skipped ? 'rgba(255,255,255,0.02)' : 'transparent'), opacity: set.skipped ? 0.5 : 1, transition: 'all 0.3s' }}>
                                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: set.completed ? 'var(--accent-primary)' : 'var(--text-muted)', textDecoration: set.skipped ? 'line-through' : 'none' }}>{setIdx + 1}</div>
-                                      <div><input type="number" min="0" className="tracker-input" step="0.5" value={set.weight} onChange={(e) => updateSet(exIdx, setIdx, 'weight', e.target.value)} disabled={inputDisabled} style={{ width: '100%', padding: '10px', background: isEditing ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)', border: isEditing ? '1px solid var(--accent-primary)' : 'none', borderRadius: '6px', color: '#fff', textAlign: 'center', textDecoration: set.skipped ? 'line-through' : 'none' }} /></div>
+                                      <div><input type="number" min="0" className="tracker-input" step="0.5" placeholder={exercise.expectedWeight ? `${exercise.expectedWeight}` : ''} value={set.weight} onChange={(e) => updateSet(exIdx, setIdx, 'weight', e.target.value)} disabled={inputDisabled} style={{ width: '100%', padding: '10px', background: isEditing ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)', border: isEditing ? '1px solid var(--accent-primary)' : 'none', borderRadius: '6px', color: '#fff', textAlign: 'center', textDecoration: set.skipped ? 'line-through' : 'none' }} /></div>
                                       <div><input type="text" className="tracker-input" placeholder={set.reps} value={set.reps} onChange={(e) => updateSet(exIdx, setIdx, 'reps', e.target.value)} disabled={inputDisabled} style={{ width: '100%', padding: '10px', background: isEditing ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)', border: isEditing ? '1px solid var(--accent-primary)' : 'none', borderRadius: '6px', color: '#fff', textAlign: 'center', textDecoration: set.skipped ? 'line-through' : 'none' }} /></div>
                                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
                                         {isWorkoutLocked ? (
