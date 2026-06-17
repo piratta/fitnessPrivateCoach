@@ -10,6 +10,33 @@ import { useDialog } from './ui/Dialog';
 import { API_BASE_URL } from '../config';
 import '../index.css';
 
+/**
+ * Returns the prescribed sets for an exercise, always as an array of
+ * { reps, intensity, notes } objects.
+ *
+ * Defined at module scope (not inside the component) so the hot-reload / production bundle
+ * always sees a stable function reference and the effect callbacks can call it on first
+ * render without any temporal-dead-zone risk.
+ */
+function normalizeExerciseSets(ex) {
+  if (ex && Array.isArray(ex.sets) && ex.sets.length > 0) {
+    return ex.sets.map(s => ({
+      reps: (s && s.reps != null ? s.reps : '').toString(),
+      intensity: (s && s.intensity) || '',
+      notes: (s && s.notes) || '',
+    }));
+  }
+  const reps = ex && typeof ex.reps === 'string' ? ex.reps : '';
+  const match = reps.match(/^\s*(\d+)\s*x\s*(.+)\s*$/);
+  const count = match ? parseInt(match[1]) : 3;
+  const targetReps = match ? match[2].trim() : (reps || '10');
+  return Array.from({ length: count }).map(() => ({
+    reps: targetReps,
+    intensity: (ex && ex.intensity) || '',
+    notes: '',
+  }));
+}
+
 export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   const dialog = useDialog();
   // null = unknown (still loading from backend). The badge only shows when explicitly false.
@@ -406,31 +433,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   // multiple accounts does not cross-contaminate state.
   const IN_PROGRESS_KEY = `pf:inProgressWorkout:${user?.id || user?.email || 'anon'}`;
 
-  /**
-   * Returns the prescribed sets for an exercise, always as an array of
-   * { reps, intensity, notes } objects.
-   *
-   * - If the coach defined per-set details (ex.sets), they win.
-   * - Otherwise the legacy "NxM" shortcut in ex.reps is expanded into N identical sets so
-   *   the rest of the UI can iterate uniformly.
-   */
-  const normalizeExerciseSets = (ex) => {
-    if (Array.isArray(ex?.sets) && ex.sets.length > 0) {
-      return ex.sets.map(s => ({
-        reps: (s.reps ?? '').toString(),
-        intensity: s.intensity || '',
-        notes: s.notes || '',
-      }));
-    }
-    const match = ex?.reps ? ex.reps.match(/^\s*(\d+)\s*x\s*(.+)\s*$/) : null;
-    const count = match ? parseInt(match[1]) : 3;
-    const targetReps = match ? match[2].trim() : (ex?.reps || '10');
-    return Array.from({ length: count }).map(() => ({
-      reps: targetReps,
-      intensity: ex?.intensity || '',
-      notes: '',
-    }));
-  };
+  // normalizeExerciseSets lives at module scope (see top of this file).
 
   // Declared up here (not after the effect that uses them) so the hook order is stable and
   // the setters are guaranteed to exist when the effect callback runs on first mount.
