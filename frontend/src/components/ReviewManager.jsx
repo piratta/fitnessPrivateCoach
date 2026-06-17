@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { MOCK_CLIENTS } from '../utils/mockClients';
 import { useDialog } from './ui/Dialog';
 import '../index.css';
 
