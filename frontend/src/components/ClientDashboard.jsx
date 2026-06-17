@@ -18,6 +18,23 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   const [showProfile, setShowProfile] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [activeTab, setActiveTab] = useState('workout');
+
+  // Capture the browser back button so it does not exit the app. We seed a history entry per
+  // tab change, and on popstate we either switch back to a previous tab or, if we are already
+  // on the root tab (workout), push the state again instead of leaving.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    // Initial sentinel so the first back press has somewhere to land.
+    window.history.pushState({ inApp: true, tab: 'workout' }, '');
+    const onPopState = (e) => {
+      // The browser already popped one entry; re-push so we stay inside the app.
+      window.history.pushState({ inApp: true, tab: 'workout' }, '');
+      // If we were on a non-root tab, treat the back press as "go to workout".
+      setActiveTab(prev => prev === 'workout' ? prev : 'workout');
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
   const [clientData, setClientData] = useState(null);
   const [showRoutineTable, setShowRoutineTable] = useState(false);
   const [showEvaluationModal, setShowEvaluationModal] = useState(false);
@@ -362,24 +379,110 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     }
   }, [clientData?.routine]);
 
-  // Initialize logs dynamically when routine changes
+  // Local storage key for the in-progress workout. We keep it per user so a shared device with
+  // multiple accounts does not cross-contaminate state.
+  const IN_PROGRESS_KEY = `pf:inProgressWorkout:${user?.id || user?.email || 'anon'}`;
+
+  // Initialize logs dynamically when routine changes. If we have a fresh-on-disk in-progress
+  // workout for today, merge its persisted logs/timer into the initialised template so the
+  // user can pick up exactly where they left off after F5 / closing the tab.
   useEffect(() => {
-    if (clientData?.routine) {
-      const initialLogs = {};
-      Object.keys(clientData.routine).forEach(day => {
-        initialLogs[day] = {};
-        const exercises = clientData.routine[day] || [];
-        const sorted = [...exercises].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
-        sorted.forEach((ex, exIdx) => {
-          const match = ex.reps ? ex.reps.match(/(\d+)x(.*)/) : null;
-          const setsCount = match ? parseInt(match[1]) : 3;
-          const targetReps = match ? match[2].trim() : (ex.reps || '10');
-          initialLogs[day][exIdx] = Array.from({ length: setsCount }).map(() => ({ weight: '', reps: targetReps, completed: false, skipped: false }));
-        });
+    if (!clientData?.routine) return;
+    const initialLogs = {};
+    Object.keys(clientData.routine).forEach(day => {
+      initialLogs[day] = {};
+      const exercises = clientData.routine[day] || [];
+      const sorted = [...exercises].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
+      sorted.forEach((ex, exIdx) => {
+        const match = ex.reps ? ex.reps.match(/(\d+)x(.*)/) : null;
+        const setsCount = match ? parseInt(match[1]) : 3;
+        const targetReps = match ? match[2].trim() : (ex.reps || '10');
+        initialLogs[day][exIdx] = Array.from({ length: setsCount }).map(() => ({ weight: '', reps: targetReps, completed: false, skipped: false }));
       });
+    });
+
+    let resumed = null;
+    try {
+      const raw = localStorage.getItem(IN_PROGRESS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const today = new Date().toISOString().split('T')[0];
+        // Only resume if it was started today AND the day still exists in the current routine.
+        if (parsed.sessionDate === today && parsed.dayName && initialLogs[parsed.dayName]) {
+          resumed = parsed;
+        } else {
+          localStorage.removeItem(IN_PROGRESS_KEY);
+        }
+      }
+    } catch { /* ignore corrupt blob */ }
+
+    if (resumed) {
+      const merged = { ...initialLogs, [resumed.dayName]: resumed.dayLogs || initialLogs[resumed.dayName] };
+      setLogs(merged);
+      setSelectedDay(resumed.dayName);
+      setWorkoutSeconds(resumed.workoutSeconds || 0);
+      if (resumed.activeSessionId) setActiveSessionId(resumed.activeSessionId);
+      // Do not flip isWorkoutStarted automatically; show a banner that lets the user resume.
+      setHasResumableWorkout(true);
+    } else {
       setLogs(initialLogs);
     }
   }, [clientData?.routine]);
+
+  // Lets us prompt the user with "Reanudar entreno" instead of silently auto-starting the
+  // timer (which would falsify the duration if they were away for hours).
+  const [hasResumableWorkout, setHasResumableWorkout] = useState(false);
+
+  // Autosave the in-progress workout whenever the relevant slices change. Only while the
+  // workout is running — once it is finished or locked we let the backend be the source of
+  // truth and clear the local snapshot.
+  useEffect(() => {
+    if (!isWorkoutStarted || !selectedDay || !logs || !logs[selectedDay]) return;
+    try {
+      localStorage.setItem(IN_PROGRESS_KEY, JSON.stringify({
+        dayName: selectedDay,
+        sessionDate: new Date().toISOString().split('T')[0],
+        dayLogs: logs[selectedDay],
+        workoutSeconds,
+        activeSessionId,
+        savedAt: Date.now(),
+      }));
+    } catch { /* quota or serialisation issue — ignore */ }
+  }, [isWorkoutStarted, selectedDay, logs, workoutSeconds, activeSessionId, IN_PROGRESS_KEY]);
+
+  // Drop the local snapshot when the workout is no longer in progress.
+  useEffect(() => {
+    if (!isWorkoutStarted && !hasResumableWorkout) {
+      try { localStorage.removeItem(IN_PROGRESS_KEY); } catch {}
+    }
+  }, [isWorkoutStarted, hasResumableWorkout, IN_PROGRESS_KEY]);
+
+  const resumeWorkout = () => {
+    setHasResumableWorkout(false);
+    setIsWorkoutStarted(true);
+    setIsWorkoutLocked(false);
+    setHasFinishedSession(false);
+  };
+
+  const discardResumableWorkout = () => {
+    setHasResumableWorkout(false);
+    try { localStorage.removeItem(IN_PROGRESS_KEY); } catch {}
+    // Restore the day to fresh empty logs.
+    if (clientData?.routine && selectedDay) {
+      const fresh = {};
+      const exercises = clientData.routine[selectedDay] || [];
+      const sorted = [...exercises].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
+      sorted.forEach((ex, exIdx) => {
+        const match = ex.reps ? ex.reps.match(/(\d+)x(.*)/) : null;
+        const setsCount = match ? parseInt(match[1]) : 3;
+        const targetReps = match ? match[2].trim() : (ex.reps || '10');
+        fresh[exIdx] = Array.from({ length: setsCount }).map(() => ({ weight: '', reps: targetReps, completed: false, skipped: false }));
+      });
+      setLogs(prev => ({ ...prev, [selectedDay]: fresh }));
+    }
+    setWorkoutSeconds(0);
+    setActiveSessionId(null);
+  };
 
   const activeWorkout = (clientData?.routine && selectedDay && clientData.routine[selectedDay])
     ? [...clientData.routine[selectedDay]].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1))
@@ -495,7 +598,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     setLogs(newLogs);
 
     if (isNowCompleted && isWorkoutStarted) {
-      setRestSeconds(90); // 90 seconds rest timer
+      setRestSeconds(180); // 3-minute rest timer between sets
     }
   };
 
@@ -554,19 +657,55 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
 
   const moveRoutineToToday = async () => {
     if (!clientData?.routine || selectedDay === todayWeekday) return;
-    const ok = await dialog.confirm(
-      `Vamos a mover los ejercicios de "${selectedDay}" al día de hoy (${todayWeekday}). El cambio es solo visual en tu planificador.`,
-      { title: 'Hacer hoy', confirmText: 'Mover a hoy' }
-    );
-    const logsFlat = currentLogs ? Object.values(currentLogs || {}).flat() : [];
-    if (!ok) return;
+    const sourceDay = selectedDay;
     const newRoutine = { ...clientData.routine };
-    const targetExisting = newRoutine[todayWeekday] || [];
-    newRoutine[todayWeekday] = [...targetExisting, ...(newRoutine[selectedDay] || [])];
-    newRoutine[selectedDay] = [];
+    const sourceExercises = [...(newRoutine[sourceDay] || [])];
+    const targetExercises = [...(newRoutine[todayWeekday] || [])];
+
+    let mode = 'replace';
+    if (targetExercises.length > 0) {
+      // The target day already has a routine — let the user decide what to do with it.
+      const swap = await dialog.confirm(
+        `Hoy (${todayWeekday}) ya tiene una rutina con ${targetExercises.length} ejercicio(s). ¿Cómo quieres combinarla con la de ${sourceDay}?`,
+        { title: 'Hacer hoy', confirmText: '🔁 Intercambiar', cancelText: '➕ Añadir al final' }
+      );
+      mode = swap ? 'swap' : 'append';
+    } else {
+      const ok = await dialog.confirm(
+        `Vamos a mover los ejercicios de "${sourceDay}" al día de hoy (${todayWeekday}).`,
+        { title: 'Hacer hoy', confirmText: 'Mover a hoy' }
+      );
+      if (!ok) return;
+    }
+
+    if (mode === 'swap') {
+      // Cross-swap: the source day takes today's routine so nothing is lost.
+      newRoutine[todayWeekday] = sourceExercises;
+      newRoutine[sourceDay] = targetExercises;
+    } else if (mode === 'append') {
+      newRoutine[todayWeekday] = [...targetExercises, ...sourceExercises];
+      newRoutine[sourceDay] = [];
+    } else {
+      newRoutine[todayWeekday] = sourceExercises;
+      newRoutine[sourceDay] = [];
+    }
+
     setClientData({ ...clientData, routine: newRoutine });
     setSelectedDay(todayWeekday);
-    dialog.toast(`Rutina movida a ${todayWeekday}`, { variant: 'success' });
+
+    // Persist so the rearrangement survives F5. The coach can overwrite later if they assign
+    // a new plan.
+    try {
+      await usersApi.updateMe({ routineJson: JSON.stringify(newRoutine) });
+      const msg = mode === 'swap'
+        ? `Intercambiados ${sourceDay} ↔ ${todayWeekday}`
+        : mode === 'append'
+          ? `Rutina añadida al final de ${todayWeekday}`
+          : `Rutina movida a ${todayWeekday}`;
+      dialog.toast(msg, { variant: 'success' });
+    } catch (e) {
+      await dialog.alert(`El cambio se aplicó localmente pero no se pudo guardar en el servidor: ${e.message || ''}`, { title: 'Aviso' });
+    }
   };
 
   const progress = isDaySkipped ? 100 : (currentLogs && Object.values(currentLogs).flat().length > 0 ? (Math.round((Object.values(currentLogs).flat().filter(s => s.completed || s.skipped).length / Object.values(currentLogs).flat().length) * 100) || 0) : 0);
@@ -1274,6 +1413,21 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                   <div className="fade-in" style={{ display: 'grid', gap: '25px' }}>
                     {!isWorkoutStarted && !isWorkoutLocked ? (
                       <div>
+                        {hasResumableWorkout && (
+                          <div style={{ background: 'rgba(255, 170, 0, 0.1)', border: '1px solid #ffaa00', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                              <span style={{ fontSize: '1.4rem' }}>⏱️</span>
+                              <strong style={{ color: '#ffaa00' }}>Entrenamiento sin terminar</strong>
+                            </div>
+                            <p style={{ color: 'var(--text-main)', fontSize: '0.9rem', marginBottom: '12px' }}>
+                              Tienes un entrenamiento empezado hoy ({selectedDay}, {formatTime(workoutSeconds)}). ¿Quieres continuarlo?
+                            </p>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                              <button onClick={resumeWorkout} className="btn-primary" style={{ flex: 1, padding: '12px', fontWeight: 'bold' }}>▶ Reanudar</button>
+                              <button onClick={discardResumableWorkout} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid #ff4500', color: '#ff4500', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Descartar</button>
+                            </div>
+                          </div>
+                        )}
                         <div style={{ textAlign: 'center', padding: '20px 0 30px' }}>
                           <button
                             onClick={handleStartWorkout}

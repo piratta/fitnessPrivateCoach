@@ -34,16 +34,22 @@ public class WorkoutController {
                 .or(() -> userRepository.findByUsername(principal))
                 .orElseThrow();
 
-        WorkoutSession session = new WorkoutSession();
+        // Always record the real execution date so a client who trains a "Monday" routine on
+        // Tuesday gets it counted in the current week's stats and history sort.
+        LocalDate today = LocalDate.now();
+        // UPSERT: if the client already finalised this dayName today (e.g. lost connection,
+        // refreshed, finished twice), reuse the existing row instead of polluting the history
+        // with duplicates.
+        WorkoutSession session = workoutRepository
+                .findFirstByClientAndDayNameAndSessionDate(client, request.getDayName(), today)
+                .orElseGet(WorkoutSession::new);
         session.setClient(client);
         session.setDayName(request.getDayName());
         session.setDurationSeconds(request.getDurationSeconds());
         session.setTotalVolume(request.getTotalVolume());
         session.setCompletedSets(request.getCompletedSets());
         session.setCompletionPercentage(request.getCompletionPercentage());
-        // Always record the real execution date so a client who trains a "Monday" routine on
-        // Tuesday gets it counted in the current week's stats and history sort.
-        session.setSessionDate(LocalDate.now());
+        session.setSessionDate(today);
         session.setLogsJson(request.getLogsJson());
         session.setCommentsJson(request.getCommentsJson());
         session.setVideoLinksJson(request.getVideoLinksJson());

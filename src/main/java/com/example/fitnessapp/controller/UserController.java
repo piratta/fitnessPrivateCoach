@@ -286,6 +286,11 @@ public class UserController {
             });
             user.setEmail(newEmail);
         }
+        // Allow the client to persist a "moved to today" routine rearrangement. The coach can
+        // overwrite this when assigning a new plan.
+        if (dto.getRoutineJson() != null) {
+            user.setRoutineJson(dto.getRoutineJson());
+        }
         userRepository.save(user);
         return ResponseEntity.ok(new UserDto(user));
     }

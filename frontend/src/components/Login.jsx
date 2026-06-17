@@ -34,6 +34,8 @@ export default function Login({ onLogin }) {
       console.log("[LOG] Datos recibidos del servidor:", data); // Verifica que 'data.user' existe
 
       localStorage.setItem('token', data.accessToken);
+      // Persist the user too so a full reload skips the credentials screen.
+      try { localStorage.setItem('user', JSON.stringify(data.user)); } catch {}
 
       if (data.user && data.user.mustChangePassword) {
         console.log("[LOG] Password debe cambiarse, redirigiendo a modo cambio...");

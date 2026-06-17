@@ -1,10 +1,17 @@
 package com.example.fitnessapp.repository;
 
+import com.example.fitnessapp.model.User;
 import com.example.fitnessapp.model.WorkoutSession;
 import org.springframework.data.jpa.repository.JpaRepository;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, UUID> {
     List<WorkoutSession> findByClientIdOrderBySessionDateDesc(UUID clientId);
+
+    // Used by the finish-workout endpoint to UPSERT instead of creating a duplicate row when
+    // the client finalises the same day's routine multiple times in the same calendar day.
+    Optional<WorkoutSession> findFirstByClientAndDayNameAndSessionDate(User client, String dayName, LocalDate sessionDate);
 }
