@@ -71,13 +71,13 @@ privateFitness/
 └── developer.md, README.md
 ```
 
-> ⚠️ Coexisten dos paquetes Java: `com.example.fitness` (legacy) y `com.example.fitnessapp` (actual). **Todo lo nuevo va en `fitnessapp`**. El paquete `fitness` se mantiene porque algunas entidades viejas aún están referenciadas.
+> ⚠️ Coexisten dos paquetes Java: `com.fitnessApp.fitness` (legacy) y `com.fitnessApp.fitnessapp` (actual). **Todo lo nuevo va en `fitnessapp`**. El paquete `fitness` se mantiene porque algunas entidades viejas aún están referenciadas.
 
 ---
 
 ## 3. Modelo de datos
 
-### Entidades principales (`com.example.fitnessapp.model`)
+### Entidades principales (`com.fitnessApp.fitnessapp.model`)
 - `User`: cuenta del sistema (rol `COACH`, `PREMIUM_CLIENT`, `FREE_USER`, `SUPER_ADMIN`). Campos clave: `email`, `username`, `passwordHash`, `coach` (self-FK), `routineJson`, `mustChangePassword`, **`onboardingCompleted`** (Boolean nullable), **`nextReviewAt`**, `reviewFrequency`.
 - `ProgressLog`: una fila por día. Constraint **`UNIQUE(client_id, log_date)`** — la lógica UPSERT vive en `ProgressLogController#addProgressLog`.
 - `Review`: snapshot de una revisión + relación 1:N con `ReviewImage`. Estado FSM en `status` (`ReviewStatus`).
@@ -255,4 +255,4 @@ java -jar target/*.jar
 - PDF personalizado del entrenamiento con `@react-pdf/renderer` (decisión: client-side, sin pasar por el backend).
 - Vista entrenamiento en formato tabla nativa para escritorio.
 - Notificación push real de mensajes nuevos (hoy solo badge in-app).
-- Eliminar el paquete legacy `com.example.fitness` cuando ya nada lo referencie.
+- Eliminar el paquete legacy `com.fitnessApp.fitness` cuando ya nada lo referencie.
