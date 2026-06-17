@@ -340,13 +340,22 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
         const d = new Date(iso);
         return d >= monday && d <= sunday;
       };
-      // Keep the MOST RECENT session per dayName in the current week.
+      const weekdayOf = (iso) => {
+        if (!iso) return null;
+        const d = new Date(iso);
+        return ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][d.getDay()];
+      };
+      // Index by the REAL execution weekday (sessionDate), not by the template column name,
+      // so a workout planned for "Lunes" but executed on Tuesday shows up under "Martes" with
+      // its summary + logs, and the original "Lunes" tab stays empty (no work done that day).
       const byDay = {};
       for (const s of list) {
-        if (!s.dayName || !inWeek(s.sessionDate)) continue;
-        const prev = byDay[s.dayName];
+        if (!inWeek(s.sessionDate)) continue;
+        const key = weekdayOf(s.sessionDate);
+        if (!key) continue;
+        const prev = byDay[key];
         if (!prev || new Date(s.sessionDate) > new Date(prev.sessionDate)) {
-          byDay[s.dayName] = s;
+          byDay[key] = s;
         }
       }
       setTodaySessionsByDay(byDay);
@@ -367,7 +376,11 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
         try {
           const parsed = JSON.parse(todays.logsJson);
           const isFlat = parsed && typeof parsed === 'object' && Object.keys(parsed).every(k => /^\d+$/.test(k));
-          setLogs(prev => ({ ...prev, ...(isFlat ? { [todays.dayName]: parsed } : parsed) }));
+          // Persisted container is keyed by the TEMPLATE dayName (e.g. "Lunes") but the user
+          // is looking at the REAL weekday (e.g. "Martes"). Project the inner slot onto the
+          // real day so currentLogs = logs[selectedDay] resolves to the saved sets.
+          const innerSlot = isFlat ? parsed : (parsed[todays.dayName] || parsed[selectedDay] || {});
+          setLogs(prev => ({ ...prev, [selectedDay]: innerSlot }));
         } catch (e) { /* ignore corrupt payload */ }
       }
       if (todays.commentsJson) {
@@ -566,8 +579,16 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     setActiveSessionId(null);
   };
 
-  const activeWorkout = (clientData?.routine && selectedDay && clientData.routine[selectedDay])
-    ? [...clientData.routine[selectedDay]].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1))
+  // When the user is looking at a day whose only "content" comes from a session executed on
+  // that day but planned for a different template column (e.g. Lunes plan trained on Martes),
+  // the visible routine is empty. Fall back to the original template day so the exercises
+  // appear right under the completed-summary card.
+  const completedSessionToday = selectedDay ? todaySessionsByDay[selectedDay] : null;
+  const routineDayForRender = (clientData?.routine?.[selectedDay]?.length > 0)
+    ? selectedDay
+    : (completedSessionToday?.dayName || selectedDay);
+  const activeWorkout = (clientData?.routine && routineDayForRender && clientData.routine[routineDayForRender])
+    ? [...clientData.routine[routineDayForRender]].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1))
     : [];
   const currentLogs = (logs && selectedDay) ? logs[selectedDay] : null;
   const isDaySkipped = skippedDays[selectedDay];
