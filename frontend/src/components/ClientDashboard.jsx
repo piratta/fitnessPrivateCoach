@@ -482,6 +482,26 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     setHasFinishedSession(false);
   };
 
+  // Manual pause: stop the live timer, force-write the snapshot so it survives a refresh
+  // / lost session, and surface the resume banner so the user can pick up later.
+  const handlePauseWorkout = () => {
+    if (!isWorkoutStarted) return;
+    try {
+      localStorage.setItem(IN_PROGRESS_KEY, JSON.stringify({
+        dayName: selectedDay,
+        sessionDate: new Date().toISOString().split('T')[0],
+        dayLogs: logs?.[selectedDay] || {},
+        workoutSeconds,
+        activeSessionId,
+        savedAt: Date.now(),
+      }));
+    } catch { /* quota — ignore, we still pause locally */ }
+    setIsWorkoutStarted(false);
+    setHasResumableWorkout(true);
+    setRestSeconds(0);
+    dialog.toast('Entrenamiento pausado. Puedes reanudarlo cuando quieras.', { variant: 'info' });
+  };
+
   const discardResumableWorkout = () => {
     setHasResumableWorkout(false);
     try { localStorage.removeItem(IN_PROGRESS_KEY); } catch {}
@@ -1598,8 +1618,16 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                         })}
 
                         {!isWorkoutLocked ? (
-                          <div style={{ marginTop: '30px', marginBottom: '20px' }}>
+                          <div style={{ marginTop: '30px', marginBottom: '20px', display: 'grid', gap: '12px' }}>
                             <button onClick={handleFinishWorkout} className="btn-primary" style={{ width: '100%', padding: '20px', fontSize: '1.2rem', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}>🏁 FINALIZAR ENTRENAMIENTO</button>
+                            {isWorkoutStarted && (
+                              <button
+                                onClick={handlePauseWorkout}
+                                style={{ width: '100%', padding: '14px', background: 'rgba(255,170,0,0.1)', border: '1px solid #ffaa00', color: '#ffaa00', borderRadius: '8px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer' }}
+                              >
+                                ⏸️ Pausar entrenamiento
+                              </button>
+                            )}
                           </div>
                         ) : (
                           <div style={{ marginTop: '30px', marginBottom: '20px' }}>
