@@ -352,6 +352,11 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
       });
       setIsWorkoutLocked(true);
       setHasFinishedSession(true);
+    } else if (hasResumableWorkout && resumableDayName === selectedDay) {
+      // Day has a paused / unfinished workout — keep its persisted state intact so the
+      // resume banner has the right seconds + logs to offer.
+      setIsWorkoutLocked(false);
+      setHasFinishedSession(false);
     } else {
       // No session for this day today → present the fresh, ready-to-train view.
       setActiveSessionId(null);
@@ -362,7 +367,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
       setHasFinishedSession(false);
     }
     // eslint-disable-next-line
-  }, [selectedDay, todaySessionsByDay]);
+  }, [selectedDay, todaySessionsByDay, hasResumableWorkout, resumableDayName]);
 
   // Timers Effect
   useEffect(() => {
@@ -442,6 +447,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
       if (resumed.activeSessionId) setActiveSessionId(resumed.activeSessionId);
       // Do not flip isWorkoutStarted automatically; show a banner that lets the user resume.
       setHasResumableWorkout(true);
+      setResumableDayName(resumed.dayName);
     } else {
       setLogs(initialLogs);
     }
@@ -450,6 +456,9 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   // Lets us prompt the user with "Reanudar entreno" instead of silently auto-starting the
   // timer (which would falsify the duration if they were away for hours).
   const [hasResumableWorkout, setHasResumableWorkout] = useState(false);
+  // The day the paused / unfinished workout belongs to, so the banner and the protection
+  // against the per-day reset are scoped to that day only.
+  const [resumableDayName, setResumableDayName] = useState(null);
 
   // Autosave the in-progress workout whenever the relevant slices change. Only while the
   // workout is running — once it is finished or locked we let the backend be the source of
@@ -477,6 +486,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
 
   const resumeWorkout = () => {
     setHasResumableWorkout(false);
+    setResumableDayName(null);
     setIsWorkoutStarted(true);
     setIsWorkoutLocked(false);
     setHasFinishedSession(false);
@@ -498,12 +508,14 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     } catch { /* quota — ignore, we still pause locally */ }
     setIsWorkoutStarted(false);
     setHasResumableWorkout(true);
+    setResumableDayName(selectedDay);
     setRestSeconds(0);
     dialog.toast('Entrenamiento pausado. Puedes reanudarlo cuando quieras.', { variant: 'info' });
   };
 
   const discardResumableWorkout = () => {
     setHasResumableWorkout(false);
+    setResumableDayName(null);
     try { localStorage.removeItem(IN_PROGRESS_KEY); } catch {}
     // Restore the day to fresh empty logs.
     if (clientData?.routine && selectedDay) {
@@ -1451,14 +1463,14 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                   <div className="fade-in" style={{ display: 'grid', gap: '25px' }}>
                     {!isWorkoutStarted && !isWorkoutLocked ? (
                       <div>
-                        {hasResumableWorkout && (
+                        {hasResumableWorkout && resumableDayName === selectedDay && (
                           <div style={{ background: 'rgba(255, 170, 0, 0.1)', border: '1px solid #ffaa00', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
                               <span style={{ fontSize: '1.4rem' }}>⏱️</span>
                               <strong style={{ color: '#ffaa00' }}>Entrenamiento sin terminar</strong>
                             </div>
                             <p style={{ color: 'var(--text-main)', fontSize: '0.9rem', marginBottom: '12px' }}>
-                              Tienes un entrenamiento empezado hoy ({selectedDay}, {formatTime(workoutSeconds)}). ¿Quieres continuarlo?
+                              Tienes un entrenamiento empezado hoy ({selectedDay}). ¿Quieres continuarlo?
                             </p>
                             <div style={{ display: 'flex', gap: '10px' }}>
                               <button onClick={resumeWorkout} className="btn-primary" style={{ flex: 1, padding: '12px', fontWeight: 'bold' }}>▶ Reanudar</button>
