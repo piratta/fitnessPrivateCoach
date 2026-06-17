@@ -406,6 +406,11 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   // multiple accounts does not cross-contaminate state.
   const IN_PROGRESS_KEY = `pf:inProgressWorkout:${user?.id || user?.email || 'anon'}`;
 
+  // Declared up here (not after the effect that uses them) so the hook order is stable and
+  // the setters are guaranteed to exist when the effect callback runs on first mount.
+  const [hasResumableWorkout, setHasResumableWorkout] = useState(false);
+  const [resumableDayName, setResumableDayName] = useState(null);
+
   // Initialize logs dynamically when routine changes. If we have a fresh-on-disk in-progress
   // workout for today, merge its persisted logs/timer into the initialised template so the
   // user can pick up exactly where they left off after F5 / closing the tab.
@@ -452,13 +457,6 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
       setLogs(initialLogs);
     }
   }, [clientData?.routine]);
-
-  // Lets us prompt the user with "Reanudar entreno" instead of silently auto-starting the
-  // timer (which would falsify the duration if they were away for hours).
-  const [hasResumableWorkout, setHasResumableWorkout] = useState(false);
-  // The day the paused / unfinished workout belongs to, so the banner and the protection
-  // against the per-day reset are scoped to that day only.
-  const [resumableDayName, setResumableDayName] = useState(null);
 
   // Autosave the in-progress workout whenever the relevant slices change. Only while the
   // workout is running — once it is finished or locked we let the backend be the source of
