@@ -23,6 +23,7 @@ public class UserDto {
     private String routineJson;
     private LocalDateTime lastReviewDate;
     private LocalDateTime nextReviewAt;
+    private LocalDateTime createdAt;
 
     public UserDto() {
     }
@@ -31,7 +32,10 @@ public class UserDto {
         this.id = user.getId();
         this.email = user.getEmail();
         this.name = user.getName();
-        this.lastName = user.getLastName();
+        // Defensive: legacy rows had lastName accidentally populated with the username; treat
+        // that as "no surname recorded" so the profile UI does not show the login alias.
+        String ln = user.getLastName();
+        this.lastName = (ln != null && ln.equalsIgnoreCase(user.getUsername())) ? null : ln;
         this.birthDate = user.getBirthDate();
         this.role = user.getRole().name();
         this.status = user.getStatus();
@@ -44,6 +48,7 @@ public class UserDto {
         this.routineJson = user.getRoutineJson();
         this.lastReviewDate = user.getLastReviewDate();
         this.nextReviewAt = user.getNextReviewAt();
+        this.createdAt = user.getCreatedAt();
     }
 
     public UUID getId() { return id; }
@@ -87,6 +92,9 @@ public class UserDto {
 
     public LocalDateTime getNextReviewAt() { return nextReviewAt; }
     public void setNextReviewAt(LocalDateTime nextReviewAt) { this.nextReviewAt = nextReviewAt; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
     public String getReviewFrequency() { return reviewFrequency; }
     public void setReviewFrequency(String reviewFrequency) { this.reviewFrequency = reviewFrequency; }

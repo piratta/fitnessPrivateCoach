@@ -48,13 +48,19 @@ public class ReviewController {
     @GetMapping("/lock-status")
     public ResponseEntity<Map<String, Object>> lockStatus() {
         User client = currentUser();
-        boolean locked = reviewService.isLocked(client);
+        // Normalize nextReviewAt to start-of-day so legacy rows recorded at random hours show
+        // the unlock at 00:00, matching the new policy. Recompute lock + countdown from there.
+        LocalDateTime stored = client.getNextReviewAt();
+        LocalDateTime nextAt = stored == null ? null : stored.toLocalDate().atStartOfDay();
+        LocalDateTime now = LocalDateTime.now();
+        boolean locked = nextAt != null && now.isBefore(nextAt);
+
         Map<String, Object> body = new HashMap<>();
         body.put("locked", locked);
-        body.put("nextReviewAt", client.getNextReviewAt());
+        body.put("nextReviewAt", nextAt);
         body.put("lastReviewDate", client.getLastReviewDate());
         if (locked) {
-            Duration remaining = Duration.between(LocalDateTime.now(), client.getNextReviewAt());
+            Duration remaining = Duration.between(now, nextAt);
             body.put("secondsRemaining", Math.max(0, remaining.getSeconds()));
             body.put("daysRemaining", Math.max(0, remaining.toDays()));
             body.put("hoursRemaining", Math.max(0, remaining.toHours() % 24));

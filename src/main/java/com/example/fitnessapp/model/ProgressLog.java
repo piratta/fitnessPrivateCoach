@@ -27,7 +27,11 @@ public class ProgressLog {
     private Double neck;
     private Double biceps;
     private Double leg;
-    
+    private Double chest;
+    private Double calf;
+    private Double forearm;
+    private Double back;
+
     public ProgressLog() {}
 
     public UUID getId() { return id; }
@@ -56,4 +60,16 @@ public class ProgressLog {
 
     public Double getLeg() { return leg; }
     public void setLeg(Double leg) { this.leg = leg; }
+
+    public Double getChest() { return chest; }
+    public void setChest(Double chest) { this.chest = chest; }
+
+    public Double getCalf() { return calf; }
+    public void setCalf(Double calf) { this.calf = calf; }
+
+    public Double getForearm() { return forearm; }
+    public void setForearm(Double forearm) { this.forearm = forearm; }
+
+    public Double getBack() { return back; }
+    public void setBack(Double back) { this.back = back; }
 }

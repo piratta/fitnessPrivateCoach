@@ -18,8 +18,10 @@ public class ReviewImage {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    // Nullable: photos uploaded during the onboarding questionnaire have no review attached
+    // (they go straight to the client's gallery and act as baseline references).
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "review_id", nullable = false)
+    @JoinColumn(name = "review_id")
     @JsonIgnore
     private Review review;
 

@@ -17,6 +17,10 @@ public class ReviewDto {
     private Double neck;
     private Double biceps;
     private Double leg;
+    private Double chest;
+    private Double calf;
+    private Double forearm;
+    private Double back;
     private String clientComments;
     private String coachFeedback;
     private LocalDateTime createdAt;
@@ -39,6 +43,10 @@ public class ReviewDto {
         this.neck = r.getNeck();
         this.biceps = r.getBiceps();
         this.leg = r.getLeg();
+        this.chest = r.getChest();
+        this.calf = r.getCalf();
+        this.forearm = r.getForearm();
+        this.back = r.getBack();
         this.clientComments = r.getClientComments();
         this.coachFeedback = r.getCoachFeedback();
         this.createdAt = r.getCreatedAt();
@@ -83,6 +91,14 @@ public class ReviewDto {
     public void setBiceps(Double biceps) { this.biceps = biceps; }
     public Double getLeg() { return leg; }
     public void setLeg(Double leg) { this.leg = leg; }
+    public Double getChest() { return chest; }
+    public void setChest(Double chest) { this.chest = chest; }
+    public Double getCalf() { return calf; }
+    public void setCalf(Double calf) { this.calf = calf; }
+    public Double getForearm() { return forearm; }
+    public void setForearm(Double forearm) { this.forearm = forearm; }
+    public Double getBack() { return back; }
+    public void setBack(Double back) { this.back = back; }
     public String getClientComments() { return clientComments; }
     public void setClientComments(String clientComments) { this.clientComments = clientComments; }
     public String getCoachFeedback() { return coachFeedback; }

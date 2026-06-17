@@ -1154,8 +1154,8 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
         }}>
           <div className="glass-panel" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '500px', background: 'rgba(20, 20, 24, 0.98)', padding: '30px', display: 'flex', flexDirection: 'column', border: '1px solid var(--accent-primary)', borderRadius: '16px', boxShadow: '0 0 30px rgba(224, 248, 0, 0.2)' }}>
             <div style={{ textAlign: 'center', marginBottom: '25px' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '10px' }}>✅</div>
-              <h3 style={{ fontSize: '1.6rem', color: 'var(--accent-primary)', fontWeight: '800', margin: '0 0 10px 0' }}>¡Cliente Creado!</h3>
+              <div style={{ fontSize: '3rem', marginBottom: '10px' }}>{createdClientInfo.isReset ? '🔑' : '✅'}</div>
+              <h3 style={{ fontSize: '1.6rem', color: 'var(--accent-primary)', fontWeight: '800', margin: '0 0 10px 0' }}>{createdClientInfo.isReset ? 'Contraseña Regenerada' : '¡Cliente Creado!'}</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>
                 Copia las siguientes credenciales para compartirlas con el cliente:
               </p>

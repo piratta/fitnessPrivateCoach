@@ -29,7 +29,10 @@ public class WorkoutController {
     @PostMapping("/finish")
     public ResponseEntity<?> finishWorkout(@RequestBody WorkoutDto request) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        User client = userRepository.findByEmail(auth.getName()).orElseThrow();
+        String principal = auth.getName();
+        User client = userRepository.findByEmail(principal)
+                .or(() -> userRepository.findByUsername(principal))
+                .orElseThrow();
 
         WorkoutSession session = new WorkoutSession();
         session.setClient(client);
@@ -38,6 +41,8 @@ public class WorkoutController {
         session.setTotalVolume(request.getTotalVolume());
         session.setCompletedSets(request.getCompletedSets());
         session.setCompletionPercentage(request.getCompletionPercentage());
+        // Always record the real execution date so a client who trains a "Monday" routine on
+        // Tuesday gets it counted in the current week's stats and history sort.
         session.setSessionDate(LocalDate.now());
         session.setLogsJson(request.getLogsJson());
         session.setCommentsJson(request.getCommentsJson());

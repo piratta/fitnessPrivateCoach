@@ -239,7 +239,7 @@ export default function ReviewManager({ clients, setClients }) {
         Gestor de Evaluaciones
       </h3>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
+      <div className="responsive-card-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
         {/* Pendientes */}
         <div style={{ background: 'rgba(255, 69, 0, 0.05)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(255, 69, 0, 0.2)' }}>
           <h4 style={{ color: '#ff4500', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>

@@ -116,19 +116,19 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
       <h3 style={{ fontSize: '1.2rem', marginBottom: '20px', borderBottom: '1px solid var(--border-light)', paddingBottom: '15px' }}>Planificador Semanal de Rutinas</h3>
       
       {isTemplateMode ? (
-        <div style={{ marginBottom: '30px', display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
-          <div style={{ flex: 1 }}>
+        <div className="responsive-flex" style={{ marginBottom: '30px', display: 'flex', gap: '20px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 220px', minWidth: 0 }}>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Nombre de la Plantilla</label>
             <input type="text" className="input-field" placeholder="Ej. Hipertrofia 4 Días" value={templateTitle} onChange={e => setTemplateTitle(e.target.value)} />
           </div>
-          <div style={{ flex: 2 }}>
+          <div style={{ flex: '2 1 280px', minWidth: 0 }}>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Descripción Breve</label>
             <input type="text" className="input-field" placeholder="Ej. Frecuencia 2 Torso/Pierna con énfasis en brazos" value={templateDescription} onChange={e => setTemplateDescription(e.target.value)} />
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', marginBottom: '30px' }}>
-          <div style={{ flex: 1 }}>
+        <div className="responsive-flex" style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', marginBottom: '30px', flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 220px', minWidth: 0 }}>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Cliente a asignar</label>
             <div style={{ position: 'relative' }} ref={dropdownRef}>
               <input 
@@ -173,19 +173,19 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
             </div>
           </div>
           
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: '1 1 180px', minWidth: 0 }}>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Nombre de la Rutina</label>
-            <input 
-              type="text" 
-              className="input-field" 
-              placeholder="Ej: Fuerza Bloque 1" 
-              value={periodStr} 
-              onChange={(e) => setPeriodStr(e.target.value)} 
+            <input
+              type="text"
+              className="input-field"
+              placeholder="Ej: Fuerza Bloque 1"
+              value={periodStr}
+              onChange={(e) => setPeriodStr(e.target.value)}
               style={{ width: '100%', marginBottom: 0 }}
             />
           </div>
 
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: '1 1 160px', minWidth: 0 }}>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Inicio (Activación)</label>
             <input 
               type="date" 

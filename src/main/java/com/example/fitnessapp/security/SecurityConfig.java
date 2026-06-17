@@ -43,10 +43,28 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/", "/api/auth/**").permitAll()
                 .requestMatchers("/h2-console/**").permitAll()
                 .requestMatchers("/ws/chat/**", "/ws/chat").permitAll()
                 .anyRequest().authenticated()
+            )
+            // Without an explicit entry point, Spring Security 6 answers 403 for missing/invalid
+            // tokens, which is confusing. Force 401 so the client can refresh credentials.
+            .exceptionHandling(eh -> eh
+                .authenticationEntryPoint((req, res, e) -> {
+                    res.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
+                    res.setContentType("application/json;charset=UTF-8");
+                    Object reasonAttr = req.getAttribute("auth.failureReason");
+                    String reason = reasonAttr != null ? reasonAttr.toString() : e.getMessage();
+                    String safe = reason == null ? "" : reason.replace("\\", "\\\\").replace("\"", "\\\"");
+                    res.getWriter().write("{\"error\":\"unauthorized\",\"message\":\"" + safe + "\"}");
+                })
+                .accessDeniedHandler((req, res, e) -> {
+                    res.setStatus(jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN);
+                    res.setContentType("application/json");
+                    res.getWriter().write("{\"error\":\"forbidden\",\"message\":\"" + e.getMessage() + "\"}");
+                })
             )
             .headers(headers -> headers.frameOptions(frame -> frame.disable())); // For H2 console
 

@@ -55,13 +55,28 @@ public class AuthController {
     @PostMapping("/change-password")
     public ResponseEntity<?> changePassword(@Valid @RequestBody com.example.fitnessapp.dto.ChangePasswordRequest request) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        String email = auth.getName();
-        
-        User user = userRepository.findByEmail(email).orElseThrow();
+        if (auth == null || auth.getName() == null) {
+            return ResponseEntity.status(401).body("Sesión expirada.");
+        }
+        String principal = auth.getName();
+        User user = userRepository.findByEmail(principal)
+                .or(() -> userRepository.findByUsername(principal))
+                .orElseThrow();
+
+        // Voluntary change (not the first-login forced flow) must validate the current password
+        // so a stolen JWT alone cannot rotate the password.
+        if (!user.isMustChangePassword()) {
+            String current = request.getCurrentPassword();
+            if (current == null || current.isBlank()
+                    || !passwordEncoder.matches(current, user.getPasswordHash())) {
+                return ResponseEntity.status(403).body("La contraseña actual no es correcta.");
+            }
+        }
+
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         user.setMustChangePassword(false);
         userRepository.save(user);
-        
+
         return ResponseEntity.ok("Contraseña actualizada correctamente");
     }
 }

@@ -41,11 +41,32 @@ public class UserController {
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
+    /**
+     * Diagnostic endpoint. Returns who the server thinks is calling without
+     * touching the database. If this returns 200 with the principal but
+     * {@code POST /api/users/me/complete-onboarding} returns 401, the deploy
+     * is missing the onboarding endpoint.
+     */
+    @GetMapping("/me/whoami")
+    public ResponseEntity<Map<String, Object>> whoami() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        Map<String, Object> body = new HashMap<>();
+        body.put("authenticated", auth != null && auth.isAuthenticated());
+        body.put("principal", auth != null ? auth.getName() : null);
+        body.put("authorities", auth != null ? auth.getAuthorities().toString() : null);
+        return ResponseEntity.ok(body);
+    }
+
     @GetMapping("/me")
     public ResponseEntity<UserDto> getMe() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        String email = auth.getName();
-        User user = userRepository.findByEmail(email).orElseThrow();
+        if (auth == null || auth.getName() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        String principal = auth.getName();
+        User user = userRepository.findByEmail(principal)
+                .or(() -> userRepository.findByUsername(principal))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no encontrado."));
         return ResponseEntity.ok(new UserDto(user));
     }
 
@@ -244,7 +265,13 @@ public class UserController {
             user.setName(dto.getName().trim());
         }
         if (dto.getLastName() != null) {
-            user.setLastName(dto.getLastName().trim());
+            String ln = dto.getLastName().trim();
+            // Treat blank or the username itself as 'no surname'.
+            if (ln.isEmpty() || ln.equalsIgnoreCase(user.getUsername())) {
+                user.setLastName(null);
+            } else {
+                user.setLastName(ln);
+            }
         }
         if (dto.getBirthDate() != null) {
             user.setBirthDate(dto.getBirthDate());
@@ -272,28 +299,43 @@ public class UserController {
      */
     @PostMapping("/me/complete-onboarding")
     @Transactional
-    public ResponseEntity<?> completeOnboarding(@RequestBody ProgressLog measurements) {
+    public ResponseEntity<?> completeOnboarding(@RequestBody(required = false) Map<String, Object> body) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        User user = userRepository.findByEmail(auth.getName()).orElseThrow();
+        if (auth == null || auth.getName() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Sesión expirada.");
+        }
+        // Auth principal can be email or username depending on how the JWT was generated.
+        String principal = auth.getName();
+        User user = userRepository.findByEmail(principal)
+                .or(() -> userRepository.findByUsername(principal))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no encontrado."));
 
         LocalDate today = LocalDate.now();
         ProgressLog log = progressLogRepository.findByClientAndLogDate(user, today)
                 .orElseGet(ProgressLog::new);
         log.setClient(user);
         log.setLogDate(today);
-        if (measurements != null) {
-            if (measurements.getWeight() != null)
-                log.setWeight(measurements.getWeight());
-            if (measurements.getWaist() != null)
-                log.setWaist(measurements.getWaist());
-            if (measurements.getHip() != null)
-                log.setHip(measurements.getHip());
-            if (measurements.getNeck() != null)
-                log.setNeck(measurements.getNeck());
-            if (measurements.getBiceps() != null)
-                log.setBiceps(measurements.getBiceps());
-            if (measurements.getLeg() != null)
-                log.setLeg(measurements.getLeg());
+        if (body != null) {
+            Double weight = readDouble(body.get("weight"));
+            Double waist  = readDouble(body.get("waist"));
+            Double hip    = readDouble(body.get("hip"));
+            Double neck   = readDouble(body.get("neck"));
+            Double biceps = readDouble(body.get("biceps"));
+            Double leg    = readDouble(body.get("leg"));
+            Double chest   = readDouble(body.get("chest"));
+            Double calf    = readDouble(body.get("calf"));
+            Double forearm = readDouble(body.get("forearm"));
+            Double back    = readDouble(body.get("back"));
+            if (weight != null) log.setWeight(weight);
+            if (waist != null)  log.setWaist(waist);
+            if (hip != null)    log.setHip(hip);
+            if (neck != null)   log.setNeck(neck);
+            if (biceps != null) log.setBiceps(biceps);
+            if (leg != null)    log.setLeg(leg);
+            if (chest != null)   log.setChest(chest);
+            if (calf != null)    log.setCalf(calf);
+            if (forearm != null) log.setForearm(forearm);
+            if (back != null)    log.setBack(back);
         }
         progressLogRepository.save(log);
 
@@ -304,6 +346,37 @@ public class UserController {
         userRepository.save(user);
 
         return ResponseEntity.ok(new UserDto(user));
+    }
+
+    private static Double readDouble(Object value) {
+        if (value == null) return null;
+        if (value instanceof Number n) return n.doubleValue();
+        String s = value.toString().trim();
+        if (s.isEmpty()) return null;
+        try { return Double.parseDouble(s.replace(',', '.')); } catch (NumberFormatException e) { return null; }
+    }
+
+    /**
+     * Uploads one of the four onboarding pictures (front/left/right/back). They are stored as
+     * standalone images (no review attached) and show up in the gallery + future review
+     * comparisons as baseline references.
+     */
+    @PostMapping(value = "/me/initial-photo", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadInitialPhoto(@org.springframework.web.bind.annotation.RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+                                                @org.springframework.web.bind.annotation.RequestParam(value = "view", required = false) String view) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getName() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Sesión expirada.");
+        }
+        String principal = auth.getName();
+        User user = userRepository.findByEmail(principal)
+                .or(() -> userRepository.findByUsername(principal))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no encontrado."));
+        com.example.fitnessapp.model.ReviewImage saved = reviewService.addStandaloneImage(user, view, file);
+        Map<String, Object> body = new HashMap<>();
+        body.put("id", saved.getId());
+        body.put("view", saved.getView());
+        return ResponseEntity.ok(body);
     }
 
     private String generateTempPassword() {
