@@ -248,6 +248,13 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   const [restSeconds, setRestSeconds] = useState(0);
   const [workoutSummary, setWorkoutSummary] = useState(null);
   const [activeSessionId, setActiveSessionId] = useState(null);
+  // Resumable / paused workout flags. Declared up here BEFORE any effect that references them
+  // in its dependency array; otherwise the JS engine hits the temporal dead zone during the
+  // first render of the component body and the whole component crashes with
+  //   "Cannot access <var> before initialization".
+  const [hasResumableWorkout, setHasResumableWorkout] = useState(false);
+  const [resumableDayName, setResumableDayName] = useState(null);
+
   // Sessions completed during the CURRENT week (Monday → Sunday) indexed by dayName. Drives
   // the per-day "locked / completed" view so that a day already trained earlier in the week
   // (e.g. Lunes) stays marked as completed when the user comes back on Martes, while days
@@ -435,10 +442,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
 
   // normalizeExerciseSets lives at module scope (see top of this file).
 
-  // Declared up here (not after the effect that uses them) so the hook order is stable and
-  // the setters are guaranteed to exist when the effect callback runs on first mount.
-  const [hasResumableWorkout, setHasResumableWorkout] = useState(false);
-  const [resumableDayName, setResumableDayName] = useState(null);
+  // (hasResumableWorkout / resumableDayName declared above the per-day reset effect.)
 
   // Initialize logs dynamically when routine changes. If we have a fresh-on-disk in-progress
   // workout for today, merge its persisted logs/timer into the initialised template so the
