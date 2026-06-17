@@ -1049,8 +1049,12 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   };
 
   const downloadRoutinePDF = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+    // We build the HTML in memory and ship it through a Blob URL instead of opening a blank
+    // pop-up and writing into it. Mobile browsers (iOS Safari, Chrome Android) block popups
+    // that come from an empty about:blank context and silently swallow window.print() called
+    // from such a context, which made the desktop flow look "stuck" on phones.
+    const isMobile = typeof navigator !== 'undefined'
+      && /Android|iPhone|iPad|iPod|IEMobile|Mobile/i.test(navigator.userAgent);
 
     let daysHtml = '';
     Object.keys(clientData.routine).forEach(day => {
@@ -1181,17 +1185,50 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
         </div>
 
         <script>
-          window.onload = function() {
-            window.print();
-            setTimeout(function() { window.close(); }, 500);
-          }
+          // On desktop fire the print dialog automatically; on mobile, just render the page
+          // so the user can hit Share → Print / Save as PDF from the native menu.
+          (function () {
+            try {
+              var ua = navigator.userAgent || '';
+              var mobile = /Android|iPhone|iPad|iPod|IEMobile|Mobile/i.test(ua);
+              if (!mobile) {
+                window.addEventListener('load', function () {
+                  setTimeout(function () { try { window.print(); } catch (e) {} }, 200);
+                });
+              }
+            } catch (e) { /* no-op */ }
+          })();
         </script>
       </body>
       </html>
     `;
 
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    // Try to open in a new tab (desktop). If the popup is blocked or the platform prefers
+    // same-tab navigation (mobile Safari for blob URLs without a user gesture chain), fall
+    // back to navigating the current tab. The user can then use the browser's native Share /
+    // Print → Save as PDF menu — which is the reliable mobile path.
+    const win = window.open(url, '_blank');
+    if (!win || win.closed || typeof win.closed === 'undefined') {
+      if (isMobile) {
+        // On mobile, swap the location so the HTML actually renders. The user comes back to
+        // the app with the back button (which is already captured to stay inside the app).
+        window.location.href = url;
+      } else {
+        // Desktop with blocked popups: download the HTML so the user can open it manually.
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Rutina_${(clientData?.name || 'cliente').replace(/\s+/g, '_')}.html`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+    }
+
+    // Revoke after a generous delay so the new tab has time to fetch the blob.
+    setTimeout(() => { try { URL.revokeObjectURL(url); } catch {} }, 60000);
   };
 
   const fmtLogDate = (l) => {
