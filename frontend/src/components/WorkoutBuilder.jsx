@@ -62,7 +62,7 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
   const addExercise = (day) => {
     setWeeklyRoutine({
       ...weeklyRoutine,
-      [day]: [...weeklyRoutine[day], { name: '', reps: '', intensity: '', notes: '', expectedWeight: '', isOptional: false }]
+      [day]: [...weeklyRoutine[day], { name: '', reps: '', intensity: '', notes: '', expectedWeight: '', isOptional: false, sets: undefined }]
     });
   };
 
@@ -73,6 +73,65 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
       ...weeklyRoutine,
       [day]: newDayRoutine
     });
+  };
+
+  /**
+   * Expands the "NxM" quick syntax (e.g. "3x10") into an array of N identical sets so the
+   * coach can switch to the per-set editor without losing what they already typed. If the
+   * exercise already has detailed sets we keep them.
+   */
+  const enableDetailedSets = (day, index) => {
+    const newDayRoutine = [...weeklyRoutine[day]];
+    const ex = newDayRoutine[index];
+    if (Array.isArray(ex.sets) && ex.sets.length > 0) return;
+    const match = ex.reps ? ex.reps.match(/^\s*(\d+)\s*x\s*(.+)\s*$/) : null;
+    const count = match ? parseInt(match[1]) : 3;
+    const targetReps = match ? match[2].trim() : (ex.reps || '10');
+    ex.sets = Array.from({ length: count }).map(() => ({ reps: targetReps, intensity: ex.intensity || '', notes: '' }));
+    setWeeklyRoutine({ ...weeklyRoutine, [day]: newDayRoutine });
+  };
+
+  const disableDetailedSets = (day, index) => {
+    const newDayRoutine = [...weeklyRoutine[day]];
+    const ex = newDayRoutine[index];
+    if (!Array.isArray(ex.sets) || ex.sets.length === 0) {
+      ex.sets = undefined;
+    } else {
+      // Try to compress N identical sets back into the "NxM" shortcut.
+      const first = ex.sets[0];
+      const allSame = ex.sets.every(s => s.reps === first.reps && (s.intensity || '') === (first.intensity || ''));
+      if (allSame) {
+        ex.reps = `${ex.sets.length}x${first.reps}`;
+        if (first.intensity) ex.intensity = first.intensity;
+      }
+      ex.sets = undefined;
+    }
+    setWeeklyRoutine({ ...weeklyRoutine, [day]: newDayRoutine });
+  };
+
+  const updateSet = (day, exIndex, setIndex, field, value) => {
+    const newDayRoutine = [...weeklyRoutine[day]];
+    const ex = newDayRoutine[exIndex];
+    if (!Array.isArray(ex.sets)) return;
+    ex.sets = ex.sets.map((s, i) => i === setIndex ? { ...s, [field]: value } : s);
+    setWeeklyRoutine({ ...weeklyRoutine, [day]: newDayRoutine });
+  };
+
+  const addSet = (day, exIndex) => {
+    const newDayRoutine = [...weeklyRoutine[day]];
+    const ex = newDayRoutine[exIndex];
+    if (!Array.isArray(ex.sets)) ex.sets = [];
+    const last = ex.sets[ex.sets.length - 1] || { reps: '10', intensity: ex.intensity || '', notes: '' };
+    ex.sets = [...ex.sets, { reps: last.reps, intensity: last.intensity || '', notes: '' }];
+    setWeeklyRoutine({ ...weeklyRoutine, [day]: newDayRoutine });
+  };
+
+  const removeSet = (day, exIndex, setIndex) => {
+    const newDayRoutine = [...weeklyRoutine[day]];
+    const ex = newDayRoutine[exIndex];
+    if (!Array.isArray(ex.sets)) return;
+    ex.sets = ex.sets.filter((_, i) => i !== setIndex);
+    setWeeklyRoutine({ ...weeklyRoutine, [day]: newDayRoutine });
   };
 
   const removeExercise = (day, index) => {
@@ -294,39 +353,84 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
                 title="Eliminar ejercicio"
               >✕</button>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.5fr 1.5fr 1.5fr', gap: '15px', marginBottom: '10px', marginTop: '15px' }}>
-                <SearchableExerciseSelect 
-                  value={ex.name} 
-                  onChange={(val) => updateExercise(activeDay, index, 'name', val)} 
-                />
-                <input type="text" className="input-field" style={{ marginBottom: 0 }} placeholder="Series x Reps (4x10)" value={ex.reps} onChange={e => updateExercise(activeDay, index, 'reps', e.target.value)} />
-                <select 
-                  className="input-field" 
-                  style={{ marginBottom: 0, cursor: 'pointer' }} 
-                  value={ex.intensity} 
-                  onChange={e => updateExercise(activeDay, index, 'intensity', e.target.value)}
-                >
-                  <option value="">Intensidad...</option>
-                  <option value="RIR 0">RIR 0</option>
-                  <option value="RIR 1">RIR 1</option>
-                  <option value="RIR 2">RIR 2</option>
-                  <option value="RIR 3">RIR 3</option>
-                  <option value="RPE 7">RPE 7</option>
-                  <option value="RPE 8">RPE 8</option>
-                  <option value="RPE 9">RPE 9</option>
-                  <option value="RPE 10">RPE 10</option>
-                  <option value="Al fallo">Al fallo</option>
-                </select>
-                <input 
-                  type="text" 
-                  className="input-field" 
-                  style={{ marginBottom: 0 }} 
-                  placeholder="Peso esp. (kg)" 
-                  value={ex.expectedWeight || ''} 
-                  onChange={e => updateExercise(activeDay, index, 'expectedWeight', e.target.value)} 
-                />
-              </div>
-              <input type="text" className="input-field" style={{ marginBottom: 0, width: '100%' }} placeholder="Notas técnicas para el cliente (ej. Baja lento en 3 segundos)" value={ex.notes} onChange={e => updateExercise(activeDay, index, 'notes', e.target.value)} />
+              {Array.isArray(ex.sets) && ex.sets.length > 0 ? (
+                // Detailed per-set mode: each set has its own reps/intensity/notes so the
+                // coach can prescribe e.g. 1x10 @8, 1x8 @9, 1x6 @9.5.
+                <div style={{ marginTop: '15px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.5fr', gap: '15px', marginBottom: '12px' }}>
+                    <SearchableExerciseSelect value={ex.name} onChange={(val) => updateExercise(activeDay, index, 'name', val)} />
+                    <input type="text" className="input-field" style={{ marginBottom: 0 }} placeholder="Peso esp. (kg)" value={ex.expectedWeight || ''} onChange={e => updateExercise(activeDay, index, 'expectedWeight', e.target.value)} />
+                  </div>
+                  <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', overflow: 'hidden' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 1.2fr 2fr 40px', gap: '10px', padding: '8px 12px', fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div>Set</div><div>Reps</div><div>Intensidad</div><div>Nota</div><div></div>
+                    </div>
+                    {ex.sets.map((s, sIdx) => (
+                      <div key={sIdx} style={{ display: 'grid', gridTemplateColumns: '40px 1fr 1.2fr 2fr 40px', gap: '10px', padding: '8px 12px', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                        <div style={{ color: 'var(--accent-primary)', fontWeight: 'bold', textAlign: 'center' }}>{sIdx + 1}</div>
+                        <input type="text" className="input-field" style={{ margin: 0 }} placeholder="10" value={s.reps} onChange={e => updateSet(activeDay, index, sIdx, 'reps', e.target.value)} />
+                        <select className="input-field" style={{ margin: 0, cursor: 'pointer' }} value={s.intensity || ''} onChange={e => updateSet(activeDay, index, sIdx, 'intensity', e.target.value)}>
+                          <option value="">—</option>
+                          <option value="RIR 0">RIR 0</option>
+                          <option value="RIR 1">RIR 1</option>
+                          <option value="RIR 2">RIR 2</option>
+                          <option value="RIR 3">RIR 3</option>
+                          <option value="RPE 7">RPE 7</option>
+                          <option value="RPE 8">RPE 8</option>
+                          <option value="RPE 9">RPE 9</option>
+                          <option value="RPE 10">RPE 10</option>
+                          <option value="Al fallo">Al fallo</option>
+                        </select>
+                        <input type="text" className="input-field" style={{ margin: 0 }} placeholder="Nota de esta serie" value={s.notes || ''} onChange={e => updateSet(activeDay, index, sIdx, 'notes', e.target.value)} />
+                        <button onClick={() => removeSet(activeDay, index, sIdx)} title="Eliminar serie" style={{ background: 'transparent', border: 'none', color: '#ff4500', cursor: 'pointer', fontSize: '1.1rem' }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                    <button onClick={() => addSet(activeDay, index)} style={{ background: 'rgba(224,248,0,0.1)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', padding: '8px 14px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.8rem' }}>+ Añadir serie</button>
+                    <button onClick={() => disableDetailedSets(activeDay, index)} style={{ background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-muted)', padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}>Volver a modo rápido</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.5fr 1.5fr 1.5fr', gap: '15px', marginBottom: '10px', marginTop: '15px' }}>
+                    <SearchableExerciseSelect
+                      value={ex.name}
+                      onChange={(val) => updateExercise(activeDay, index, 'name', val)}
+                    />
+                    <input type="text" className="input-field" style={{ marginBottom: 0 }} placeholder="Series x Reps (4x10)" value={ex.reps} onChange={e => updateExercise(activeDay, index, 'reps', e.target.value)} />
+                    <select
+                      className="input-field"
+                      style={{ marginBottom: 0, cursor: 'pointer' }}
+                      value={ex.intensity}
+                      onChange={e => updateExercise(activeDay, index, 'intensity', e.target.value)}
+                    >
+                      <option value="">Intensidad...</option>
+                      <option value="RIR 0">RIR 0</option>
+                      <option value="RIR 1">RIR 1</option>
+                      <option value="RIR 2">RIR 2</option>
+                      <option value="RIR 3">RIR 3</option>
+                      <option value="RPE 7">RPE 7</option>
+                      <option value="RPE 8">RPE 8</option>
+                      <option value="RPE 9">RPE 9</option>
+                      <option value="RPE 10">RPE 10</option>
+                      <option value="Al fallo">Al fallo</option>
+                    </select>
+                    <input
+                      type="text"
+                      className="input-field"
+                      style={{ marginBottom: 0 }}
+                      placeholder="Peso esp. (kg)"
+                      value={ex.expectedWeight || ''}
+                      onChange={e => updateExercise(activeDay, index, 'expectedWeight', e.target.value)}
+                    />
+                  </div>
+                  <button onClick={() => enableDetailedSets(activeDay, index)} style={{ marginTop: '8px', background: 'rgba(255,255,255,0.05)', border: '1px dashed var(--accent-primary)', color: 'var(--accent-primary)', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                    🎯 Definir series diferentes (ej. 10/8/6)
+                  </button>
+                </>
+              )}
+              <input type="text" className="input-field" style={{ marginBottom: 0, marginTop: '12px', width: '100%' }} placeholder="Notas técnicas para el cliente (ej. Baja lento en 3 segundos)" value={ex.notes} onChange={e => updateExercise(activeDay, index, 'notes', e.target.value)} />
             </div>
           ))
         )}

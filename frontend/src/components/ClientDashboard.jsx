@@ -406,6 +406,32 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   // multiple accounts does not cross-contaminate state.
   const IN_PROGRESS_KEY = `pf:inProgressWorkout:${user?.id || user?.email || 'anon'}`;
 
+  /**
+   * Returns the prescribed sets for an exercise, always as an array of
+   * { reps, intensity, notes } objects.
+   *
+   * - If the coach defined per-set details (ex.sets), they win.
+   * - Otherwise the legacy "NxM" shortcut in ex.reps is expanded into N identical sets so
+   *   the rest of the UI can iterate uniformly.
+   */
+  const normalizeExerciseSets = (ex) => {
+    if (Array.isArray(ex?.sets) && ex.sets.length > 0) {
+      return ex.sets.map(s => ({
+        reps: (s.reps ?? '').toString(),
+        intensity: s.intensity || '',
+        notes: s.notes || '',
+      }));
+    }
+    const match = ex?.reps ? ex.reps.match(/^\s*(\d+)\s*x\s*(.+)\s*$/) : null;
+    const count = match ? parseInt(match[1]) : 3;
+    const targetReps = match ? match[2].trim() : (ex?.reps || '10');
+    return Array.from({ length: count }).map(() => ({
+      reps: targetReps,
+      intensity: ex?.intensity || '',
+      notes: '',
+    }));
+  };
+
   // Declared up here (not after the effect that uses them) so the hook order is stable and
   // the setters are guaranteed to exist when the effect callback runs on first mount.
   const [hasResumableWorkout, setHasResumableWorkout] = useState(false);
@@ -422,10 +448,13 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
       const exercises = clientData.routine[day] || [];
       const sorted = [...exercises].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
       sorted.forEach((ex, exIdx) => {
-        const match = ex.reps ? ex.reps.match(/(\d+)x(.*)/) : null;
-        const setsCount = match ? parseInt(match[1]) : 3;
-        const targetReps = match ? match[2].trim() : (ex.reps || '10');
-        initialLogs[day][exIdx] = Array.from({ length: setsCount }).map(() => ({ weight: '', reps: targetReps, completed: false, skipped: false }));
+        const sets = normalizeExerciseSets(ex);
+        initialLogs[day][exIdx] = sets.map(s => ({
+          weight: '',
+          reps: s.reps || '10',
+          completed: false,
+          skipped: false,
+        }));
       });
     });
 
@@ -521,10 +550,8 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
       const exercises = clientData.routine[selectedDay] || [];
       const sorted = [...exercises].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
       sorted.forEach((ex, exIdx) => {
-        const match = ex.reps ? ex.reps.match(/(\d+)x(.*)/) : null;
-        const setsCount = match ? parseInt(match[1]) : 3;
-        const targetReps = match ? match[2].trim() : (ex.reps || '10');
-        fresh[exIdx] = Array.from({ length: setsCount }).map(() => ({ weight: '', reps: targetReps, completed: false, skipped: false }));
+        const sets = normalizeExerciseSets(ex);
+        fresh[exIdx] = sets.map(s => ({ weight: '', reps: s.reps || '10', completed: false, skipped: false }));
       });
       setLogs(prev => ({ ...prev, [selectedDay]: fresh }));
     }
@@ -804,10 +831,8 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
               fresh[day] = {};
               const sorted = [...(clientData.routine[day] || [])].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
               sorted.forEach((ex, exIdx) => {
-                const match = ex.reps ? ex.reps.match(/(\d+)x(.*)/) : null;
-                const setsCount = match ? parseInt(match[1]) : 3;
-                const targetReps = match ? match[2].trim() : (ex.reps || '10');
-                fresh[day][exIdx] = Array.from({ length: setsCount }).map(() => ({ weight: '', reps: targetReps, completed: false, skipped: false }));
+                const sets = normalizeExerciseSets(ex);
+                fresh[day][exIdx] = sets.map(s => ({ weight: '', reps: s.reps || '10', completed: false, skipped: false }));
               });
             });
             setLogs(fresh);
@@ -1493,22 +1518,38 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                           <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Vista previa del entrenamiento. Empieza el entrenamiento para registrar tus marcas.</span>
                         </div>
                         <div style={{ display: 'grid', gap: '12px' }}>
-                          {activeWorkout.map((ex, exIdx) => (
+                          {activeWorkout.map((ex, exIdx) => {
+                            const previewSets = normalizeExerciseSets(ex);
+                            const allSameReps = previewSets.length > 0 && previewSets.every(s => s.reps === previewSets[0].reps);
+                            const allSameInt = previewSets.length > 0 && previewSets.every(s => (s.intensity || '') === (previewSets[0].intensity || ''));
+                            return (
                             <div key={exIdx} className="glass-panel" style={{ padding: '16px', borderLeft: ex.isOptional ? '4px solid #ffaa00' : '4px solid var(--accent-primary)', opacity: 0.92 }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <h4 style={{ fontSize: '1.1rem', fontWeight: 800 }}>{ex.name}</h4>
                                 {ex.isOptional && <span style={{ background: 'rgba(255,170,0,0.1)', color: '#ffaa00', padding: '3px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>OPCIONAL</span>}
                               </div>
-                              <div style={{ display: 'flex', gap: '15px', marginTop: '8px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                                <span>🎯 Objetivo: <strong style={{ color: '#fff' }}>{ex.reps}</strong></span>
-                                {ex.intensity && <span>🔥 Int: <strong style={{ color: '#fff' }}>{ex.intensity}</strong></span>}
-                                {(ex.expectedWeight !== undefined && ex.expectedWeight !== null && ex.expectedWeight !== '') && (
-                                  <span>🏋️ Peso esperado: <strong style={{ color: '#fff' }}>{ex.expectedWeight} kg</strong></span>
-                                )}
-                              </div>
+                              {allSameReps ? (
+                                <div style={{ display: 'flex', gap: '15px', marginTop: '8px', fontSize: '0.85rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                                  <span>🎯 Objetivo: <strong style={{ color: '#fff' }}>{previewSets.length}x{previewSets[0].reps}</strong></span>
+                                  {allSameInt && previewSets[0].intensity && <span>🔥 Int: <strong style={{ color: '#fff' }}>{previewSets[0].intensity}</strong></span>}
+                                  {(ex.expectedWeight !== undefined && ex.expectedWeight !== null && ex.expectedWeight !== '') && (
+                                    <span>🏋️ Peso esperado: <strong style={{ color: '#fff' }}>{ex.expectedWeight} kg</strong></span>
+                                  )}
+                                </div>
+                              ) : (
+                                <div style={{ marginTop: '8px', fontSize: '0.85rem', color: 'var(--text-muted)', display: 'grid', gap: '4px' }}>
+                                  {previewSets.map((s, i) => (
+                                    <span key={i}>🎯 Serie {i + 1}: <strong style={{ color: '#fff' }}>{s.reps} reps</strong>{s.intensity ? <> · 🔥 <strong style={{ color: '#fff' }}>{s.intensity}</strong></> : null}{s.notes ? <> · 📝 <em>{s.notes}</em></> : null}</span>
+                                  ))}
+                                  {(ex.expectedWeight !== undefined && ex.expectedWeight !== null && ex.expectedWeight !== '') && (
+                                    <span>🏋️ Peso esperado: <strong style={{ color: '#fff' }}>{ex.expectedWeight} kg</strong></span>
+                                  )}
+                                </div>
+                              )}
                               {ex.notes && <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '8px', fontStyle: 'italic' }}>📝 {ex.notes}</p>}
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     ) : (
@@ -1546,6 +1587,9 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                           // Mock history string for visual demonstration
                           const historyMocks = ["80kg x 10 (RIR 1)", "60kg x 12 (RIR 2)", "20kg x 15 (RIR 1)", "100kg x 8 (RIR 2)", "15kg x 15 (RIR 0)"];
                           const historyMock = historyMocks[exIdx % historyMocks.length];
+                          const exerciseSets = normalizeExerciseSets(exercise);
+                          const setsAreUniform = exerciseSets.length > 0
+                            && exerciseSets.every(s => s.reps === exerciseSets[0].reps && (s.intensity || '') === (exerciseSets[0].intensity || ''));
 
                           return (
                             <div key={exIdx} className="glass-panel" style={{ padding: '20px', borderLeft: exercise.isOptional ? '4px solid #ffaa00' : '4px solid var(--accent-primary)', background: 'rgba(20, 20, 24, 0.8)' }}>
@@ -1558,10 +1602,18 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                                   </div>
                                 </div>
                                 <div style={{ fontSize: '0.8rem', color: 'var(--accent-primary)', marginTop: '5px' }}>⏱️ Última vez: {historyMock}</div>
-                                <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
-                                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>🎯 Objetivo: <strong style={{ color: '#fff' }}>{exercise.reps}</strong></span>
-                                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>🔥 Int: <strong style={{ color: '#fff' }}>{exercise.intensity}</strong></span>
-                                </div>
+                                {setsAreUniform ? (
+                                  <div style={{ display: 'flex', gap: '15px', marginTop: '10px', flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>🎯 Objetivo: <strong style={{ color: '#fff' }}>{exerciseSets.length}x{exerciseSets[0].reps}</strong></span>
+                                    {exerciseSets[0].intensity && <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>🔥 Int: <strong style={{ color: '#fff' }}>{exerciseSets[0].intensity}</strong></span>}
+                                  </div>
+                                ) : (
+                                  <div style={{ marginTop: '10px', display: 'grid', gap: '4px' }}>
+                                    {exerciseSets.map((s, i) => (
+                                      <span key={i} style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>🎯 Serie {i + 1}: <strong style={{ color: '#fff' }}>{s.reps} reps</strong>{s.intensity ? <> · 🔥 <strong style={{ color: '#fff' }}>{s.intensity}</strong></> : null}{s.notes ? <> · 📝 <em>{s.notes}</em></> : null}</span>
+                                    ))}
+                                  </div>
+                                )}
                                 {exercise.notes && <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '8px', fontStyle: 'italic', background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '6px' }}>📝 {exercise.notes}</p>}
                               </div>
 
