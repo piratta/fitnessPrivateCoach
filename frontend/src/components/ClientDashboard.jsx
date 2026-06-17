@@ -258,6 +258,10 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   // else this week. Set is per render — when the week rolls over the underlying sessions
   // disappear and so does the need for the override.
   const [overrideConsumed, setOverrideConsumed] = useState(new Set());
+  // When the user picks a pending day from the "swapped" card, we load that day's routine
+  // INTO the currently selected tab. This map of selectedDay → realDayName tells us which
+  // routine is actually being executed so handleFinishWorkout can grab the right dayName.
+  const [loadedRoutineByTab, setLoadedRoutineByTab] = useState({});
 
   // Sessions completed during the CURRENT week (Monday → Sunday) indexed by dayName. Drives
   // the per-day "locked / completed" view so that a day already trained earlier in the week
@@ -604,14 +608,49 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
         return ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][d.getDay()];
       })()
     : null;
-  const routineDayForRender = (clientData?.routine?.[selectedDay]?.length > 0)
-    ? selectedDay
-    : (completedSessionToday?.dayName || selectedDay);
-  const activeWorkout = isDayConsumedElsewhere
+  // A "loaded routine" wins over the regular fallback: the user explicitly picked a pending
+  // day's routine to execute from THIS tab, so render and finishWorkout must use it.
+  const loadedRoutineHere = selectedDay ? loadedRoutineByTab[selectedDay] : null;
+  const routineDayForRender = loadedRoutineHere
+    ? loadedRoutineHere
+    : (clientData?.routine?.[selectedDay]?.length > 0)
+      ? selectedDay
+      : (completedSessionToday?.dayName || selectedDay);
+  const activeWorkout = (isDayConsumedElsewhere && !loadedRoutineHere)
     ? []
     : (clientData?.routine && routineDayForRender && clientData.routine[routineDayForRender])
       ? [...clientData.routine[routineDayForRender]].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1))
       : [];
+
+  // Days that have a routine assigned but no completed session this week.
+  const pendingDays = clientData?.routine
+    ? Object.keys(clientData.routine).filter(d =>
+        Array.isArray(clientData.routine[d])
+        && clientData.routine[d].length > 0
+        && !trainedTemplateDays.has(d))
+    : [];
+
+  // Action wired to each "Hacer el entreno del X" button on the swapped-day card. Loads the
+  // picked day's routine into the current tab and unblocks the training UI.
+  const pickPendingDay = (day) => {
+    if (!clientData?.routine || !clientData.routine[day]) return;
+    const exercises = clientData.routine[day] || [];
+    const sorted = [...exercises].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
+    const fresh = {};
+    sorted.forEach((ex, exIdx) => {
+      const sets = normalizeExerciseSets(ex);
+      fresh[exIdx] = sets.map(s => ({ weight: '', reps: s.reps || '10', completed: false, skipped: false }));
+    });
+    setLogs(prev => ({ ...prev, [selectedDay]: fresh }));
+    setLoadedRoutineByTab(prev => ({ ...prev, [selectedDay]: day }));
+    setOverrideConsumed(prev => { const n = new Set(prev); n.add(selectedDay); return n; });
+    setWorkoutSeconds(0);
+    setRestSeconds(0);
+    setWorkoutSummary(null);
+    setActiveSessionId(null);
+    setIsWorkoutLocked(false);
+    setHasFinishedSession(false);
+  };
   const currentLogs = (logs && selectedDay) ? logs[selectedDay] : null;
   const isDaySkipped = skippedDays[selectedDay];
 
@@ -915,13 +954,18 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          dayName: selectedDay,
+          // If the user picked a pending day from the swapped-day card, the workout they just
+          // finished belongs to THAT plan (e.g. Jueves) even though they did it from the
+          // Lunes tab. Save it under the real plan's dayName so history + hydration credit
+          // it correctly.
+          dayName: loadedRoutineHere || selectedDay,
           durationSeconds: workoutSeconds,
           totalVolume: totalVolume,
           completedSets: completedSets.length,
           completionPercentage: completionPercentage,
-          // Persist the full per-day container so reload + history restore have a stable shape.
-          logsJson: JSON.stringify(logs),
+          // Persist the inner per-exercise slot under the real plan key so the hydration
+          // effect (which looks up parsed[todays.dayName]) finds it on the next reload.
+          logsJson: JSON.stringify({ ...logs, [(loadedRoutineHere || selectedDay)]: logs[selectedDay] }),
           commentsJson: JSON.stringify(comments),
           videoLinksJson: JSON.stringify(videoLinks)
         })
@@ -1571,25 +1615,42 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                     <p style={{ color: 'var(--text-muted)' }}>El descanso es donde ocurre la magia. Aliméntate bien y prepárate para la próxima sesión. ¡Buen trabajo!</p>
                   </div>
                 ) : isDayConsumedElsewhere ? (
-                  // The Lunes plan was executed this week on another weekday (e.g. Martes).
-                  // Show an informative card with two ways out: jump to the executed day to
-                  // see the detail, OR keep training here (creates a brand new session).
-                  <div className="glass-panel fade-in" style={{ padding: '40px 20px', textAlign: 'center', borderTop: '4px solid var(--accent-primary)' }}>
+                  // The plan for this weekday was already executed elsewhere this week. Offer
+                  // the user the list of pending routines (days with exercises assigned that
+                  // have NOT been trained yet this week) so they can grab one and do it here
+                  // instead of repeating the same workout.
+                  <div className="glass-panel fade-in" style={{ padding: '32px 20px', textAlign: 'center', borderTop: '4px solid var(--accent-primary)' }}>
                     <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🔁</div>
                     <h3 style={{ marginBottom: '8px', color: '#fff' }}>Días intercambiados</h3>
                     <p style={{ color: 'var(--text-muted)', maxWidth: '420px', margin: '0 auto 18px', lineHeight: 1.5 }}>
                       Hiciste la rutina de {selectedDay} el {realExecutionDay}. El detalle del entreno está en esa pestaña.
                     </p>
-                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                      {realExecutionDay && (
-                        <button onClick={() => setSelectedDay(realExecutionDay)} className="btn-primary" style={{ padding: '12px 22px' }}>
-                          Ver entreno del {realExecutionDay}
-                        </button>
-                      )}
-                      <button onClick={() => setOverrideConsumed(prev => { const n = new Set(prev); n.add(selectedDay); return n; })}
-                        style={{ padding: '12px 22px', background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-main)', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
-                        Entrenar este día de todas formas
+                    {realExecutionDay && (
+                      <button onClick={() => setSelectedDay(realExecutionDay)} className="btn-primary" style={{ padding: '12px 22px', marginBottom: '20px' }}>
+                        Ver entreno del {realExecutionDay}
                       </button>
+                    )}
+
+                    <div style={{ marginTop: '10px', borderTop: '1px solid var(--border-light)', paddingTop: '20px', textAlign: 'left', maxWidth: '420px', marginLeft: 'auto', marginRight: 'auto' }}>
+                      <h4 style={{ color: 'var(--accent-primary)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', textAlign: 'center' }}>Entrenos pendientes esta semana</h4>
+                      {pendingDays.length === 0 ? (
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', margin: 0 }}>
+                          🎉 No te queda ningún entreno por hacer esta semana.
+                        </p>
+                      ) : (
+                        <div style={{ display: 'grid', gap: '8px' }}>
+                          {pendingDays.map(d => (
+                            <button key={d} onClick={() => pickPendingDay(d)}
+                              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'rgba(224,248,0,0.05)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', textAlign: 'left' }}>
+                              <span>📋 Entreno del {d}</span>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{(clientData?.routine?.[d] || []).length} ejercicios →</span>
+                            </button>
+                          ))}
+                          <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '8px', textAlign: 'center' }}>
+                            Se cargará aquí; el cambio se registra automáticamente al finalizar el entreno.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : (
