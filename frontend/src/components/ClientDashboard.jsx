@@ -221,8 +221,10 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   const [restSeconds, setRestSeconds] = useState(0);
   const [workoutSummary, setWorkoutSummary] = useState(null);
   const [activeSessionId, setActiveSessionId] = useState(null);
-  // Sessions completed TODAY indexed by dayName. Drives the per-day "locked / completed" view
-  // so that finishing Lunes does not flag Martes (or any other day) as completed too.
+  // Sessions completed during the CURRENT week (Monday → Sunday) indexed by dayName. Drives
+  // the per-day "locked / completed" view so that a day already trained earlier in the week
+  // (e.g. Lunes) stays marked as completed when the user comes back on Martes, while days
+  // that have not been trained yet show the fresh "ready to start" UI.
   const [todaySessionsByDay, setTodaySessionsByDay] = useState({});
 
   // Review Form State
@@ -290,10 +292,26 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     if (!clientData?.routine) return;
     fetchHistory().then(list => {
       if (!Array.isArray(list)) return;
-      const today = new Date().toISOString().split('T')[0];
+      // Compute the [Monday, Sunday] window for the current week (week starts on Monday in ES).
+      const now = new Date();
+      const dow = now.getDay(); // 0=Sun, 1=Mon, ... 6=Sat
+      const offsetToMonday = (dow + 6) % 7;
+      const monday = new Date(now);
+      monday.setHours(0, 0, 0, 0);
+      monday.setDate(monday.getDate() - offsetToMonday);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      const inWeek = (iso) => {
+        if (!iso) return false;
+        const d = new Date(iso);
+        return d >= monday && d <= sunday;
+      };
+      // Keep the MOST RECENT session per dayName in the current week.
       const byDay = {};
       for (const s of list) {
-        if (s.sessionDate === today && s.dayName && !byDay[s.dayName]) {
+        if (!s.dayName || !inWeek(s.sessionDate)) continue;
+        const prev = byDay[s.dayName];
+        if (!prev || new Date(s.sessionDate) > new Date(prev.sessionDate)) {
           byDay[s.dayName] = s;
         }
       }
