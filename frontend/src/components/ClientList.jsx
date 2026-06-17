@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { MOCK_ROUTINES } from '../utils/mockRoutines';
 import { getChatMessages, addChatMessage, connectWebSocket, disconnectWebSocket, sendWebSocketMessage } from '../utils/chatStore';
 import { getClientBillingStatus } from '../utils/statusUtils';
 import { usersApi } from '../utils/api';
