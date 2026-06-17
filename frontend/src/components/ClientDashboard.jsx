@@ -254,6 +254,10 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   //   "Cannot access <var> before initialization".
   const [hasResumableWorkout, setHasResumableWorkout] = useState(false);
   const [resumableDayName, setResumableDayName] = useState(null);
+  // Per-day overrides letting the user retrain a day that was already executed somewhere
+  // else this week. Set is per render — when the week rolls over the underlying sessions
+  // disappear and so does the need for the override.
+  const [overrideConsumed, setOverrideConsumed] = useState(new Set());
 
   // Sessions completed during the CURRENT week (Monday → Sunday) indexed by dayName. Drives
   // the per-day "locked / completed" view so that a day already trained earlier in the week
@@ -593,7 +597,7 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   const consumedElsewhereSession = (selectedDay && !completedSessionToday)
     ? Object.values(todaySessionsByDay).find(s => s && s.dayName === selectedDay)
     : null;
-  const isDayConsumedElsewhere = !!consumedElsewhereSession;
+  const isDayConsumedElsewhere = !!consumedElsewhereSession && !overrideConsumed.has(selectedDay);
   const realExecutionDay = consumedElsewhereSession
     ? (() => {
         const d = new Date(consumedElsewhereSession.sessionDate);
@@ -1567,19 +1571,26 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                     <p style={{ color: 'var(--text-muted)' }}>El descanso es donde ocurre la magia. Aliméntate bien y prepárate para la próxima sesión. ¡Buen trabajo!</p>
                   </div>
                 ) : isDayConsumedElsewhere ? (
-                  // The Lunes plan was already executed this week on another weekday — show a
-                  // placeholder instead of repeating the same exercises here.
+                  // The Lunes plan was executed this week on another weekday (e.g. Martes).
+                  // Show an informative card with two ways out: jump to the executed day to
+                  // see the detail, OR keep training here (creates a brand new session).
                   <div className="glass-panel fade-in" style={{ padding: '40px 20px', textAlign: 'center', borderTop: '4px solid var(--accent-primary)' }}>
-                    <div style={{ fontSize: '3rem', marginBottom: '10px' }}>✅</div>
-                    <h3 style={{ marginBottom: '8px', color: '#fff' }}>Ya entrenaste este día</h3>
-                    <p style={{ color: 'var(--text-muted)', maxWidth: '380px', margin: '0 auto 18px', lineHeight: 1.5 }}>
-                      Hiciste la rutina de {selectedDay} el {realExecutionDay}. Puedes ver el detalle pulsando en esa pestaña.
+                    <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🔁</div>
+                    <h3 style={{ marginBottom: '8px', color: '#fff' }}>Días intercambiados</h3>
+                    <p style={{ color: 'var(--text-muted)', maxWidth: '420px', margin: '0 auto 18px', lineHeight: 1.5 }}>
+                      Hiciste la rutina de {selectedDay} el {realExecutionDay}. El detalle del entreno está en esa pestaña.
                     </p>
-                    {realExecutionDay && (
-                      <button onClick={() => setSelectedDay(realExecutionDay)} className="btn-primary" style={{ padding: '12px 24px' }}>
-                        Ver entreno del {realExecutionDay}
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      {realExecutionDay && (
+                        <button onClick={() => setSelectedDay(realExecutionDay)} className="btn-primary" style={{ padding: '12px 22px' }}>
+                          Ver entreno del {realExecutionDay}
+                        </button>
+                      )}
+                      <button onClick={() => setOverrideConsumed(prev => { const n = new Set(prev); n.add(selectedDay); return n; })}
+                        style={{ padding: '12px 22px', background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-main)', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                        Entrenar este día de todas formas
                       </button>
-                    )}
+                    </div>
                   </div>
                 ) : (
                   <div className="fade-in" style={{ display: 'grid', gap: '25px' }}>
