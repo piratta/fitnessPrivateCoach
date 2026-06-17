@@ -44,11 +44,10 @@ spring:
     activate:
       on-profile: prod
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://ep-muddy-poetry-ab2hlmw1-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require}
+    url: ${DATABASE_URL:jdbc:postgresql://ep-muddy-poetry-ab2hlmw1-pooler.eu-west-2.aws.neon.tech/neondb?sslmod=require&prepareThreshold=0}
     username: ${DATABASE_USERNAME:neondb_owner}
     password: ${DATABASE_PASSWORD:npg_qhsvFmEC69eQ}
     driverClassName: org.postgresql.Driver
-    connection-properties: prepareThreshold=0
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:

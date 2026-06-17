@@ -2,7 +2,6 @@ package com.example.fitness;
 
 import com.example.fitness.model.*;
 import com.example.fitness.service.TrainingPlanService;
-import com.example.fitness.service.UserFreeService;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -50,9 +49,4 @@ public class FitnessAppTest {
         assertNotNull(service);
     }
 
-    @Test
-    public void testUserFreeService() {
-        UserFreeService service = new UserFreeService();
-        assertNotNull(service);
-    }
 }
