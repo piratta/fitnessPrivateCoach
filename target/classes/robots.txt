@@ -1,6 +1,0 @@
-User-agent: *
-Disallow: /private/
-Disallow: /admin/
-Disallow: /config/
-
-Sitemap: https://fitnessapp.com/sitemap.xml
