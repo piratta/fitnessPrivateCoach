@@ -971,8 +971,6 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
                   try { sessionComments = JSON.parse(session.commentsJson || '{}'); } catch(e){}
                   try { sessionVideos = JSON.parse(session.videoLinksJson || '{}'); } catch(e){}
 
-                  const routineExercises = MOCK_ROUTINES[session.dayName] || [];
-                  const sortedExercises = [...routineExercises].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
                   // Try to get the day's logs - they might be nested under dayName or flat
                   const dayLogs = sessionLogs[session.dayName] || sessionLogs;
 
@@ -1004,138 +1002,8 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
                     <button onClick={() => setExpandedSessions(prev => ({ ...prev, [session.id]: !prev[session.id] }))} style={{ marginTop: '10px', alignSelf: 'flex-end', background: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '6px', padding: '8px 16px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}>
                       {expandedSessions[session.id] ? '▲ Ocultar Detalles' : '▼ Ver Detalles (como el cliente)'}
                     </button>
-                    {expandedSessions[session.id] && (
-                      <div style={{ marginTop: '10px', display: 'grid', gap: '20px' }}>
-                        {sortedExercises.map((exercise, exIdx) => {
-                          const exLogs = dayLogs[exIdx] || [];
-                          const stateKey = `${session.dayName}_${exIdx}`;
-                          const sessionEditKey = `${session.id}_${exIdx}`;
-                          const isEditingExtra = trainerEditingExtras[sessionEditKey];
 
-                          return (
-                            <div key={exIdx} style={{ padding: '15px', borderLeft: exercise.isOptional ? '4px solid #ffaa00' : '4px solid var(--accent-primary)', background: 'rgba(20, 20, 24, 0.8)', borderRadius: '8px' }}>
-                              <div style={{ marginBottom: '10px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <h4 style={{ fontSize: '1rem', fontWeight: '800', color: '#fff' }}>{exercise.name}</h4>
-                                  {exercise.isOptional && <span style={{ background: 'rgba(255, 170, 0, 0.1)', color: '#ffaa00', padding: '3px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>OPCIONAL</span>}
-                                </div>
-                                <div style={{ display: 'flex', gap: '15px', marginTop: '5px' }}>
-                                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>🎯 <strong style={{ color: '#fff' }}>{exercise.reps}</strong></span>
-                                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>🔥 <strong style={{ color: '#fff' }}>{exercise.intensity}</strong></span>
-                                </div>
-                              </div>
 
-                              {/* Sets Grid */}
-                              <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', overflow: 'hidden', marginBottom: '10px' }}>
-                                <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 1fr 90px', gap: '8px', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                                  <div style={{ textAlign: 'center' }}>Set</div><div style={{ textAlign: 'center' }}>kg</div><div style={{ textAlign: 'center' }}>Reps</div><div style={{ textAlign: 'center' }}>Estado</div>
-                                </div>
-                                {exLogs.map((set, setIdx) => {
-                                  const setEditKey = `${session.id}_${exIdx}-${setIdx}`;
-                                  const isEditingSet = trainerEditingSets[setEditKey];
-                                  return (
-                                    <div key={setIdx} style={{ display: 'grid', gridTemplateColumns: '40px 1fr 1fr 90px', gap: '8px', padding: '10px 12px', background: set.completed ? 'rgba(224, 248, 0, 0.03)' : (set.skipped ? 'rgba(255,255,255,0.02)' : 'transparent'), opacity: set.skipped ? 0.5 : 1 }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: set.completed ? 'var(--accent-primary)' : 'var(--text-muted)' }}>{setIdx + 1}</div>
-                                      <div><input type="number" step="0.5" value={set.weight} disabled={!isEditingSet} onChange={(e) => {
-                                        const newData = [...clientHistoryData];
-                                        const sIdx = newData.findIndex(s => s.id === session.id);
-                                        const newLogs = JSON.parse(newData[sIdx].logsJson || '{}');
-                                        const dl = newLogs[session.dayName] || newLogs;
-                                        dl[exIdx][setIdx].weight = e.target.value;
-                                        newData[sIdx].logsJson = JSON.stringify(newLogs);
-                                        setClientHistoryData(newData);
-                                      }} style={{ width: '100%', padding: '8px', background: isEditingSet ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)', border: isEditingSet ? '1px solid var(--accent-primary)' : 'none', borderRadius: '6px', color: '#fff', textAlign: 'center' }} /></div>
-                                      <div><input type="text" value={set.reps} disabled={!isEditingSet} onChange={(e) => {
-                                        const newData = [...clientHistoryData];
-                                        const sIdx = newData.findIndex(s => s.id === session.id);
-                                        const newLogs = JSON.parse(newData[sIdx].logsJson || '{}');
-                                        const dl = newLogs[session.dayName] || newLogs;
-                                        dl[exIdx][setIdx].reps = e.target.value;
-                                        newData[sIdx].logsJson = JSON.stringify(newLogs);
-                                        setClientHistoryData(newData);
-                                      }} style={{ width: '100%', padding: '8px', background: isEditingSet ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)', border: isEditingSet ? '1px solid var(--accent-primary)' : 'none', borderRadius: '6px', color: '#fff', textAlign: 'center' }} /></div>
-                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        {isEditingSet ? (
-                                          <button onClick={() => {
-                                            setTrainerEditingSets({...trainerEditingSets, [setEditKey]: false});
-                                            // Save to backend
-                                            const s = clientHistoryData.find(s => s.id === session.id);
-                                            const token = localStorage.getItem('token');
-                                            fetch(`${API_BASE_URL}/api/workouts/update/${session.id}`, {
-                                              method: 'PUT',
-                                              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                                              body: JSON.stringify({ dayName: s.dayName, durationSeconds: s.durationSeconds, totalVolume: s.totalVolume, completedSets: s.completedSets, completionPercentage: s.completionPercentage, logsJson: s.logsJson, commentsJson: s.commentsJson, videoLinksJson: s.videoLinksJson })
-                                            });
-                                          }} style={{ padding: '4px 10px', borderRadius: '6px', background: 'var(--accent-primary)', color: '#000', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.75rem' }}>💾</button>
-                                        ) : (
-                                          <button onClick={() => setTrainerEditingSets({...trainerEditingSets, [setEditKey]: true})} style={{ padding: '4px 10px', borderRadius: '6px', background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer', fontSize: '0.75rem' }}>✏️</button>
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                                {exLogs.length === 0 && (
-                                  <div style={{ padding: '15px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Sin datos de series registrados</div>
-                                )}
-                              </div>
-
-                                {/* Comments & Video Links */}
-                                <div style={{ display: 'grid', gap: '8px' }}>
-                                  {isEditingExtra ? (
-                                    <>
-                                      <input type="text" placeholder="Comentario del cliente..." value={sessionComments[stateKey] || ''} onChange={(e) => {
-                                        const newData = [...clientHistoryData];
-                                        const sIdx = newData.findIndex(s => s.id === session.id);
-                                        const newComments = JSON.parse(newData[sIdx].commentsJson || '{}');
-                                        newComments[stateKey] = e.target.value;
-                                        newData[sIdx].commentsJson = JSON.stringify(newComments);
-                                        setClientHistoryData(newData);
-                                      }} style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--accent-primary)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }} />
-                                      <input type="text" placeholder="🔗 Link de vídeo..." value={sessionVideos[stateKey] || ''} onChange={(e) => {
-                                        const newData = [...clientHistoryData];
-                                        const sIdx = newData.findIndex(s => s.id === session.id);
-                                        const newVideos = JSON.parse(newData[sIdx].videoLinksJson || '{}');
-                                        newVideos[stateKey] = e.target.value;
-                                        newData[sIdx].videoLinksJson = JSON.stringify(newVideos);
-                                        setClientHistoryData(newData);
-                                      }} style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--accent-primary)', borderRadius: '6px', color: 'var(--accent-primary)', fontSize: '0.85rem' }} />
-                                      <textarea placeholder="Feedback del Entrenador (el cliente lo verá)..." value={sessionComments[`coach_${stateKey}`] || ''} onChange={(e) => {
-                                        const newData = [...clientHistoryData];
-                                        const sIdx = newData.findIndex(s => s.id === session.id);
-                                        const newComments = JSON.parse(newData[sIdx].commentsJson || '{}');
-                                        newComments[`coach_${stateKey}`] = e.target.value;
-                                        newData[sIdx].commentsJson = JSON.stringify(newComments);
-                                        setClientHistoryData(newData);
-                                      }} style={{ width: '100%', padding: '10px', background: 'rgba(224, 248, 0, 0.05)', border: '1px solid var(--accent-primary)', borderRadius: '6px', color: 'var(--accent-primary)', fontSize: '0.85rem', minHeight: '60px', fontFamily: 'Outfit' }} />
-                                      <button onClick={() => {
-                                        setTrainerEditingExtras({...trainerEditingExtras, [sessionEditKey]: false});
-                                        const s = clientHistoryData.find(s => s.id === session.id);
-                                        const token = localStorage.getItem('token');
-                                        fetch(`${API_BASE_URL}/api/workouts/update/${session.id}`, {
-                                          method: 'PUT',
-                                          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                                          body: JSON.stringify({ dayName: s.dayName, durationSeconds: s.durationSeconds, totalVolume: s.totalVolume, completedSets: s.completedSets, completionPercentage: s.completionPercentage, logsJson: s.logsJson, commentsJson: s.commentsJson, videoLinksJson: s.videoLinksJson })
-                                        });
-                                      }} style={{ alignSelf: 'flex-end', padding: '5px 12px', borderRadius: '6px', background: 'var(--accent-primary)', color: '#000', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.75rem' }}>💾 Guardar Notas</button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      {sessionComments[stateKey] && <div style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }}>💬 Cliente: {sessionComments[stateKey]}</div>}
-                                      {sessionVideos[stateKey] && <div style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: 'var(--accent-primary)', fontSize: '0.85rem' }}>🔗 {sessionVideos[stateKey]}</div>}
-                                      {sessionComments[`coach_${stateKey}`] && <div style={{ padding: '8px 12px', background: 'rgba(224, 248, 0, 0.05)', border: '1px dashed var(--accent-primary)', borderRadius: '6px', color: 'var(--accent-primary)', fontSize: '0.85rem' }}>👨‍🏫 Feedback: {sessionComments[`coach_${stateKey}`]}</div>}
-                                      <button onClick={() => setTrainerEditingExtras({...trainerEditingExtras, [sessionEditKey]: true})} style={{ alignSelf: 'flex-end', padding: '4px 10px', borderRadius: '6px', background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer', fontSize: '0.7rem' }}>✏️ Editar Notas</button>
-                                    </>
-                                  )}
-                                </div>
-                            </div>
-                          );
-                        })}
-
-                        {sortedExercises.length === 0 && (
-                          <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>No se encontró la rutina "{session.dayName}" en las rutinas configuradas. Datos brutos disponibles.</div>
-                        )}
-                      </div>
-                    )}
                   </div>
                   );
                 })

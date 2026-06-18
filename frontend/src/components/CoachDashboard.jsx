@@ -36,15 +36,6 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
     });
   }, [user]);
 
-  const sampleRoutine = {
-    Lunes: MOCK_ROUTINES["Día 1 - Pecho y Tríceps"] || [],
-    Martes: MOCK_ROUTINES["Día 2 - Espalda y Bíceps"] || [],
-    Miércoles: [],
-    Jueves: MOCK_ROUTINES["Día 3 - Pierna"] || [],
-    Viernes: MOCK_ROUTINES["Día 4 - Hombro y Abs"] || [],
-    Sábado: [],
-    Domingo: []
-  };
 
   const davidRoutine = {
     Lunes: [
