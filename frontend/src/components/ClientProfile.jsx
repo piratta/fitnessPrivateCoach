@@ -55,14 +55,22 @@ export default function ClientProfile({ user, onClose, onUpdated }) {
       await dialog.alert('El nombre no puede estar vacío.', { title: 'Faltan datos' });
       return;
     }
+    // Defensive: never let the surname be set to the login alias (legacy rows had them
+    // confused). If the user accidentally typed their username here, treat it as empty.
+    const cleanLastName = form.lastName.trim();
+    const safeLastName = (cleanLastName && cleanLastName.toLowerCase() !== (user?.username || '').toLowerCase())
+      ? cleanLastName
+      : '';
     setSaving(true);
     try {
       const updated = await usersApi.updateMe({
         name: form.name.trim(),
-        lastName: form.lastName.trim() || null,
+        lastName: safeLastName,
         birthDate: form.birthDate || null,
       });
       dialog.toast('Perfil actualizado', { variant: 'success' });
+      // Reflect the cleaned value in the form so the user sees what was actually saved.
+      setForm(prev => ({ ...prev, lastName: safeLastName }));
       if (onUpdated) onUpdated(updated);
     } catch (e) {
       await dialog.alert(e.message || 'No se pudo actualizar el perfil.', { title: 'Error' });

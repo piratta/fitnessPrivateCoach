@@ -1662,6 +1662,35 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
                       )}
                     </div>
                   </div>
+                ) : (!isWorkoutStarted && !isWorkoutLocked && activeWorkout.length === 0) ? (
+                  // The day has no exercises in the routine AND it has not been trained — show
+                  // a friendly empty state with the list of pending plans so the user can drag
+                  // one here instead of seeing a misleading "EMPEZAR ENTRENAMIENTO" button.
+                  <div className="glass-panel fade-in" style={{ padding: '32px 20px', textAlign: 'center', borderTop: '4px solid var(--text-muted)' }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🗓️</div>
+                    <h3 style={{ marginBottom: '8px', color: '#fff' }}>Día libre</h3>
+                    <p style={{ color: 'var(--text-muted)', maxWidth: '420px', margin: '0 auto 18px', lineHeight: 1.5 }}>
+                      No tienes ningún entreno asignado para {selectedDay}. Puedes cargar aquí una rutina pendiente de la semana.
+                    </p>
+                    <div style={{ marginTop: '10px', borderTop: '1px solid var(--border-light)', paddingTop: '20px', textAlign: 'left', maxWidth: '420px', marginLeft: 'auto', marginRight: 'auto' }}>
+                      <h4 style={{ color: 'var(--accent-primary)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', textAlign: 'center' }}>Entrenos pendientes esta semana</h4>
+                      {pendingDays.length === 0 ? (
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', margin: 0 }}>
+                          🎉 No te queda ningún entreno por hacer esta semana.
+                        </p>
+                      ) : (
+                        <div style={{ display: 'grid', gap: '8px' }}>
+                          {pendingDays.map(d => (
+                            <button key={d} onClick={() => pickPendingDay(d)}
+                              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'rgba(224,248,0,0.05)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', textAlign: 'left' }}>
+                              <span>📋 Entreno del {d}</span>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{(clientData?.routine?.[d] || []).length} ejercicios →</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 ) : (
                   <div className="fade-in" style={{ display: 'grid', gap: '25px' }}>
                     {!isWorkoutStarted && !isWorkoutLocked ? (
