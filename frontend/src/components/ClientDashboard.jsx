@@ -1305,15 +1305,25 @@ export default function ClientDashboard({ user, onLogout}) {
 
   // A weight-only quick entry must NOT create a new column in the measurement comparison, so the
   // comparison table and body-measurement charts only use days that recorded a body measurement.
+
   const measurementLogs = progressHistory.filter(l =>
       [l.waist, l.hip, l.neck, l.biceps, l.leg, l.chest, l.calf, l.forearm, l.back].some(v => v !== null && v !== undefined)
   );
 
-  // 2. AHORA SÍ PODEMOS MAPEALAS SIN QUE ROMPA:
+  // 2. Extraemos las fechas y los historiales
   const measurementDates = measurementLogs.map(fmtLogDate);
+  const cmpWeight = measurementLogs.length > 0 ? measurementLogs.map(l => l.weight || 0) : [];
+  const waistHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.waist || 0) : [];
+  const caderaHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.hip || 0) : [];
+  const cuelloHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.neck || 0) : [];
+  const bicepsHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.biceps || 0) : [];
+  const piernaHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.leg || 0) : [];
+  const pechoHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.chest || 0) : [];
+  const gemeloHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.calf || 0) : [];
+  const antebrazoHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.forearm || 0) : [];
+  const espaldaHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.back || 0) : [];
 
-  // Si tu backend envía estos datos agrupados en clientData, se usarán.
-  // De lo contrario, se inicializan vacíos para que la gráfica muestre "No hay datos suficientes".
+  // 3. Datos de volumen y adherencia
   const volumeHistory = clientData?.volumeHistory || [];
   const adherenceHistory = clientData?.adherenceHistory || [];
 
