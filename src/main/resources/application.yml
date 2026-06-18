@@ -1,3 +1,4 @@
+# Bloque 1: Configuración Global (se aplica siempre)
 spring:
   servlet:
     multipart:
@@ -9,10 +10,10 @@ spring:
     password: password
     driverClassName: org.h2.Driver
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: update
     show-sql: true
+    open-in-view: false
     properties:
       hibernate:
         format_sql: true
@@ -23,21 +24,9 @@ spring:
 
 jwt:
   secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
-  expiration: 86400000 # 1 day
+  expiration: 86400000
 
-# Uncomment for PostgreSQL
-# spring:
-#   datasource:
-#     url: jdbc:postgresql://localhost:5432/gym_app
-#     username: postgres
-#     password: password
-#   jpa:
-#     hibernate:
-#       ddl-auto: update
-#     properties:
-#       hibernate:
-#         dialect: org.hibernate.dialect.PostgreSQLDialect
-
+# Bloque 2: Configuración Específica para Producción
 ---
 spring:
   config:
@@ -49,10 +38,8 @@ spring:
     password: ${DATABASE_PASSWORD:npg_qhsvFmEC69eQ}
     driverClassName: org.postgresql.Driver
   jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: update
     show-sql: false
-  spring:
-    jpa:
-      open-in-view: false
-
+    open-in-view: false
