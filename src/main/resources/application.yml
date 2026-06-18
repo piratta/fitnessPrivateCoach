@@ -49,8 +49,10 @@ spring:
     password: ${DATABASE_PASSWORD:npg_qhsvFmEC69eQ}
     driverClassName: org.postgresql.Driver
   jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: update
     show-sql: false
+  spring:
+    jpa:
+      open-in-view: false
 
