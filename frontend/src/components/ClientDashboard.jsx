@@ -253,14 +253,50 @@ export default function ClientDashboard({ user, onLogout}) {
   //   "Cannot access <var> before initialization".
   const [hasResumableWorkout, setHasResumableWorkout] = useState(false);
   const [resumableDayName, setResumableDayName] = useState(null);
-  // Per-day overrides letting the user retrain a day that was already executed somewhere
-  // else this week. Set is per render — when the week rolls over the underlying sessions
-  // disappear and so does the need for the override.
-  const [overrideConsumed, setOverrideConsumed] = useState(new Set());
-  // When the user picks a pending day from the "swapped" card, we load that day's routine
-  // INTO the currently selected tab. This map of selectedDay → realDayName tells us which
-  // routine is actually being executed so handleFinishWorkout can grab the right dayName.
-  const [loadedRoutineByTab, setLoadedRoutineByTab] = useState({});
+  // Weekly UI state that needs to survive F5: the "this day is consumed elsewhere but the
+  // user said train it anyway" overrides and the "I picked the Jueves plan to do from this
+  // Lunes tab" loaded-routine map. We persist them in localStorage keyed by the start of the
+  // current week, so the moment the week rolls over the entry is considered stale and gets
+  // wiped automatically (no leftover overrides leaking into the next week).
+  const WEEKLY_STATE_KEY = `pf:weeklyState:${user?.id || user?.email || 'anon'}`;
+  const getWeekStartISO = () => {
+    const now = new Date();
+    const offsetToMonday = (now.getDay() + 6) % 7;
+    const monday = new Date(now);
+    monday.setHours(0, 0, 0, 0);
+    monday.setDate(monday.getDate() - offsetToMonday);
+    return monday.toISOString().split('T')[0];
+  };
+  const loadStoredWeeklyState = () => {
+    try {
+      const raw = localStorage.getItem(WEEKLY_STATE_KEY);
+      if (!raw) return { override: new Set(), loaded: {} };
+      const parsed = JSON.parse(raw);
+      if (parsed.weekStart !== getWeekStartISO()) {
+        localStorage.removeItem(WEEKLY_STATE_KEY);
+        return { override: new Set(), loaded: {} };
+      }
+      return {
+        override: new Set(Array.isArray(parsed.overrideConsumed) ? parsed.overrideConsumed : []),
+        loaded: (parsed.loadedRoutineByTab && typeof parsed.loadedRoutineByTab === 'object') ? parsed.loadedRoutineByTab : {},
+      };
+    } catch {
+      return { override: new Set(), loaded: {} };
+    }
+  };
+  const initialWeekly = loadStoredWeeklyState();
+  const [overrideConsumed, setOverrideConsumed] = useState(initialWeekly.override);
+  const [loadedRoutineByTab, setLoadedRoutineByTab] = useState(initialWeekly.loaded);
+  // Persist both whenever they change so a refresh restores the user's choices.
+  useEffect(() => {
+    try {
+      localStorage.setItem(WEEKLY_STATE_KEY, JSON.stringify({
+        weekStart: getWeekStartISO(),
+        overrideConsumed: Array.from(overrideConsumed),
+        loadedRoutineByTab,
+      }));
+    } catch { /* quota — ignore, in-memory state is still correct */ }
+  }, [overrideConsumed, loadedRoutineByTab, WEEKLY_STATE_KEY]);
 
   // Sessions completed during the CURRENT week (Monday → Sunday) indexed by dayName. Drives
   // the per-day "locked / completed" view so that a day already trained earlier in the week
@@ -982,21 +1018,38 @@ export default function ClientDashboard({ user, onLogout}) {
 
     // Register this day as completed today so navigating away and back keeps the locked view
     // without re-fetching the history, and so other days do not inherit it.
+    const realDayName = loadedRoutineHere || selectedDay;
+    const todayWeekdayLocal = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][new Date().getDay()];
     setTodaySessionsByDay(prev => ({
       ...prev,
-      [selectedDay]: {
+      [todayWeekdayLocal]: {
         id: activeSessionId,
-        dayName: selectedDay,
+        dayName: realDayName,
         sessionDate: new Date().toISOString().split('T')[0],
         durationSeconds: workoutSeconds,
         totalVolume,
         completedSets: completedSets.length,
         completionPercentage,
-        logsJson: JSON.stringify(logs),
+        logsJson: JSON.stringify({ ...logs, [realDayName]: logs[selectedDay] }),
         commentsJson: JSON.stringify(comments),
         videoLinksJson: JSON.stringify(videoLinks),
       }
     }));
+    // Once the workout is recorded, the override is no longer needed; the day is now
+    // legitimately "consumed elsewhere" by the freshly saved session. Drop both flags so the
+    // pestaña shows the up-to-date placeholder on next render.
+    setLoadedRoutineByTab(prev => {
+      if (!prev[selectedDay]) return prev;
+      const copy = { ...prev };
+      delete copy[selectedDay];
+      return copy;
+    });
+    setOverrideConsumed(prev => {
+      if (!prev.has(selectedDay)) return prev;
+      const copy = new Set(prev);
+      copy.delete(selectedDay);
+      return copy;
+    });
   };
 
   const updateBackendSession = async (currentLogsToSave, currentCommentsToSave, currentLinksToSave) => {
