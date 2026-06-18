@@ -184,7 +184,7 @@ public class UserService {
         String username = initials + firstSurname.substring(0, Math.min(firstSurname.length(), surnameLen));
         int num = 1;
         String temp = username;
-        while (userRepository.existsByUsername(username) || userRepository.findByEmail(username).isPresent()) {
+        while (userRepository.existsByUsernameIgnoreCase(username) || userRepository.findByEmailIgnoreCase(username).isPresent()) {
             username = temp + num;
             num++;
         }

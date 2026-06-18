@@ -43,8 +43,8 @@ public class AuthController {
 
         String jwt = tokenProvider.generateToken(authentication);
 
-        User user = userRepository.findByUsername(loginRequest.getEmail())
-                .or(() -> userRepository.findByEmail(loginRequest.getEmail()))
+        User user = userRepository.findByUsernameIgnoreCase(loginRequest.getEmail())
+                .or(() -> userRepository.findByEmailIgnoreCase(loginRequest.getEmail()))
                 .orElseThrow();
         
         return ResponseEntity.ok(new JwtAuthenticationResponse(jwt, new UserDto(user)));
