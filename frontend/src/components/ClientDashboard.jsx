@@ -659,12 +659,19 @@ export default function ClientDashboard({ user, onLogout}) {
       ? [...clientData.routine[routineDayForRender]].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1))
       : [];
 
-  // Days that have a routine assigned but no completed session this week.
+  // Plans claimed somewhere in the UI: either already trained (saved session this week) OR
+  // loaded into another tab through pickPendingDay (e.g. Lunes tab has Jueves loaded, even
+  // if the user has not started it yet). Without this second source the same plan would
+  // appear as pending in every other day's swapped-day card and could be picked twice.
+  const claimedTemplateDays = new Set(trainedTemplateDays);
+  Object.values(loadedRoutineByTab).forEach(plan => { if (plan) claimedTemplateDays.add(plan); });
+  // Days that have a routine assigned but no completed session this week AND nobody else has
+  // already picked them into a tab.
   const pendingDays = clientData?.routine
     ? Object.keys(clientData.routine).filter(d =>
         Array.isArray(clientData.routine[d])
         && clientData.routine[d].length > 0
-        && !trainedTemplateDays.has(d))
+        && !claimedTemplateDays.has(d))
     : [];
 
   // Action wired to each "Hacer el entreno del X" button on the swapped-day card. Loads the
