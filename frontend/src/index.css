@@ -235,4 +235,29 @@ select option {
   .scrollable-tabs {
     -webkit-overflow-scrolling: touch;
   }
+
+  /* Modals that contain a long form (e.g. "Registrar Medidas Pasadas").
+     - Use the full viewport height so the keyboard does not push the
+       footer off-screen.
+     - Override .glass-panel's mobile padding so the form has breathing
+       room without wasting space. */
+  .modal-form-mobile {
+    padding: 18px !important;
+    max-width: 100% !important;
+    max-height: calc(100vh - 24px) !important;
+  }
+
+  .modal-form-mobile input[type="number"],
+  .modal-form-mobile input[type="date"],
+  .modal-form-mobile input[type="text"] {
+    font-size: 16px; /* prevents iOS auto-zoom on focus */
+  }
+
+  /* Allow the overlay itself to scroll when content is taller than the
+     viewport — useful with the soft keyboard open. */
+  .modal-overlay-scroll {
+    align-items: flex-start !important;
+    padding: 12px !important;
+    -webkit-overflow-scrolling: touch;
+  }
 }

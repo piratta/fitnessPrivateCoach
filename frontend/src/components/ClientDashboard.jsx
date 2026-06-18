@@ -2558,14 +2558,14 @@ export default function ClientDashboard({ user, onLogout}) {
 
       {/* Modal Registrar Medidas Pasadas */}
       {showLogModal && createPortal(
-        <div className="fade-in" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
-          <form onSubmit={handleSaveProgress} className="glass-panel" style={{ width: '100%', maxWidth: '500px', display: 'flex', flexDirection: 'column', padding: '30px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border-light)', paddingBottom: '15px' }}>
-              <h3 style={{ fontSize: '1.4rem', fontWeight: 'bold', color: 'var(--accent-primary)' }}>Registrar Medidas Pasadas</h3>
-              <button type="button" onClick={() => setShowLogModal(false)} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '1.5rem', cursor: 'pointer' }}>✖</button>
+        <div className="fade-in modal-overlay-scroll" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)', zIndex: 3000, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '20px', overflowY: 'auto' }}>
+          <form onSubmit={handleSaveProgress} className="glass-panel modal-form-mobile" style={{ width: '100%', maxWidth: '500px', maxHeight: 'calc(100vh - 40px)', display: 'flex', flexDirection: 'column', padding: '24px', margin: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-light)', paddingBottom: '12px', flexShrink: 0 }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--accent-primary)' }}>Registrar Medidas Pasadas</h3>
+              <button type="button" onClick={() => setShowLogModal(false)} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '1.4rem', cursor: 'pointer', padding: '4px 8px', lineHeight: 1 }}>✖</button>
             </div>
 
-            <div style={{ overflowY: 'auto', flex: 1, paddingRight: '5px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <div style={{ overflowY: 'auto', flex: 1, paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '12px', minHeight: 0 }}>
               <div>
                 <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Fecha de la Medición</label>
                 <input type="date" required value={logForm.logDate} onChange={e => setLogForm({...logForm, logDate: e.target.value})} className="input-field" style={{ colorScheme: 'dark', margin: 0, width: '100%' }} />
@@ -2615,9 +2615,9 @@ export default function ClientDashboard({ user, onLogout}) {
               </div>
             </div>
 
-            <div style={{ marginTop: '20px', display: 'flex', gap: '15px' }}>
+            <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border-light)', display: 'flex', gap: '10px', flexShrink: 0 }}>
               <button type="button" onClick={() => setShowLogModal(false)} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid var(--border-light)', color: '#fff', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Cancelar</button>
-              <button type="submit" style={{ flex: 2, padding: '12px', background: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Guardar Medidas</button>
+              <button type="submit" style={{ flex: 2, padding: '12px', background: 'var(--accent-primary)', color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Guardar</button>
             </div>
           </form>
         </div>,
