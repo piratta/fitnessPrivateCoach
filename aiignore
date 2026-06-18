@@ -1,0 +1,22 @@
+# Archivos de Base de Datos Locales
+*.db
+*.mv.db
+*.h2.db
+fitnessdb.mv.db
+
+# Carpetas del IDE y configuraciones locales
+.idea/
+*.iml
+.vscode/
+
+# Carpetas de compilación y dependencias
+target/
+node_modules/
+dist/
+*.jar
+
+# Archivos multimedia que la IA no necesita leer
+*.png
+*.svg
+*.jpg
+*.ico

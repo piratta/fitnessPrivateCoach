@@ -26,7 +26,13 @@ public class DataSeeder implements CommandLineRunner {
             String encodedPassword = passwordEncoder.encode("1234");
 
             // Create Coach
-            User coach = new User("antonio.ortiz@ficticio.com", encodedPassword, "Antonio Ortiz Gómez", Role.COACH);
+            User coach = User.builder()
+                    .email("antonio.ortiz@ficticio.com")
+                    .passwordHash(encodedPassword)
+                    .name("Antonio Ortiz Gómez")
+                    .role(Role.COACH)
+                    .build();
+
             coach.setUsername("antonio");
             coach.setMustChangePassword(false);
             coach = userRepository.save(coach);
