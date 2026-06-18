@@ -84,20 +84,12 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
     Domingo: []
   };
 
-  const [templates, setTemplates] = useState([
-    { id: 't1', title: 'Hipertrofia 4 Días (Torso/Pierna)', description: 'Rutina clásica de hipertrofia con frecuencia 2.', routine: sampleRoutine },
-    { id: 't2', title: 'Fuerza 3 Días (Full Body)', description: 'Rutina de fuerza enfocada en los básicos.', routine: sampleRoutine },
-    { id: 't3', title: 'rutina david', description: 'Rutina David (Bloque 1) - Frecuencia 2 y Pierna.', routine: davidRoutine }
-  ]);
-
   const [billingPlans, setBillingPlans] = useState([
     { id: 'bp1', name: 'Mensual', months: 1 },
     { id: 'bp2', name: 'Trimestral', months: 3 },
     { id: 'bp3', name: 'Semestral', months: 6 },
     { id: 'bp4', name: 'Anual', months: 12 }
   ]);
-
-  const [clients, setClients] = useState(MOCK_CLIENTS);
 
   // Fetch clients from backend database
   useEffect(() => {
@@ -129,7 +121,6 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
         return date.toISOString().split('T')[0];
       };
       const formattedClients = data.map(u => {
-        const existingMock = MOCK_CLIENTS.find(c => c.email === u.email);
         const billingPlanId = u.billingPlanId || 'bp1';
         return {
           id: u.id,
@@ -137,22 +128,10 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
           email: u.email,
           username: u.username,
           status: u.status || 'Activo',
-          weight: existingMock ? existingMock.weight : '75kg',
           goal: u.goal || 'Hipertrofia',
           billingPlanId,
           nextPaymentDate: computeNextPayment(u.createdAt, billingPlanId),
-          completion: existingMock ? existingMock.completion : 0,
-          nextReview: existingMock ? existingMock.nextReview : 'En 1 mes',
-          weightHistory: existingMock ? existingMock.weightHistory : [75.0],
-          adherenceHistory: existingMock ? existingMock.adherenceHistory : [0],
-          waistHistory: existingMock ? existingMock.waistHistory : [0],
-          caderaHistory: existingMock ? existingMock.caderaHistory : [0],
-          cuelloHistory: existingMock ? existingMock.cuelloHistory : [0],
-          bicepsHistory: existingMock ? existingMock.bicepsHistory : [0],
-          piernaHistory: existingMock ? existingMock.piernaHistory : [0],
-          volumeHistory: existingMock ? existingMock.volumeHistory : [0],
           messages: [],
-          hasRoutine: u.routineJson ? true : (existingMock ? existingMock.hasRoutine : false),
           routineJson: u.routineJson,
           routine: u.routineJson ? JSON.parse(u.routineJson) : null,
           progressionStrategy: u.progressionStrategy || 'Sobrecarga Progresiva (Subir peso)',
