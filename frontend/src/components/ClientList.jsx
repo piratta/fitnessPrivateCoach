@@ -668,7 +668,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
               </div>
               <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '20px', borderRadius: '12px', textAlign: 'center' }}>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Peso Actual</p>
-                <h4 style={{ fontSize: '1.2rem', marginTop: '8px', fontWeight: '600' }}>{selectedClient.weightHistory[selectedClient.weightHistory.length - 1] || selectedClient.weight}kg</h4>
+                <h4 style={{ fontSize: '1.2rem', marginTop: '8px', fontWeight: '600' }}>{selectedClient.weightHistory[selectedClient.weightHistory.length - 1] || selectedClient.weight}kg || 0Kg</h4>
               </div>
               <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '20px', borderRadius: '12px', textAlign: 'center' }}>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Cumplimiento</p>
