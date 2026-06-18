@@ -37,52 +37,8 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
   }, [user]);
 
 
-  const davidRoutine = {
-    Lunes: [
-      { name: 'Press banca plano con mancuerna', reps: '3x6', intensity: 'RIR 2', notes: 'Peso: 25 KG', isOptional: false },
-      { name: 'Contractor (peck deck)', reps: '3x12', intensity: 'Al fallo', notes: 'Peso: 54 KG (2 series x 12-14 reps + 1 serie x 5-7 reps)', isOptional: false },
-      { name: 'Aperturas en polea media sentado', reps: '3x12-14', intensity: 'Al fallo', notes: 'Peso: 10 KG. Banco inclinado', isOptional: false },
-      { name: 'Elevación lateral unilateral en banco inclinado', reps: '5xFallo', intensity: 'Al fallo', notes: 'Peso: 7.5 KG', isOptional: false },
-      { name: 'Extensión tríceps katana en banco scott invertido', reps: '3x12-14', intensity: 'Al fallo', notes: '', isOptional: false },
-      { name: 'Extensión tríceps polea alta', reps: '4x12-14', intensity: 'Al fallo', notes: 'Peso: 20 KG', isOptional: false },
-      { name: 'Plancha abdominal', reps: '3x1\'', intensity: 'Al fallo', notes: '', isOptional: false }
-    ],
-    Martes: [
-      { name: 'Remo dorian', reps: '3x10', intensity: 'Al fallo', notes: 'Peso: 40 KG', isOptional: false },
-      { name: 'Jalón al pecho unilateral', reps: '2x12-14', intensity: 'Al fallo', notes: 'Peso: 27.5 KG', isOptional: false },
-      { name: 'Dominadas', reps: '3xFallo', intensity: 'Al fallo', notes: 'Peso: 8 / 7 / 8 KG', isOptional: false },
-      { name: 'Remo gironda unilateral', reps: '2x10-12', intensity: 'Al fallo', notes: 'Peso: 42.5 KG', isOptional: false },
-      { name: 'Pájaro posterior unilateral en polea media (muñequera)', reps: '3x12-14', intensity: 'Al fallo', notes: 'Peso: 12.5 KG', isOptional: false },
-      { name: 'Curl bíceps bayesian', reps: '3x10', intensity: 'Al fallo', notes: 'Peso: 12.5 KG', isOptional: false },
-      { name: 'Curl bíceps mancuerna unilateral', reps: '3x10', intensity: 'Al fallo', notes: 'Peso: 10 / 10 / 7.5 KG', isOptional: false }
-    ],
-    Miércoles: [
-      { name: 'BELT SQ / globet sq tempo 600', reps: '3x5', intensity: 'RPE 9', notes: 'Peso: 20 KG. Tempo: 6 (Globet con rusa)', isOptional: false },
-      { name: 'Extensión de cuadriceps unilateral', reps: '2x12-14', intensity: 'Al fallo', notes: 'Peso: 25 KG. Por lado', isOptional: false },
-      { name: 'Prensa horizontal', reps: '3x10', intensity: 'Al fallo', notes: 'Peso: 95 / 125 / 125 KG. Ko técnico, ayuda al final', isOptional: false },
-      { name: 'Aductor en máquina', reps: '3x10-15', intensity: 'Al fallo', notes: 'Peso: 153 KG', isOptional: false },
-      { name: 'Sentadilla búlgara', reps: '2x12-14', intensity: 'Al fallo', notes: '', isOptional: false },
-      { name: 'Curl femoral tumbado unilateral', reps: '2x10-15', intensity: 'Al fallo', notes: '', isOptional: false }
-    ],
-    Jueves: [
-      { name: 'Press banca declinado', reps: '3x7', intensity: 'RPE 9', notes: 'Peso: 20/20 KG', isOptional: true },
-      { name: 'Cruces de polea', reps: '3x12-14', intensity: 'Al fallo', notes: 'Peso: 45/45 KG. Altura media', isOptional: true },
-      { name: 'Egyptian lateral raises (polea)', reps: '3x10-12', intensity: 'Al fallo', notes: 'Peso: 20 o 25 / 30 KG', isOptional: true },
-      { name: 'Press militar en máquina unilateral', reps: '3x6-8', intensity: 'RPE 9', notes: '', isOptional: true },
-      { name: 'Press francés', reps: '2x12-14', intensity: 'Al fallo', notes: 'Peso: 17.5 KG', isOptional: true },
-      { name: 'Flexiones de diamante', reps: '2x10', intensity: 'Al fallo', notes: '', isOptional: true },
-      { name: 'Plancha lateral', reps: '2x30"', intensity: 'Al fallo', notes: '', isOptional: true }
-    ],
-    Viernes: [
-      { name: 'Pull over', reps: '3x12-14', intensity: 'Al fallo', notes: '', isOptional: true },
-      { name: 'Remo alto en máquina', reps: '3x10', intensity: 'Al fallo', notes: '', isOptional: true },
-      { name: 'Seal row', reps: '2x10', intensity: 'Al fallo', notes: '', isOptional: true },
-      { name: 'Curl bíceps barra en polea alta', reps: '2x12-14', intensity: 'Al fallo', notes: '', isOptional: true },
-      { name: 'Curl bíceps barra romana', reps: '3x10-12', intensity: 'Al fallo', notes: '', isOptional: true }
-    ],
-    Sábado: [],
-    Domingo: []
-  };
+  const [templates, setTemplates] = useState([]);
+
 
   const [billingPlans, setBillingPlans] = useState([
     { id: 'bp1', name: 'Mensual', months: 1 },
@@ -90,6 +46,8 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
     { id: 'bp3', name: 'Semestral', months: 6 },
     { id: 'bp4', name: 'Anual', months: 12 }
   ]);
+
+  const [clients, setClients] = useState([]);
 
   // Fetch clients from backend database
   useEffect(() => {
@@ -127,14 +85,15 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
           name: u.name,
           email: u.email,
           username: u.username,
-          status: u.status || 'Activo',
-          goal: u.goal || 'Hipertrofia',
+          status: u.status || 'undefined',
+          goal: u.goal || 'No definida',
           billingPlanId,
           nextPaymentDate: computeNextPayment(u.createdAt, billingPlanId),
+
           messages: [],
           routineJson: u.routineJson,
           routine: u.routineJson ? JSON.parse(u.routineJson) : null,
-          progressionStrategy: u.progressionStrategy || 'Sobrecarga Progresiva (Subir peso)',
+          progressionStrategy: u.progressionStrategy || 'No definida',
           reviewFrequency: u.reviewFrequency || 'Semanal'
         };
       });
@@ -159,13 +118,13 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
           if (window.activeChatEmail !== clientEmail) {
             // Show toast notification
             dialog.toast(`Nuevo mensaje de ${clientName}: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`, { variant: 'info' });
-            return prev.map(c => 
-              c.email === clientEmail 
-                ? { 
-                    ...c, 
-                    unreadMessages: (c.unreadMessages || 0) + 1, 
-                    messages: [...(c.messages || []), { sender: message.sender, text: message.text, time: message.time }] 
-                  } 
+            return prev.map(c =>
+              c.email === clientEmail
+                ? {
+                    ...c,
+                    unreadMessages: (c.unreadMessages || 0) + 1,
+                    messages: [...(c.messages || []), { sender: message.sender, text: message.text, time: message.time }]
+                  }
                 : c
             );
           } else {

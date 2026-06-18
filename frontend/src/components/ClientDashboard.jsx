@@ -37,7 +37,7 @@ function normalizeExerciseSets(ex) {
   }));
 }
 
-export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
+export default function ClientDashboard({ user, onLogout}) {
   const dialog = useDialog();
   // null = unknown (still loading from backend). The badge only shows when explicitly false.
   const [isReviewLocked, setIsReviewLocked] = useState(null);
@@ -65,7 +65,6 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   const [clientData, setClientData] = useState(null);
   const [showRoutineTable, setShowRoutineTable] = useState(false);
   const [showEvaluationModal, setShowEvaluationModal] = useState(false);
-  const [isModifyingReview, setIsModifyingReview] = useState(false);
   const [selectedMonths, setSelectedMonths] = useState([0]);
   const [largePhotoView, setLargePhotoView] = useState(null);
   const [toggledPhoto, setToggledPhoto] = useState(false);
@@ -275,13 +274,6 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
     photos: { front: '', left: '', right: '', back: '' }
   });
 
-  const handlePhotoUpload = (view) => {
-    // Simulate upload by setting a mock image URL
-    setReviewData(prev => ({
-      ...prev,
-      photos: { ...prev.photos, [view]: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&w=400&q=80' }
-    }));
-  };
 
   // History State
   const [historyData, setHistoryData] = useState([]);
@@ -739,11 +731,6 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
   const daysUntilNext = 7 - daysSinceReview;
   const isMeasurementsLocked = daysUntilNext > 0;
 
-  const myStats = {
-      weightHistory: [72.0, 72.8, 73.5, 74.0, 74.8, 75.5, 76.2, 77.0, 77.5, 78.0, 78.2, 78.5],
-      adherenceHistory: [90, 85, 95, 90, 100, 80, 95, 90, 100, 100, 95, 95],
-      volumeHistory: [4500, 4800, 5200, 5500, 5800, 6000, 6500, 7000, 7500, 7800, 8200, 8500],
-  };
 
   const updateSet = (exIdx, setIdx, field, value) => {
     const newLogs = { ...logs };
@@ -1318,21 +1305,22 @@ export default function ClientDashboard({ user, onLogout, onUserUpdate }) {
 
   // A weight-only quick entry must NOT create a new column in the measurement comparison, so the
   // comparison table and body-measurement charts only use days that recorded a body measurement.
-  const measurementLogs = progressHistory.filter(l =>
-    [l.waist, l.hip, l.neck, l.biceps, l.leg, l.chest, l.calf, l.forearm, l.back].some(v => v !== null && v !== undefined));
   const measurementDates = measurementLogs.map(fmtLogDate);
-  const cmpWeight = measurementLogs.length > 0 ? measurementLogs.map(l => l.weight || 0) : [0];
-  const waistHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.waist || 0) : (clientData?.waistHistory || [0]);
-  const caderaHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.hip || 0) : (clientData?.caderaHistory || [0]);
-  const cuelloHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.neck || 0) : (clientData?.cuelloHistory || [0]);
-  const bicepsHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.biceps || 0) : (clientData?.bicepsHistory || [0]);
-  const piernaHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.leg || 0) : (clientData?.piernaHistory || [0]);
-  const pechoHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.chest || 0) : [0];
-  const gemeloHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.calf || 0) : [0];
-  const antebrazoHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.forearm || 0) : [0];
-  const espaldaHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.back || 0) : [0];
-  const volumeHistory = clientData?.volumeHistory || [4500, 4800, 5200, 5500, 5800, 6000, 6500, 7000, 7500, 7800, 8200, 8500];
-  const adherenceHistory = clientData?.adherenceHistory || [90, 85, 95, 90, 100, 80, 95, 90, 100, 100, 95, 95];
+  const cmpWeight = measurementLogs.length > 0 ? measurementLogs.map(l => l.weight || 0) : [];
+  const waistHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.waist || 0) : [];
+  const caderaHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.hip || 0) : [];
+  const cuelloHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.neck || 0) : [];
+  const bicepsHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.biceps || 0) : [];
+  const piernaHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.leg || 0) : [];
+  const pechoHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.chest || 0) : [];
+  const gemeloHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.calf || 0) : [];
+  const antebrazoHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.forearm || 0) : [];
+  const espaldaHistory = measurementLogs.length > 0 ? measurementLogs.map(l => l.back || 0) : [];
+
+  // Si tu backend envía estos datos agrupados en clientData, se usarán.
+  // De lo contrario, se inicializan vacíos para que la gráfica muestre "No hay datos suficientes".
+  const volumeHistory = clientData?.volumeHistory || [];
+  const adherenceHistory = clientData?.adherenceHistory || [];
 
   const renderChart = (type = chartType) => {
     let history = [];
