@@ -5,6 +5,7 @@ import WorkoutBuilder from './WorkoutBuilder';
 import ReviewManager from './ReviewManager';
 import TemplateManager from './TemplateManager';
 import BillingManager from './BillingManager';
+import ExercisesManager from './ExercisesManager';
 import { initChatIfEmpty, connectWebSocket, disconnectWebSocket } from '../utils/chatStore';
 import { useDialog } from './ui/Dialog';
 import { API_BASE_URL } from '../config';
@@ -280,6 +281,7 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
         </div>
         <div style={navItemStyle('rutinas')} onClick={() => setActiveTab('rutinas')}>Asignar Rutina</div>
         <div style={navItemStyle('plantillas')} onClick={() => setActiveTab('plantillas')}>Mis Plantillas</div>
+        <div style={navItemStyle('ejercicios')} onClick={() => setActiveTab('ejercicios')}>Ejercicios</div>
         <div style={navItemStyle('revisiones')} onClick={() => setActiveTab('revisiones')}>
           Revisiones 
           {pendingReviews > 0 && <span style={{ background: '#ff4500', color: '#fff', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '10px', marginLeft: '8px', fontWeight: 'bold' }}>{pendingReviews}</span>}
@@ -327,6 +329,7 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
               setActiveTab('rutinas');
             }}
           />}
+        {activeTab === 'ejercicios' && <ExercisesManager />}
         {activeTab === 'revisiones' && <ReviewManager clients={clients} setClients={setClients} />}
         {activeTab === 'facturacion' && <BillingManager clients={clients} setClients={setClients} billingPlans={billingPlans} setBillingPlans={setBillingPlans} />}
       </div>

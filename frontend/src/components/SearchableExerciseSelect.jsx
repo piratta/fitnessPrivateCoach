@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { exercisesApi } from '../utils/api';
 import '../index.css';
 
 // Master exercise catalogue. Kept as a flat string array — duplicates are filtered at runtime
@@ -456,12 +457,66 @@ const MOCK_EXERCISES = (() => {
   return unique.sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
 })();
 
+// Module-level cache so multiple selects on the same page share a single backend fetch and
+// stay in sync after a CREATE.
+let cachedCustomExercises = null;
+const cacheListeners = new Set();
+function notifyCustomCacheUpdated() {
+  cacheListeners.forEach(fn => { try { fn(); } catch { /* swallow */ } });
+}
+export function refreshCustomExerciseCache() {
+  cachedCustomExercises = null;
+  notifyCustomCacheUpdated();
+}
+
+async function loadCustomExercises() {
+  if (cachedCustomExercises) return cachedCustomExercises;
+  try {
+    const list = await exercisesApi.list();
+    cachedCustomExercises = Array.isArray(list) ? list : [];
+  } catch {
+    cachedCustomExercises = [];
+  }
+  return cachedCustomExercises;
+}
+
 export default function SearchableExerciseSelect({ value, onChange }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [customNames, setCustomNames] = useState([]);
+  const [creating, setCreating] = useState(false);
   const wrapperRef = useRef(null);
 
-  const filtered = MOCK_EXERCISES.filter(ex => ex.toLowerCase().includes(search.toLowerCase()));
+  // Pull the coach-created catalogue once on mount and whenever another select on the page
+  // refreshes the cache. We only need the names — the manager screen handles the rest.
+  useEffect(() => {
+    let cancelled = false;
+    loadCustomExercises().then(list => {
+      if (!cancelled) setCustomNames(list.map(e => e.name).filter(Boolean));
+    });
+    const onCacheUpdate = () => {
+      loadCustomExercises().then(list => {
+        if (!cancelled) setCustomNames(list.map(e => e.name).filter(Boolean));
+      });
+    };
+    cacheListeners.add(onCacheUpdate);
+    return () => { cancelled = true; cacheListeners.delete(onCacheUpdate); };
+  }, []);
+
+  // Union of built-in catalogue + coach-created entries, deduped case-insensitively.
+  const allExercises = (() => {
+    const seen = new Set();
+    const out = [];
+    for (const ex of [...MOCK_EXERCISES, ...customNames]) {
+      const key = ex.toLowerCase().trim();
+      if (!seen.has(key)) { seen.add(key); out.push(ex); }
+    }
+    return out.sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+  })();
+
+  const term = search.trim();
+  const filtered = term ? allExercises.filter(ex => ex.toLowerCase().includes(term.toLowerCase())) : allExercises;
+  const exactMatch = term && allExercises.some(ex => ex.toLowerCase() === term.toLowerCase());
 
   // Close when clicking outside
   useEffect(() => {
@@ -474,13 +529,33 @@ export default function SearchableExerciseSelect({ value, onChange }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const handleCreate = async () => {
+    if (!term || exactMatch || creating) return;
+    setCreating(true);
+    try {
+      const created = await exercisesApi.create(term, '');
+      refreshCustomExerciseCache();
+      onChange(created?.name || term);
+      setIsOpen(false);
+      setSearch('');
+    } catch (err) {
+      // Silently fall back to just picking the typed name so the user is not blocked even
+      // if the persistence fails. Manager screen will reconcile later.
+      onChange(term);
+      setIsOpen(false);
+      setSearch('');
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <div ref={wrapperRef} style={{ position: 'relative', width: '100%' }}>
       <input
         type="text"
         className="input-field"
         style={{ marginBottom: 0, cursor: 'text' }}
-        placeholder="Buscar ejercicio..."
+        placeholder="Buscar o escribir nuevo ejercicio..."
         value={isOpen ? search : value}
         onChange={(e) => {
           setSearch(e.target.value);
@@ -490,8 +565,14 @@ export default function SearchableExerciseSelect({ value, onChange }) {
           setIsOpen(true);
           setSearch('');
         }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && term && !exactMatch) {
+            e.preventDefault();
+            handleCreate();
+          }
+        }}
       />
-      
+
       {isOpen && (
         <div style={{
           position: 'absolute',
@@ -502,12 +583,27 @@ export default function SearchableExerciseSelect({ value, onChange }) {
           border: '1px solid var(--border-light)',
           borderRadius: '8px',
           marginTop: '4px',
-          maxHeight: '200px',
+          maxHeight: '240px',
           overflowY: 'auto',
           zIndex: 10
         }}>
+          {term && !exactMatch && (
+            <div
+              onClick={handleCreate}
+              style={{
+                padding: '10px 15px',
+                cursor: creating ? 'wait' : 'pointer',
+                borderBottom: '1px solid rgba(224,248,0,0.2)',
+                background: 'rgba(224,248,0,0.05)',
+                color: 'var(--accent-primary)',
+                fontWeight: 'bold',
+              }}
+            >
+              {creating ? 'Creando…' : `➕ Crear "${term}"`}
+            </div>
+          )}
           {filtered.length > 0 ? filtered.map((ex, i) => (
-            <div 
+            <div
               key={i}
               onClick={() => {
                 onChange(ex);
@@ -525,7 +621,7 @@ export default function SearchableExerciseSelect({ value, onChange }) {
               {ex}
             </div>
           )) : (
-            <div style={{ padding: '10px 15px', color: 'var(--text-muted)' }}>No se encontraron ejercicios</div>
+            !term && <div style={{ padding: '10px 15px', color: 'var(--text-muted)' }}>No se encontraron ejercicios</div>
           )}
         </div>
       )}

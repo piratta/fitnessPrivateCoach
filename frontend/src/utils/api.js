@@ -67,6 +67,13 @@ export const authApi = {
     request('/api/auth/change-password', { method: 'POST', body: { currentPassword, newPassword } }),
 };
 
+export const exercisesApi = {
+  list: () => request('/api/exercises'),
+  create: (name, description) => request('/api/exercises', { method: 'POST', body: { name, description } }),
+  update: (id, body) => request(`/api/exercises/${id}`, { method: 'PUT', body }),
+  remove: (id) => request(`/api/exercises/${id}`, { method: 'DELETE' }),
+};
+
 export const usersApi = {
   completeOnboarding: (measurements) => request('/api/users/me/complete-onboarding', { method: 'POST', body: measurements }),
   uploadInitialPhoto: (file, view) => {
