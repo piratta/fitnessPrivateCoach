@@ -1,8 +1,6 @@
 package com.fitnessApp.core.exception;
 
-import jakarta.persistence.EntityNotFoundException;
-
-public class WorkoutNotFoundException extends EntityNotFoundException {
+public class WorkoutNotFoundException extends RuntimeException {
     public WorkoutNotFoundException(String message) {
         super(message);
     }

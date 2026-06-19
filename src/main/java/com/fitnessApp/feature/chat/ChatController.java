@@ -22,6 +22,7 @@ public class ChatController {
     private final ChatMessageRepository chatMessageRepository;
     private final UserRepository userRepository;
     private final ChatWebSocketHandler chatWebSocketHandler;
+    private final ChatMapper chatMapper;
 
     @GetMapping("/{clientEmail}")
     public ResponseEntity<List<ChatMessageDto>> getChatHistory(@PathVariable String clientEmail) {
@@ -46,16 +47,9 @@ public class ChatController {
 
         List<ChatMessage> messages = chatMessageRepository.findChatHistory(theClient, coach);
 
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
-
-        List<ChatMessageDto> dtos = messages.stream().map(msg -> {
-            String senderPerspective = msg.getSender().getId().equals(currentUser.getId()) 
-                    ? (currentUser.getRole() == Role.PREMIUM_CLIENT ? "client" : "coach")
-                    : (currentUser.getRole() == Role.PREMIUM_CLIENT ? "coach" : "client");
-            
-            String timeStr = "Hoy " + msg.getSentAt().format(formatter);
-            return new ChatMessageDto(senderPerspective, msg.getMessageText(), timeStr);
-        }).collect(Collectors.toList());
+        List<ChatMessageDto> dtos = messages.stream()
+                .map(chatMapper::toDto)
+                .collect(Collectors.toList());
 
         return ResponseEntity.ok(dtos);
     }

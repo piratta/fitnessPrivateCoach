@@ -13,6 +13,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import lombok.RequiredArgsConstructor;
+import com.fitnessApp.core.exception.ClientNotFoundException;
+import com.fitnessApp.core.exception.WorkoutNotFoundException;
 
 @Service // ¡Esta anotación es la clave!
 @RequiredArgsConstructor
@@ -21,6 +23,7 @@ public class WorkoutService {
 
     private final WorkoutSessionRepository workoutRepository;
     private final UserRepository userRepository;
+    private final WorkoutMapper workoutMapper;
 
     public UUID finishWorkout(String principalEmail, WorkoutDto request) {
         User client = userRepository.findByEmail(principalEmail)
@@ -60,8 +63,8 @@ public class WorkoutService {
     }
 
     public void updateWorkout(String principalEmail, UUID id, WorkoutDto request) {
-        User client = userRepository.findByEmail(principalEmail).orElseThrow();
-        WorkoutSession session = workoutRepository.findById(id).orElseThrow();
+        User client = userRepository.findByEmail(principalEmail).orElseThrow(() -> new ClientNotFoundException("Cliente no encontrado con email: " + principalEmail));
+        WorkoutSession session = workoutRepository.findById(id).orElseThrow(() -> new WorkoutNotFoundException("Sesión de entrenamiento no encontrada con ID: " + id));
 
         if (!session.getClient().getId().equals(client.getId())) {
             throw new RuntimeException("No tienes permisos para modificar este entrenamiento.");
@@ -85,27 +88,7 @@ public class WorkoutService {
 
     public List<WorkoutDto> getHistory(UUID clientId) {
         List<WorkoutSession> sessions = workoutRepository.findByClientIdOrderBySessionDateDesc(clientId);
-        return sessions.stream().map(s -> {
-            WorkoutDto dto = new WorkoutDto();
-            dto.setId(s.getId());
-            dto.setDayName(s.getDayName());
-            dto.setDurationSeconds(s.getDurationSeconds());
-            dto.setTotalVolume(s.getTotalVolume());
-            dto.setCompletedSets(s.getCompletedSets());
-            dto.setCompletionPercentage(s.getCompletionPercentage());
-            dto.setSessionDate(s.getSessionDate());
-            dto.setAssignedDate(s.getAssignedDate());
-            dto.setLogsJson(s.getLogsJson());
-            dto.setCommentsJson(s.getCommentsJson());
-            dto.setVideoLinksJson(s.getVideoLinksJson());
-            dto.setRoutineSnapshotJson(s.getRoutineSnapshotJson());
-            dto.setStress(s.getStress());
-            dto.setFatigue(s.getFatigue());
-            dto.setMotivation(s.getMotivation());
-            dto.setSleepHours(s.getSleepHours());
-            dto.setDigestions(s.getDigestions());
-            return dto;
-        }).collect(Collectors.toList());
+        return sessions.stream().map(workoutMapper::toDto).collect(Collectors.toList());
     }
 
     public List<WorkoutDto> getHistoryByEmail(String email) {

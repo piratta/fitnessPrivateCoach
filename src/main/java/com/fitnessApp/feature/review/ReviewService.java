@@ -16,34 +16,44 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Owns the review lifecycle. All state transitions and the review-creation lock live here so the
- * frontend never decides anything critical — it only reflects the state the backend reports.
+ * Owns the review lifecycle. All state transitions and the review-creation lock
+ * live here so the
+ * frontend never decides anything critical — it only reflects the state the
+ * backend reports.
  */
 @Service
 @RequiredArgsConstructor
 @SuppressWarnings("null")
 public class ReviewService {
 
-    private static final List<ReviewStatus> ACTIVE_STATUSES =
-            List.of(ReviewStatus.PENDING, ReviewStatus.VALIDATED, ReviewStatus.FEEDBACK_RECEIVED);
+    private static final List<ReviewStatus> ACTIVE_STATUSES = List.of(ReviewStatus.PENDING, ReviewStatus.VALIDATED,
+            ReviewStatus.FEEDBACK_RECEIVED);
 
     private final ReviewRepository reviewRepository;
     private final ReviewImageRepository reviewImageRepository;
     private final UserRepository userRepository;
 
     /**
-     * Computes when the next review is allowed, based on the client's configured frequency.
-     * The result is always at 00:00 of the target day — the hour of the previous review is
-     * irrelevant, so a weekly review made on day 1 unlocks on day 8 at 00:00, not 24h later.
+     * Computes when the next review is allowed, based on the client's configured
+     * frequency.
+     * The result is always at 00:00 of the target day — the hour of the previous
+     * review is
+     * irrelevant, so a weekly review made on day 1 unlocks on day 8 at 00:00, not
+     * 24h later.
      */
     public LocalDateTime computeNextReviewAt(User client, LocalDateTime from) {
         String freq = client.getReviewFrequency() == null ? "" : client.getReviewFrequency().toLowerCase();
         LocalDateTime base;
-        if (freq.contains("bisemanal")) base = from.plusWeeks(2);
-        else if (freq.contains("3 semana")) base = from.plusWeeks(3);
-        else if (freq.contains("bimensual")) base = from.plusMonths(2);
-        else if (freq.contains("mensual")) base = from.plusMonths(1);
-        else base = from.plusWeeks(1); // Default: weekly.
+        if (freq.contains("bisemanal"))
+            base = from.plusWeeks(2);
+        else if (freq.contains("3 semana"))
+            base = from.plusWeeks(3);
+        else if (freq.contains("bimensual"))
+            base = from.plusMonths(2);
+        else if (freq.contains("mensual"))
+            base = from.plusMonths(1);
+        else
+            base = from.plusWeeks(1); // Default: weekly.
         return base.toLocalDate().atStartOfDay();
     }
 
@@ -58,7 +68,8 @@ public class ReviewService {
     }
 
     /**
-     * Creates a new PENDING review. Guarded by the lock (current time must be >= next_review_at)
+     * Creates a new PENDING review. Guarded by the lock (current time must be >=
+     * next_review_at)
      * and by the single-active-review rule.
      */
     @Transactional
@@ -88,7 +99,10 @@ public class ReviewService {
         return reviewRepository.save(review);
     }
 
-    /** Persists an uploaded photo inside the same transaction as the review it belongs to. */
+    /**
+     * Persists an uploaded photo inside the same transaction as the review it
+     * belongs to.
+     */
     @Transactional
     public ReviewImage addImage(User client, UUID reviewId, String view, boolean visibleForClient, MultipartFile file) {
         Review review = loadOwnedReview(client, reviewId);
@@ -100,7 +114,8 @@ public class ReviewService {
     }
 
     /**
-     * Stand-alone photo (no review attached). Used by the onboarding flow so the initial
+     * Stand-alone photo (no review attached). Used by the onboarding flow so the
+     * initial
      * pictures appear in the client's gallery and act as baseline references.
      */
     @Transactional
@@ -108,7 +123,8 @@ public class ReviewService {
         return persistImage(client, null, view, visibleForClient, file);
     }
 
-    private ReviewImage persistImage(User client, Review review, String view, boolean visibleForClient, MultipartFile file) {
+    private ReviewImage persistImage(User client, Review review, String view, boolean visibleForClient,
+            MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Archivo vacío.");
         }
@@ -140,7 +156,9 @@ public class ReviewService {
         reviewImageRepository.delete(image);
     }
 
-    /** Coach validates a PENDING review and leaves feedback: PENDING -> VALIDATED. */
+    /**
+     * Coach validates a PENDING review and leaves feedback: PENDING -> VALIDATED.
+     */
     @Transactional
     public Review validate(User coach, UUID reviewId, String feedback) {
         Review review = reviewRepository.findById(reviewId)
@@ -156,7 +174,8 @@ public class ReviewService {
     }
 
     /**
-     * Client acknowledges the feedback. Moves VALIDATED -> FEEDBACK_RECEIVED -> ARCHIVED, archives
+     * Client acknowledges the feedback. Moves VALIDATED -> FEEDBACK_RECEIVED ->
+     * ARCHIVED, archives
      * the review and arms the lock until the next allowed review.
      */
     @Transactional

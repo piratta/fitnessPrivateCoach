@@ -8,7 +8,7 @@ import { useDialog } from './ui/Dialog';
 import { API_BASE_URL } from '../config';
 import '../index.css';
 
-export default function ClientList({ clients, setClients, billingPlans, onPlanRoutine, isChatMode }) {
+export default function ClientList({ clients, setClients, billingPlans, onPlanRoutine, isChatMode, onViewClientDetail }) {
   const dialog = useDialog();
   const [selectedClient, setSelectedClient] = useState(null);
   const [editingClient, setEditingClient] = useState(null); // { name, email }
@@ -553,6 +553,201 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
                       borderRadius: '50%', padding: '2px 6px'
                     }}>
                       {client.unreadMessages}
+      unit = 'kg';
+      title = 'Evolución del Peso Corporal';
+    } else if (type === 'adherence') {
+      history = selectedClient.adherenceHistory;
+      unit = '%';
+      title = 'Cumplimiento de Rutina';
+      color = '#00f2fe'; // Azul Neón
+    } else if (type === 'waist') {
+      history = selectedClient.waistHistory;
+      unit = 'cm';
+      title = 'Perímetro de Cintura';
+      color = '#ff0844'; // Rojo Neón
+    } else if (type === 'cadera') {
+      history = selectedClient.caderaHistory;
+      unit = 'cm';
+      title = 'Perímetro de Cadera';
+      color = '#bb00ff'; // Morado Neón
+    } else if (type === 'cuello') {
+      history = selectedClient.cuelloHistory;
+      unit = 'cm';
+      title = 'Perímetro de Cuello';
+      color = '#00ff88'; // Verde Neón
+    } else if (type === 'biceps') {
+      history = selectedClient.bicepsHistory;
+      unit = 'cm';
+      title = 'Perímetro de Bíceps';
+      color = '#ff00aa'; // Rosa Neón
+    } else if (type === 'pierna') {
+      history = selectedClient.piernaHistory;
+      unit = 'cm';
+      title = 'Perímetro de Pierna';
+      color = '#00d2ff'; // Cian Oscuro Neón
+    } else if (type === 'volume') {
+      history = selectedClient.volumeHistory;
+      unit = 'kg';
+      title = 'Volumen Total Levantado (Sobrecarga Progresiva)';
+      color = '#ffaa00'; // Naranja
+    }
+
+    if (!history || history.length === 0 || history[0] === 0) return <p style={{ color: 'var(--text-muted)' }}>No hay datos suficientes para esta métrica.</p>;
+    if (history.length === 1) return <p style={{ color: 'var(--text-muted)' }}>Dato actual: {history[0]}{unit}. Esperando más semanas para trazar gráfica.</p>;
+
+    const min = type === 'volume' ? Math.floor(Math.min(...history) - 500) : Math.floor(Math.min(...history) - 2);
+    const max = type === 'volume' ? Math.ceil(Math.max(...history) + 500) : Math.ceil(Math.max(...history) + 2);
+    const range = max - min || 1;
+
+    const svgWidth = 600;
+    const svgHeight = 220;
+    const paddingY = 40;
+    const paddingX = 40;
+    
+    const getX = (index) => paddingX + (index / (history.length - 1)) * (svgWidth - paddingX * 2);
+    const getY = (val) => svgHeight - paddingY - ((val - min) / range) * (svgHeight - paddingY * 2);
+
+    const points = history.map((val, i) => `${getX(i)},${getY(val)}`).join(' ');
+    const areaPath = `M ${getX(0)},${svgHeight - paddingY + 20} L ${points.split(' ').join(' L ')} L ${getX(history.length - 1)},${svgHeight - paddingY + 20} Z`;
+
+    return (
+      <div className="fade-in" style={{ marginTop: '30px' }}>
+        <h4 style={{ color: 'white', textAlign: 'center', marginBottom: '25px', fontWeight: '800', fontSize: '1.4rem' }}>{title}</h4>
+        <div style={{ background: 'rgba(10,10,12,0.8)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)', padding: '30px 20px 10px', position: 'relative', overflowX: 'visible', boxShadow: 'inset 0 0 20px rgba(0,0,0,0.5)' }}>
+          <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ width: '100%', height: 'auto', display: 'block', overflow: 'visible' }}>
+            <defs>
+              <linearGradient id={`grad-${type}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+                <stop offset="100%" stopColor={color} stopOpacity="0.0" />
+              </linearGradient>
+            </defs>
+            
+            {/* Grid Lines */}
+            {[0, 0.25, 0.5, 0.75, 1].map(factor => {
+               const y = svgHeight - paddingY - factor * (svgHeight - paddingY * 2);
+               return <line key={factor} x1={paddingX - 10} y1={y} x2={svgWidth - paddingX + 10} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="1" strokeDasharray="4 4" />
+            })}
+
+            {/* Area and Line */}
+            <path d={areaPath} fill={`url(#grad-${type})`} />
+            <polyline points={points} fill="none" stroke={color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" style={{ filter: `drop-shadow(0px 8px 12px ${color}40)` }} />
+            
+            {/* Points and Labels */}
+            {history.map((val, index) => {
+              const getLabel = () => {
+                if (type === 'adherence') return `Seman. ${index + 1}`;
+                if (selectedClient.progressLogs && selectedClient.progressLogs[index]) {
+                  const dateStr = selectedClient.progressLogs[index].logDate;
+                  const parts = dateStr.split('-');
+                  if (parts.length === 3) return `${parts[2]}/${parts[1]}`;
+                }
+                return `Mes ${index + 1}`;
+              };
+              return (
+                <g key={index} style={{ transition: 'all 0.3s' }}>
+                  <circle cx={getX(index)} cy={getY(val)} r="8" fill="#0a0a0c" stroke={color} strokeWidth="3" style={{ cursor: 'pointer' }} />
+                  <text x={getX(index)} y={getY(val) - 20} fill={color} fontSize="16" fontWeight="800" textAnchor="middle" fontFamily="Outfit" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>{val}{unit}</text>
+                  <text x={getX(index)} y={svgHeight - 5} fill="var(--text-muted)" fontSize="13" fontWeight="600" textAnchor="middle" textTransform="uppercase" fontFamily="Outfit" letterSpacing="1px">{getLabel()}</text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="glass-panel" style={{ padding: '30px', position: 'relative' }}>
+      
+      {/* Cabecera Principal */}
+      <div className="mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border-light)', paddingBottom: '15px' }}>
+        <h3 style={{ fontSize: '1.2rem' }}>{isChatMode ? 'Mensajes Privados' : 'Tus Clientes Premium'}</h3>
+        <div className="mobile-header-actions" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+          {!isChatMode && (
+            <select 
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="input-field"
+              style={{ marginBottom: '0', width: '150px' }}
+            >
+              <option value="Todos">Todos</option>
+              <option value="Activo">Activos</option>
+              <option value="Inactivo">Inactivos</option>
+            </select>
+          )}
+          <input 
+            type="text" 
+            className="input-field" 
+            placeholder="🔍 Buscar cliente..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ marginBottom: '0', width: '300px' }}
+          />
+          {!isChatMode && (
+            <button 
+              onClick={() => setIsAddingClient(true)} 
+              style={{ background: 'var(--accent-primary)', color: '#000', border: 'none', padding: '8px 16px', borderRadius: '6px', fontWeight: '800', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
+              <span>+</span> Nuevo Cliente
+            </button>
+          )}
+        </div>
+      </div>
+      
+      {/* Tabla de Clientes */}
+      <div className="table-responsive">
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
+          <thead>
+          <tr style={{ color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '0.85rem', letterSpacing: '1px' }}>
+            <th style={{ paddingBottom: '15px', cursor: 'pointer' }} onClick={() => handleSort('name')}>Nombre {sortConfig.key === 'name' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
+            <th style={{ paddingBottom: '15px', cursor: 'pointer' }} onClick={() => handleSort('email')}>Email {sortConfig.key === 'email' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
+            {!isChatMode && <th style={{ paddingBottom: '15px', cursor: 'pointer' }} onClick={() => handleSort('status')}>Estado {sortConfig.key === 'status' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>}
+            {!isChatMode && <th style={{ paddingBottom: '15px', cursor: 'pointer' }} onClick={() => handleSort('nextReview')}>Próx. Revisión {sortConfig.key === 'nextReview' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>}
+            <th style={{ paddingBottom: '15px', textAlign: 'center', cursor: 'pointer' }} onClick={() => handleSort('chat')}>Chat {sortConfig.key === 'chat' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
+            {!isChatMode && <th style={{ paddingBottom: '15px', textAlign: 'right' }}>Acciones</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {filteredClients.map(client => (
+            <tr key={client.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <td style={{ padding: '15px 0', fontWeight: '600' }}>{client.name} {client.lastName || ''}</td>
+              <td style={{ padding: '15px 0', color: 'var(--text-muted)' }}>{client.email}</td>
+              {!isChatMode && (
+                <>
+                  <td style={{ padding: '15px 0' }}>
+                    <span style={{ 
+                      padding: '4px 10px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold',
+                      background: client.status === 'Activo' ? 'rgba(224, 248, 0, 0.1)' : 'rgba(255, 69, 0, 0.1)',
+                      color: client.status === 'Activo' ? 'var(--accent-primary)' : '#ff4500'
+                    }}>
+                      {client.status}
+                    </span>
+                  </td>
+                  <td style={{ padding: '15px 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                    {client.status === 'Inactivo' ? '-' : (client.nextReview || 'No asignada')}
+                  </td>
+                </>
+              )}
+              <td style={{ padding: '15px 0', textAlign: 'center' }}>
+                <button 
+                  onClick={() => {
+                    setOpenedFromTable(true);
+                    setClients(prev => prev.map(c => c.id === client.id ? { ...c, unreadMessages: 0 } : c));
+                    setSelectedClient({...client, unreadMessages: 0, messages: client.messages || []});
+                    setShowChatModal(true);
+                  }}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', position: 'relative', fontSize: '1.2rem', color: client.unreadMessages > 0 ? 'var(--accent-primary)' : 'var(--text-muted)' }}
+                  title="Abrir Chat"
+                >
+                  💬
+                  {client.unreadMessages > 0 && (
+                    <span style={{
+                      position: 'absolute', top: '-5px', right: '-8px',
+                      background: '#ff4500', color: '#fff', fontSize: '0.6rem', fontWeight: 'bold',
+                      borderRadius: '50%', padding: '2px 6px'
+                    }}>
+                      {client.unreadMessages}
                     </span>
                   )}
                 </button>
@@ -560,7 +755,10 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
               {!isChatMode && (
                 <td style={{ padding: '15px 0', textAlign: 'right' }}>
                   <button 
-                    onClick={() => setSelectedClient(client)}
+                    onClick={() => {
+                      if (onViewClientDetail) onViewClientDetail(client.id);
+                      else setSelectedClient(client);
+                    }}
                     style={{ background: 'transparent', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', transition: 'all 0.2s', fontWeight: 'bold' }}
                   >
                     Ver Detalle
@@ -802,99 +1000,6 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
                         setNewStrategyInput('');
                       }
                     // eslint-disable-next-line no-unused-vars, no-empty
-                    } catch (err) {}
-                  }}
-                  style={{ background: 'var(--accent-primary)', color: '#000', border: 'none', padding: '0 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
-                >Añadir</button>
-              </div>
-            </div>
-
-            {/* Estrategia de Progresión */}
-            <h4 style={{ marginBottom: '10px', color: 'var(--text-muted)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Estrategia de Progresión (Pesos)</h4>
-            <div style={{ marginBottom: '15px' }}>
-              <select 
-                className="input-field" 
-                value={selectedClient.progressionStrategy || "Sobrecarga Progresiva (Subir peso)"}
-                onChange={async (e) => {
-                  const newStrategy = e.target.value;
-                  const token = localStorage.getItem('token');
-                  try {
-                    const response = await fetch(`${API_BASE_URL}/api/users/clients/${selectedClient.id}`, {
-                      method: 'PUT',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                      },
-                      body: JSON.stringify({ progressionStrategy: newStrategy })
-                    });
-                    if (response.ok) {
-                      setSelectedClient(prev => ({ ...prev, progressionStrategy: newStrategy }));
-                      setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, progressionStrategy: newStrategy } : c));
-                    } else {
-                      await dialog.alert("Error al guardar la estrategia de progresión en el servidor.", { title: "Error" });
-                    }
-                  // eslint-disable-next-line no-unused-vars
-                  } catch (err) {
-                    await dialog.alert("Error de red al guardar la estrategia.", { title: "Error" });
-                  }
-                }}
-                style={{ width: '100%', marginBottom: 0 }}
-              >
-                <option value="Sobrecarga Progresiva (Subir peso)">Sobrecarga Progresiva (Subir peso)</option>
-                <option value="Aumentar Repeticiones (Mantener peso)">Aumentar Repeticiones (Mantener peso)</option>
-                <option value="Mantenimiento (Mismo peso y reps)">Mantenimiento (Mismo peso y reps)</option>
-                <option value="Semana de Descarga (Bajar peso/volumen)">Semana de Descarga (Bajar peso/volumen)</option>
-                <option value="Foco en Técnica (Bajar peso)">Foco en Técnica (Bajar peso)</option>
-              </select>
-            </div>
-
-            {/* Periodicidad de Revisiones */}
-            <h4 style={{ marginBottom: '10px', color: 'var(--text-muted)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Periodicidad de Revisiones</h4>
-            <div style={{ marginBottom: '25px' }}>
-              <select 
-                className="input-field" 
-                value={selectedClient.reviewFrequency || "Semanal"}
-                onChange={async (e) => {
-                  const newFrequency = e.target.value;
-                  const token = localStorage.getItem('token');
-                  try {
-                    const response = await fetch(`${API_BASE_URL}/api/users/clients/${selectedClient.id}`, {
-                      method: 'PUT',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                      },
-                      body: JSON.stringify({ reviewFrequency: newFrequency })
-                    });
-                    if (response.ok) {
-                      setSelectedClient(prev => ({ ...prev, reviewFrequency: newFrequency }));
-                      setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, reviewFrequency: newFrequency } : c));
-                    } else {
-                      await dialog.alert("Error al guardar la periodicidad de revisiones en el servidor.", { title: "Error" });
-                    }
-                  // eslint-disable-next-line no-unused-vars
-                  } catch (err) {
-                    await dialog.alert("Error de red al guardar la periodicidad.", { title: "Error" });
-                  }
-                }}
-                style={{ width: '100%', marginBottom: 0 }}
-              >
-                <option value="Semanal">Semanal (1 semana)</option>
-                <option value="Bisemanal">Bisemanal (2 semanas)</option>
-                <option value="3 Semanas">Cada 3 Semanas</option>
-                <option value="Mensual">Mensual (4 semanas)</option>
-                <option value="Bimensual">Bimensual (8 semanas)</option>
-              </select>
-            </div>
-
-            {/* Acciones del Cliente */}
-            <h4 style={{ marginBottom: '20px', color: 'var(--text-muted)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Panel de Control Activo</h4>
-            <div className="responsive-grid-2">
-              {selectedClient.status === 'Activo' ? (
-                <>
-                  <button 
-                    onClick={() => selectedClient.hasRoutine !== false && handlePlanRoutine()} 
-                    className="btn-primary" 
                     style={{ 
                       padding: '15px', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', 
                       background: selectedClient.hasRoutine !== false ? 'rgba(224, 248, 0, 0.1)' : 'rgba(255,255,255,0.05)', 

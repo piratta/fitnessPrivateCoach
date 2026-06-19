@@ -26,6 +26,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fitnessApp.feature.workout.WorkoutSession;
 import com.fitnessApp.feature.workout.WorkoutSessionRepository;
 import lombok.RequiredArgsConstructor;
+import com.fitnessApp.core.exception.ClientNotFoundException;
 
 @Service
 @RequiredArgsConstructor
@@ -55,7 +56,7 @@ public class UserService {
     }
 
     public List<UserDto> getMyClients(String coachEmail) {
-        User coach = userRepository.findByEmail(coachEmail).orElseThrow();
+        User coach = userRepository.findByEmail(coachEmail).orElseThrow(() -> new ClientNotFoundException("Usuario no encontrado con email: " + coachEmail));
         List<User> clients = userRepository.findAll().stream()
                 .filter(u -> u.getCoach() != null && u.getCoach().getId().equals(coach.getId()))
                 .collect(Collectors.toList());
@@ -105,7 +106,7 @@ public class UserService {
 
     @Transactional
     public User createClient(String coachEmail, UserDto clientDto) {
-        User coach = userRepository.findByEmail(coachEmail).orElseThrow();
+        User coach = userRepository.findByEmail(coachEmail).orElseThrow(() -> new ClientNotFoundException("Usuario no encontrado con email: " + coachEmail));
 
         String firstName = clientDto.getName() == null ? "" : clientDto.getName().trim();
         String surnames = clientDto.getLastName() == null ? "" : clientDto.getLastName().trim();
@@ -136,7 +137,7 @@ public class UserService {
     }
 
     public User updateClient(String coachEmail, UUID clientId, UserDto clientDto) {
-        User coach = userRepository.findByEmail(coachEmail).orElseThrow();
+        User coach = userRepository.findByEmail(coachEmail).orElseThrow(() -> new ClientNotFoundException("Usuario no encontrado con email: " + coachEmail));
         User client = userRepository.findById(clientId)
                 .orElseThrow(() -> new RuntimeException("Client not found"));
 
@@ -169,7 +170,7 @@ public class UserService {
 
     @Transactional
     public void deleteClient(String coachEmail, UUID clientId) {
-        User coach = userRepository.findByEmail(coachEmail).orElseThrow();
+        User coach = userRepository.findByEmail(coachEmail).orElseThrow(() -> new ClientNotFoundException("Usuario no encontrado con email: " + coachEmail));
         User client = userRepository.findById(clientId)
                 .orElseThrow(() -> new RuntimeException("Client not found"));
 
@@ -185,7 +186,7 @@ public class UserService {
     }
 
     public String resetClientPassword(String coachEmail, UUID clientId, User[] clientRef) {
-        User coach = userRepository.findByEmail(coachEmail).orElseThrow();
+        User coach = userRepository.findByEmail(coachEmail).orElseThrow(() -> new ClientNotFoundException("Usuario no encontrado con email: " + coachEmail));
         User client = userRepository.findById(clientId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente no encontrado."));
 
@@ -201,7 +202,7 @@ public class UserService {
     }
 
     public User updateMe(String principalEmail, UserDto dto) {
-        User user = userRepository.findByEmail(principalEmail).orElseThrow();
+        User user = userRepository.findByEmail(principalEmail).orElseThrow(() -> new ClientNotFoundException("Usuario no encontrado con email: " + principalEmail));
 
         if (dto.getName() != null && !dto.getName().isBlank())
             user.setName(dto.getName().trim());

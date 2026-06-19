@@ -6,6 +6,7 @@ import ReviewManager from './ReviewManager';
 import TemplateManager from './TemplateManager';
 import BillingManager from './BillingManager';
 import ExercisesManager from './ExercisesManager';
+import ClientDetailView from './ClientDetailView';
 // eslint-disable-next-line no-unused-vars
 import { initChatIfEmpty, connectWebSocket, disconnectWebSocket } from '../utils/chatStore';
 import { useDialog } from './ui/Dialog';
@@ -22,6 +23,9 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
   const dropdownRef = useRef(null);
   const portalRef = useRef(null);
   const [dropdownCoords, setDropdownCoords] = useState({ top: 0, left: 0, width: 0 });
+  
+  // State for ClientDetailView
+  const [viewDetailClientId, setViewDetailClientId] = useState(null);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -172,185 +176,6 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
     })
     .catch(err => console.error("Error loading clients:", err));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Connect to WebSocket and receive live messages globally
-  useEffect(() => {
-    if (!user?.email) return;
-
-    const handleWsMessage = (message) => {
-      const clientEmail = message.clientEmail;
-      const text = message.text;
-
-      setClients(prev => {
-        const clientObj = prev.find(c => c.email === clientEmail);
-        const clientName = clientObj ? clientObj.name.split(' ')[0] : 'Cliente';
-
-        if (message.sender === 'client') {
-          if (window.activeChatEmail !== clientEmail) {
-            // Show toast notification
-            dialog.toast(`Nuevo mensaje de ${clientName}: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`, { variant: 'info' });
-            return prev.map(c =>
-              c.email === clientEmail
-                ? {
-                    ...c,
-                    unreadMessages: (c.unreadMessages || 0) + 1,
-                    messages: [...(c.messages || []), { sender: message.sender, text: message.text, time: message.time }]
-                  }
-                : c
-            );
-          } else {
-            return prev.map(c => {
-              if (c.email === clientEmail) {
-                const isDuplicate = (c.messages || []).some(m => m.text === message.text && m.time === message.time && m.sender === message.sender);
-                if (isDuplicate) return c;
-                return { ...c, messages: [...(c.messages || []), { sender: message.sender, text: message.text, time: message.time }] };
-              }
-              return c;
-            });
-          }
-        } else if (message.sender === 'coach') {
-          return prev.map(c => {
-            if (c.email === clientEmail) {
-              const isDuplicate = (c.messages || []).some(m => m.text === message.text && m.time === message.time && m.sender === message.sender);
-              if (isDuplicate) return c;
-              return { ...c, messages: [...(c.messages || []), { sender: message.sender, text: message.text, time: message.time }] };
-            }
-            return c;
-          });
-        }
-        return prev;
-      });
-    };
-
-    connectWebSocket(handleWsMessage);
-
-    return () => {
-      disconnectWebSocket(handleWsMessage);
-    };
-  }, [user?.email, dialog]);
-
-  const totalUnread = clients.reduce((acc, c) => acc + (c.unreadMessages || 0), 0);
-  const pendingReviews = clients.filter(c => c.nextReview === 'Pendiente' || c.nextReview === 'Hoy').length;
-
-  const navItemStyle = (tabId) => ({
-    padding: '10px 20px',
-    cursor: 'pointer',
-    background: activeTab === tabId ? 'rgba(224, 248, 0, 0.1)' : 'transparent',
-    color: activeTab === tabId ? 'var(--accent-primary)' : 'var(--text-main)',
-    borderBottom: activeTab === tabId ? '2px solid var(--accent-primary)' : '2px solid transparent',
-    fontWeight: activeTab === tabId ? '800' : '600',
-    transition: 'all 0.3s',
-    textTransform: 'uppercase',
-    letterSpacing: '1px',
-    fontSize: '0.9rem'
-  });
-
-  const isEjerciciosActive = ['rutinas', 'plantillas', 'ejercicios'].includes(activeTab);
-
-  const ejerciciosTabStyle = {
-    padding: '10px 20px',
-    cursor: 'pointer',
-    background: isEjerciciosActive ? 'rgba(224, 248, 0, 0.1)' : 'transparent',
-    color: isEjerciciosActive ? 'var(--accent-primary)' : 'var(--text-main)',
-    borderBottom: isEjerciciosActive ? '2px solid var(--accent-primary)' : '2px solid transparent',
-    fontWeight: isEjerciciosActive ? '800' : '600',
-    transition: 'all 0.3s',
-    textTransform: 'uppercase',
-    letterSpacing: '1px',
-    fontSize: '0.9rem',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    userSelect: 'none'
-  };
-
-  return (
-    <div className="fade-in" style={{ padding: '40px 20px', maxWidth: '1200px', margin: '0 auto' }}>
-      
-      {/* Header */}
-      <header className="glass-panel mobile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 30px', marginBottom: '20px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: '800' }}>
-            ENTRENADOR <span style={{ color: 'var(--accent-primary)' }}>PRO</span>
-          </h2>
-        </div>
-        <div className="mobile-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div onClick={() => setShowProfileModal(true)} style={{ textAlign: 'right', cursor: 'pointer' }} title="Editar mi perfil">
-            <p style={{ fontWeight: '600', fontSize: '1rem', textDecoration: 'underline' }}>{user.name}</p>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>{user.role}</p>
-          </div>
-          <button 
-            onClick={onLogout}
-            style={{ background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-main)', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontFamily: 'Outfit', fontWeight: '600', transition: 'all 0.2s' }}
-            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; }}
-          >
-            Salir
-          </button>
-        </div>
-      </header>
-
-      {/* Navegación de Pestañas */}
-      <div className="scrollable-tabs" style={{ marginBottom: '30px', borderBottom: '1px solid var(--border-light)' }}>
-        <div style={navItemStyle('resumen')} onClick={() => setActiveTab('resumen')}>Resumen</div>
-        <div style={navItemStyle('clientes')} onClick={() => setActiveTab('clientes')}>Mis Clientes</div>
-        <div style={navItemStyle('mensajes')} onClick={() => setActiveTab('mensajes')}>
-          Mensajes
-          {totalUnread > 0 && <span className="fade-in" style={{ background: '#ff4500', color: '#fff', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '10px', marginLeft: '8px', fontWeight: 'bold' }}>{totalUnread}</span>}
-        </div>
-        
-        {/* Dropdown de Ejercicios */}
-        <div 
-          ref={dropdownRef} 
-          style={{ position: 'relative', display: 'inline-block' }}
-        >
-          <div 
-            style={ejerciciosTabStyle} 
-            onClick={toggleDropdown}
-          >
-            Ejercicios <span style={{ fontSize: '0.75rem', transform: showEjerciciosDropdown ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▼</span>
-          </div>
-        </div>
-
-        <div style={navItemStyle('revisiones')} onClick={() => setActiveTab('revisiones')}>
-          Revisiones 
-          {pendingReviews > 0 && <span style={{ background: '#ff4500', color: '#fff', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '10px', marginLeft: '8px', fontWeight: 'bold' }}>{pendingReviews}</span>}
-        </div>
-        <div style={navItemStyle('facturacion')} onClick={() => setActiveTab('facturacion')}>Facturación</div>
-      </div>
-
-      {/* Contenido Dinámico */}
-      <div className="fade-in">
-        {activeTab === 'resumen' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
-            <div className="glass-panel" style={{ padding: '25px', borderTop: '3px solid var(--accent-primary)' }}>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>Clientes Activos</p>
-              <h3 style={{ fontSize: '2.5rem', fontWeight: '800' }}>{clients.filter(c => c.status === 'Activo').length}</h3>
-            </div>
-            <div className="glass-panel" style={{ padding: '25px' }}>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>Revisiones Pendientes</p>
-              <h3 style={{ fontSize: '2.5rem', fontWeight: '800', color: '#ff4500' }}>{pendingReviews}</h3>
-            </div>
-            <div className="glass-panel" style={{ padding: '25px' }}>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>Mensajes Nuevos</p>
-              <h3 style={{ fontSize: '2.5rem', fontWeight: '800' }}>{totalUnread}</h3>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'clientes' && <ClientList clients={clients} setClients={setClients} billingPlans={billingPlans} onPlanRoutine={(client) => {
-          if (client) setWorkoutClient(`${client.name} ${client.lastName || ''}`.trim());
-          setActiveTab('rutinas');
-          setTemplateMode(false);
-        }} />}
-        {activeTab === 'mensajes' && <ClientList clients={clients} setClients={setClients} isChatMode={true} />}
-        {activeTab === 'rutinas' && <WorkoutBuilder clients={clients} templates={templates} isTemplateMode={templateMode} editingTemplate={editingTemplate} initialClient={workoutClient} setClients={setClients} setTemplates={setTemplates} setActiveTab={setActiveTab} />}
-        {activeTab === 'plantillas' && <TemplateManager 
-            templates={templates} 
-            setTemplates={setTemplates} 
-            onCreateNew={() => {
-              setTemplateMode(true);
               setEditingTemplate(null);
               setActiveTab('rutinas');
             }}

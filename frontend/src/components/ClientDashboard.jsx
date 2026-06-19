@@ -9,6 +9,7 @@ import { getChatMessages, addChatMessage, connectWebSocket, disconnectWebSocket,
 import { usersApi, reviewsApi } from '../utils/api';
 import { useDialog } from './ui/Dialog';
 import { API_BASE_URL } from '../config';
+import { formatTime } from '../utils/timeUtils';
 import '../index.css';
 
 /**
@@ -166,19 +167,40 @@ export default function ClientDashboard({ user, onLogout}) {
   });
 
   // Workout Tracker States
-  const [selectedDay, setSelectedDay] = useState('');
+  const [_selectedDay, setSelectedDay] = useState('');
   const [skippedDays, setSkippedDays] = useState({});
-  const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, +1 = next week, -1 = previous
+  const [weekOffset, setWeekOffset] = useState(0);
 
-  const currentRoutineObj = (viewingNextRoutine && clientData?.nextRoutine)
-    ? clientData.nextRoutine
-    : clientData?.routine;
-  const activeDayNotes = currentRoutineObj ? currentRoutineObj[`${selectedDay}_notes`] : '';
-  const routineDays = currentRoutineObj ? Object.keys(currentRoutineObj).filter(day => !day.endsWith('_notes')) : [];
+  const [_comments, setComments] = useState({});
+  const [_videoLinks, setVideoLinks] = useState({});
+  const [_logs, setLogs] = useState({});
+  
+  const defaultDay = clientData?.routine ? Object.keys(clientData.routine).filter(day => !day.endsWith('_notes'))[0] : '';
+  const selectedDay = _selectedDay || defaultDay || '';
+  
+  const logs = useMemo(() => {
+    if (Object.keys(_logs).length > 0) return _logs;
+    if (!clientData?.routine || !selectedDay) return {};
+    const fresh = {};
+    Object.keys(clientData.routine).filter(k => !k.endsWith('_notes')).forEach(dayName => {
+      const initialized = initializeLogsForTab(dayName, dayName, clientData, {}, {}, {});
+      fresh[dayName] = initialized.logs;
+    });
+    return fresh;
+  }, [_logs, clientData?.routine, selectedDay]);
 
-  const [comments, setComments] = useState({}); // { [day_exIdx]: string }
-  const [videoLinks, setVideoLinks] = useState({});
-  const [logs, setLogs] = useState({});
+  const comments = useMemo(() => {
+    if (Object.keys(_comments).length > 0) return _comments;
+    return {};
+  }, [_comments]);
+
+  const videoLinks = useMemo(() => {
+    if (Object.keys(_videoLinks).length > 0) return _videoLinks;
+    return {};
+  }, [_videoLinks]);
+
+  
+  const [_logs, setLogs] = useState({});
 
 
 
@@ -257,20 +279,6 @@ export default function ClientDashboard({ user, onLogout}) {
 
   // Drive the review-tab badge from the backend so it never shows "1" while the lock is still
   // closed. We refresh on mount and whenever the user navigates back to the review tab.
-  // eslint-disable-next-line no-unused-vars
-  const refreshReviewBadge = async () => {
-    try {
-      const [lock, active] = await Promise.all([
-        reviewsApi.lockStatus(),
-        reviewsApi.active().catch(() => null),
-      ]);
-      setIsReviewLocked(!!lock?.locked);
-      setHasActiveReview(!!active);
-    } catch {
-      // Fall back to unknown so the badge stays hidden.
-      setIsReviewLocked(null);
-    }
-  };
   useEffect(() => {
     fetchProgressHistory();
   }, [user, activeTab]);
@@ -341,7 +349,7 @@ export default function ClientDashboard({ user, onLogout}) {
         overrideConsumed: Array.from(overrideConsumed),
         loadedRoutineByTab,
       }));
-    } catch { /* quota — ignore, in-memory state is still correct */ }
+    } catch (e) { console.error(e);  /* quota — ignore, in-memory state is still correct */  }
   }, [overrideConsumed, loadedRoutineByTab, WEEKLY_STATE_KEY]);
 
   // Sessions completed during the CURRENT week (Monday → Sunday) indexed by dayName. Drives
@@ -351,13 +359,6 @@ export default function ClientDashboard({ user, onLogout}) {
   const [todaySessionsByDay, setTodaySessionsByDay] = useState({});
 
   // Review Form State
-  // eslint-disable-next-line no-unused-vars
-  const [reviewData, setReviewData] = useState({
-    weight: '', waist: '', cadera: '', biceps: '', pierna: '', comments: '',
-    photos: { front: '', left: '', right: '', back: '' }
-  });
-
-
   // History State
   const [historyData, setHistoryData] = useState([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -457,7 +458,7 @@ export default function ClientDashboard({ user, onLogout}) {
               const parsed = JSON.parse(s.logsJson);
               slot = parsed._executionSlot;
            // eslint-disable-next-line no-unused-vars, no-empty
-           } catch(e) {}
+           } catch (e) { console.error("Error capturado:", e); }
         }
         
         const key = slot || weekdayOf(s.sessionDate) || s.dayName;
@@ -495,11 +496,11 @@ export default function ClientDashboard({ user, onLogout}) {
       }
       if (todays.commentsJson) {
         // eslint-disable-next-line no-unused-vars, no-empty
-        try { setComments(JSON.parse(todays.commentsJson)); } catch (e) {}
+        try { setComments(JSON.parse(todays.commentsJson)); } catch (e) { console.error("Error capturado:", e); }
       }
       if (todays.videoLinksJson) {
         // eslint-disable-next-line no-unused-vars, no-empty
-        try { setVideoLinks(JSON.parse(todays.videoLinksJson)); } catch (e) {}
+        try { setVideoLinks(JSON.parse(todays.videoLinksJson)); } catch (e) { console.error("Error capturado:", e); }
       }
       setActiveSessionId(todays.id);
       setWorkoutSeconds(todays.durationSeconds || 0);
@@ -542,15 +543,6 @@ export default function ClientDashboard({ user, onLogout}) {
     }
     return () => clearInterval(interval);
   }, [isWorkoutStarted, isWorkoutLocked]);
-
-  const formatTime = (totalSeconds) => {
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
-    const s = (totalSeconds % 60).toString().padStart(2, '0');
-    return h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
-  };
-
-
 
   // Initialize selectedDay when routine is loaded
   useEffect(() => {
@@ -612,7 +604,7 @@ export default function ClientDashboard({ user, onLogout}) {
           localStorage.removeItem(IN_PROGRESS_KEY);
         }
       }
-    } catch { /* ignore corrupt blob */ }
+    } catch (e) { console.error(e);  /* ignore corrupt blob */  }
 
     if (resumed) {
       const merged = { ...initialLogs, [resumed.dayName]: resumed.dayLogs || initialLogs[resumed.dayName] };
@@ -644,7 +636,7 @@ export default function ClientDashboard({ user, onLogout}) {
         activeSessionId,
         savedAt: Date.now(),
       }));
-    } catch { /* quota or serialisation issue — ignore */ }
+    } catch (e) { console.error(e);  /* quota or serialisation issue — ignore */  }
   }, [isWorkoutStarted, selectedDay, logs, workoutSeconds, activeSessionId, IN_PROGRESS_KEY]);
 
   // Drop the local snapshot when the workout is no longer in progress.
@@ -660,7 +652,7 @@ export default function ClientDashboard({ user, onLogout}) {
     }
     if (!isWorkoutStarted && !hasResumableWorkout) {
       // eslint-disable-next-line no-empty
-      try { localStorage.removeItem(IN_PROGRESS_KEY); } catch {}
+      try { localStorage.removeItem(IN_PROGRESS_KEY); } catch (e) { console.error("Error capturado:", e); }
     }
   }, [isWorkoutStarted, hasResumableWorkout, IN_PROGRESS_KEY]);
 
@@ -685,7 +677,7 @@ export default function ClientDashboard({ user, onLogout}) {
         activeSessionId,
         savedAt: Date.now(),
       }));
-    } catch { /* quota — ignore, we still pause locally */ }
+    } catch (e) { console.error(e);  /* quota — ignore, we still pause locally */  }
     setIsWorkoutStarted(false);
     setHasResumableWorkout(true);
     setResumableDayName(selectedDay);
@@ -697,7 +689,7 @@ export default function ClientDashboard({ user, onLogout}) {
     setHasResumableWorkout(false);
     setResumableDayName(null);
     // eslint-disable-next-line no-empty
-    try { localStorage.removeItem(IN_PROGRESS_KEY); } catch {}
+    try { localStorage.removeItem(IN_PROGRESS_KEY); } catch (e) { console.error("Error capturado:", e); }
     // Restore the day to fresh empty logs.
     if (clientData?.routine && selectedDay) {
       const fresh = {};
@@ -870,135 +862,6 @@ export default function ClientDashboard({ user, onLogout}) {
     setHasFinishedSession(false);
   };
 
-  // eslint-disable-next-line no-unused-vars
-  const cancelLoadedRoutine = () => {
-    const loadedRoutine = loadedRoutineByTab[selectedDay];
-    if (!loadedRoutine) return;
-
-    setLoadedRoutineByTab(prev => {
-      const copy = { ...prev };
-      // Delete the mapping for the current tab
-      delete copy[selectedDay];
-      // Find if the current tab's original routine was mapped somewhere else, and delete that too
-      Object.keys(copy).forEach(k => {
-        if (copy[k] === selectedDay) {
-          delete copy[k];
-        }
-      });
-      return copy;
-    });
-
-    setOverrideConsumed(prev => {
-      const copy = new Set(prev);
-      copy.delete(selectedDay);
-      // Also delete the reciprocal tab if it was overridden
-      Object.keys(loadedRoutineByTab).forEach(k => {
-        if (loadedRoutineByTab[k] === selectedDay) {
-          copy.delete(k);
-        }
-      });
-      return copy;
-    });
-
-    // Reset logs back to original for this day and the reciprocal day
-    if (clientData?.routine) {
-      setLogs(prev => {
-        const copy = { ...prev };
-        
-        // Reset selectedDay
-        const freshSelected = {};
-        const exercisesSelected = clientData.routine[selectedDay] || [];
-        const sortedSelected = [...exercisesSelected].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
-        sortedSelected.forEach((ex, exIdx) => {
-          const sets = normalizeExerciseSets(ex);
-          freshSelected[exIdx] = sets.map(s => ({
-            weight: '',
-            reps: s.reps || '10',
-            completed: false,
-            skipped: false,
-            exerciseName: ex.name,
-            intensity: s.intensity || '',
-            notes: s.notes || ''
-          }));
-        });
-        copy[selectedDay] = freshSelected;
-
-        // Reset reciprocal day if it was loaded somewhere
-        const reciprocalTab = Object.keys(loadedRoutineByTab).find(k => loadedRoutineByTab[k] === selectedDay);
-        if (reciprocalTab) {
-          const freshReciprocal = {};
-          const exercisesReciprocal = clientData.routine[reciprocalTab] || [];
-          const sortedReciprocal = [...exercisesReciprocal].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
-          sortedReciprocal.forEach((ex, exIdx) => {
-            const sets = normalizeExerciseSets(ex);
-            freshReciprocal[exIdx] = sets.map(s => ({
-              weight: '',
-              reps: s.reps || '10',
-              completed: false,
-              skipped: false,
-              exerciseName: ex.name,
-              intensity: s.intensity || '',
-              notes: s.notes || ''
-            }));
-          });
-          copy[reciprocalTab] = freshReciprocal;
-        }
-
-        return copy;
-      });
-    }
-  };
-
-  // eslint-disable-next-line no-unused-vars
-  const retrieveRoutine = () => {
-    const targetTab = targetTabWhereLoaded;
-    if (!targetTab) return;
-
-    setLoadedRoutineByTab(prev => {
-      const copy = { ...prev };
-      delete copy[targetTab];
-      delete copy[selectedDay];
-      return copy;
-    });
-
-    setOverrideConsumed(prev => {
-      const copy = new Set(prev);
-      copy.delete(targetTab);
-      copy.delete(selectedDay);
-      return copy;
-    });
-
-    // Reset logs for both
-    if (clientData?.routine) {
-      setLogs(prev => {
-        const copy = { ...prev };
-        
-        [selectedDay, targetTab].forEach(dayName => {
-          const fresh = {};
-          const exercises = clientData.routine[dayName] || [];
-          const sorted = [...exercises].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
-          sorted.forEach((ex, exIdx) => {
-            const sets = normalizeExerciseSets(ex);
-            fresh[exIdx] = sets.map(s => ({
-              weight: '',
-              reps: s.reps || '10',
-              completed: false,
-              skipped: false,
-              exerciseName: ex.name,
-              intensity: s.intensity || '',
-              notes: s.notes || ''
-            }));
-          });
-          copy[dayName] = fresh;
-        });
-
-        return copy;
-      });
-    }
-
-    dialog.toast(`Rutina de ${selectedDay} devuelta a su día original`, { variant: 'success' });
-  };
-
   const currentLogs = (logs && selectedDay) ? logs[selectedDay] : null;
   const isDaySkipped = skippedDays[selectedDay];
 
@@ -1082,9 +945,6 @@ export default function ClientDashboard({ user, onLogout}) {
   const daysSinceReview = Math.floor((Date.now() - lastReviewDate) / (1000 * 60 * 60 * 24));
   const daysUntilNext = 7 - daysSinceReview;
   // eslint-disable-next-line no-unused-vars
-  const isMeasurementsLocked = daysUntilNext > 0;
-
-
   const updateSet = (exIdx, setIdx, field, value) => {
     setLogs(prev => {
       const newLogs = { ...prev };
@@ -1729,7 +1589,7 @@ export default function ClientDashboard({ user, onLogout}) {
               var mobile = /Android|iPhone|iPad|iPod|IEMobile|Mobile/i.test(ua);
               if (!mobile) {
                 window.addEventListener('load', function () {
-                  setTimeout(function () { try { window.print(); } catch (e) {} }, 200);
+                  setTimeout(function () { try { window.print(); } catch (e) { console.error("Error capturado:", e); } }, 200);
                 });
               }
             } catch (e) { /* no-op */ }
@@ -1765,7 +1625,7 @@ export default function ClientDashboard({ user, onLogout}) {
 
     // Revoke after a generous delay so the new tab has time to fetch the blob.
     // eslint-disable-next-line no-empty
-    setTimeout(() => { try { URL.revokeObjectURL(url); } catch {} }, 60000);
+    setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) { console.error("Error capturado:", e); } }, 60000);
   };
 
   const fmtLogDate = (l) => {
@@ -2875,7 +2735,7 @@ export default function ClientDashboard({ user, onLogout}) {
                              executedTab = parsed._executionSlot;
                            }
                          // eslint-disable-next-line no-unused-vars, no-empty
-                         } catch(e){}
+                         } catch (e) { console.error("Error capturado:", e); }
                       }
                       
                       return (
@@ -2890,15 +2750,15 @@ export default function ClientDashboard({ user, onLogout}) {
                                const isFlat = parsed && typeof parsed === 'object' && Object.keys(parsed).every(k => /^\d+$/.test(k));
                                setLogs(isFlat ? { [session.dayName]: parsed } : parsed);
                              // eslint-disable-next-line no-unused-vars, no-empty
-                             } catch(e){}
+                             } catch (e) { console.error("Error capturado:", e); }
                           }
                           if (session.commentsJson) {
                              // eslint-disable-next-line no-unused-vars, no-empty
-                             try { setComments(JSON.parse(session.commentsJson)); } catch(e){}
+                             try { setComments(JSON.parse(session.commentsJson)); } catch (e) { console.error("Error capturado:", e); }
                           }
                           if (session.videoLinksJson) {
                              // eslint-disable-next-line no-unused-vars, no-empty
-                             try { setVideoLinks(JSON.parse(session.videoLinksJson)); } catch(e){}
+                             try { setVideoLinks(JSON.parse(session.videoLinksJson)); } catch (e) { console.error("Error capturado:", e); }
                           }
                           setSelectedDay(executedTab);
                           setWorkoutSeconds(session.durationSeconds || 0);

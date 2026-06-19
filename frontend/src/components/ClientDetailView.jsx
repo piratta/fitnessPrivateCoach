@@ -5,8 +5,8 @@ import ReviewManager from './ReviewManager';
 import { getClientBillingStatus } from '../utils/statusUtils';
 
    
-  // eslint-disable-next-line no-unused-vars
-export default function ClientDetailView({ clientId, user, onLogout }) {
+// eslint-disable-next-line no-unused-vars
+export default function ClientDetailView({ clientId, user, onLogout, onBack }) {
   const [client, setClient] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('resumen');
@@ -209,7 +209,7 @@ export default function ClientDetailView({ clientId, user, onLogout }) {
       
       {/* Back Button */}
       <button 
-        onClick={() => window.location.href = '/'} 
+        onClick={() => onBack ? onBack() : window.location.href = '/'} 
         style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', fontWeight: 'bold', transition: 'color 0.2s' }}
         onMouseOver={(e) => e.target.style.color = 'var(--accent-primary)'}
         onMouseOut={(e) => e.target.style.color = 'var(--text-muted)'}
