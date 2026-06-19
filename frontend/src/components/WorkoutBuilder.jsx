@@ -7,7 +7,7 @@ import '../index.css';
 
 const DAYS_OF_WEEK = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
-export default function WorkoutBuilder({ clients = [], templates = [], isTemplateMode = false, editingTemplate = null, initialClient = '', setClients }) {
+export default function WorkoutBuilder({ clients = [], templates = [], isTemplateMode = false, editingTemplate = null, initialClient = '', setClients, setTemplates, setActiveTab }) {
   const dialog = useDialog();
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [templateTitle, setTemplateTitle] = useState(editingTemplate ? editingTemplate.title : '');
@@ -48,7 +48,7 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
 
   useEffect(() => {
     if (!isTemplateMode && selectedClient) {
-      const clientObj = clients.find(c => c.name === selectedClient);
+      const clientObj = clients.find(c => `${c.name} ${c.lastName || ''}`.trim() === selectedClient);
       if (clientObj && clientObj.routine) {
         setWeeklyRoutine(JSON.parse(JSON.stringify(clientObj.routine)));
       } else {
@@ -209,19 +209,19 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
                   zIndex: 10,
                   boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
                 }}>
-                  {clients.filter(c => c.name.toLowerCase().includes(selectedClient.toLowerCase())).length > 0 ? (
-                    clients.filter(c => c.name.toLowerCase().includes(selectedClient.toLowerCase())).map(c => (
+                  {clients.filter(c => `${c.name} ${c.lastName || ''}`.toLowerCase().includes(selectedClient.toLowerCase())).length > 0 ? (
+                    clients.filter(c => `${c.name} ${c.lastName || ''}`.toLowerCase().includes(selectedClient.toLowerCase())).map(c => (
                       <div 
                         key={c.id}
                         style={{ padding: '10px 15px', cursor: 'pointer', borderBottom: '1px solid var(--border-light)', transition: 'background 0.2s' }}
                         onMouseEnter={(e) => e.target.style.background = 'rgba(224, 248, 0, 0.1)'}
                         onMouseLeave={(e) => e.target.style.background = 'transparent'}
                         onClick={() => {
-                          setSelectedClient(c.name);
+                          setSelectedClient(`${c.name} ${c.lastName || ''}`.trim());
                           setShowClientDropdown(false);
                         }}
                       >
-                        {c.name}
+                        {c.name} {c.lastName || ''}
                       </div>
                     ))
                   ) : (
@@ -445,13 +445,55 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
         </button>
         <button type="button" className="btn-primary" style={{ flex: 2 }} onClick={async () => {
           if (isTemplateMode) {
-            dialog.toast("Plantilla maestra guardada con éxito.", { variant: 'success' });
+            if (!templateTitle.trim()) {
+              await dialog.alert("Por favor, introduce un título para la plantilla.", { title: "Falta título" });
+              return;
+            }
+            const token = localStorage.getItem('token');
+            const routineStr = JSON.stringify(weeklyRoutine);
+            try {
+              const url = editingTemplate 
+                ? `${API_BASE_URL}/api/templates/${editingTemplate.id}` 
+                : `${API_BASE_URL}/api/templates`;
+              const method = editingTemplate ? 'PUT' : 'POST';
+              const response = await fetch(url, {
+                method: method,
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                  title: templateTitle,
+                  description: templateDescription,
+                  routineJson: routineStr
+                })
+              });
+              if (response.ok) {
+                const saved = await response.json();
+                if (setTemplates) {
+                  setTemplates(prev => {
+                    if (editingTemplate) {
+                      return prev.map(t => t.id === saved.id ? saved : t);
+                    } else {
+                      return [...prev, saved];
+                    }
+                  });
+                }
+                dialog.toast(editingTemplate ? "Plantilla actualizada con éxito." : "Plantilla maestra guardada con éxito.", { variant: 'success' });
+                if (setActiveTab) setActiveTab('plantillas');
+              } else {
+                const errText = await response.text();
+                await dialog.alert("Error al guardar la plantilla: " + errText, { title: "Error" });
+              }
+            } catch (err) {
+              await dialog.alert("Error de red al guardar la plantilla.", { title: "Error de red" });
+            }
           } else {
             if (!selectedClient) {
               await dialog.alert("Por favor, selecciona un cliente primero.", { title: "Faltan datos" });
               return;
             }
-            const clientObj = clients.find(c => c.name === selectedClient);
+            const clientObj = clients.find(c => `${c.name} ${c.lastName || ''}`.trim() === selectedClient);
             if (!clientObj) {
               await dialog.alert("Cliente no encontrado.", { title: "Error" });
               return;

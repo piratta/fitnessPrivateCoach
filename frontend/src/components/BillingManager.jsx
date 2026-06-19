@@ -12,7 +12,8 @@ export default function BillingManager({ clients, setClients, billingPlans, setB
   const [newPlan, setNewPlan] = useState({ name: '', months: 1 });
 
   const filteredClients = clients.filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const fullName = `${c.name} ${c.lastName || ''}`.trim().toLowerCase();
+    const matchesSearch = fullName.includes(searchTerm.toLowerCase()) || 
                           c.email.toLowerCase().includes(searchTerm.toLowerCase());
     
     let matchesStatus = true;
@@ -48,7 +49,8 @@ export default function BillingManager({ clients, setClients, billingPlans, setB
         currentDate.setMonth(currentDate.getMonth() + monthsToAdd);
         const newDateString = currentDate.toISOString().split('T')[0];
         
-        showToast(`✅ Suscripción renovada para ${c.name} hasta el ${newDateString}`);
+        const cFullName = `${c.name} ${c.lastName || ''}`.trim();
+        showToast(`✅ Suscripción renovada para ${cFullName} hasta el ${newDateString}`);
         
         return { 
           ...c, 
@@ -67,7 +69,8 @@ export default function BillingManager({ clients, setClients, billingPlans, setB
     setClients(prev => prev.map(c => {
       if (c.id === clientId) {
         if (periodString === 'Gratuito') {
-          showToast(`✅ Periodo gratuito infinito aplicado a ${c.name}`);
+          const cFullName = `${c.name} ${c.lastName || ''}`.trim();
+          showToast(`✅ Periodo gratuito infinito aplicado a ${cFullName}`);
           return { ...c, gracePeriod: 'Gratuito' };
         }
         
@@ -76,7 +79,8 @@ export default function BillingManager({ clients, setClients, billingPlans, setB
         graceDate.setDate(graceDate.getDate() + days);
         const graceDateString = graceDate.toISOString().split('T')[0];
         
-        showToast(`✅ Periodo de gracia aplicado a ${c.name} hasta el ${graceDateString}`);
+        const cFullName = `${c.name} ${c.lastName || ''}`.trim();
+        showToast(`✅ Periodo de gracia aplicado a ${cFullName} hasta el ${graceDateString}`);
         return { ...c, gracePeriod: graceDateString };
       }
       return c;
@@ -144,11 +148,12 @@ export default function BillingManager({ clients, setClients, billingPlans, setB
           {filteredClients.map(client => {
             const status = getStatus(client);
             const isPending = status.text === 'Pendiente' || status.text === 'BAJA' || status.text === 'Desactivado';
+            const fullName = `${client.name} ${client.lastName || ''}`.trim();
             
             return (
               <tr key={client.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                 <td style={{ padding: '15px', fontWeight: '600' }}>
-                  {client.name}
+                  {fullName}
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal', marginBottom: '5px' }}>{client.email}</div>
                   <select 
                     value={client.billingPlanId || 'bp1'} 
@@ -218,10 +223,10 @@ export default function BillingManager({ clients, setClients, billingPlans, setB
                     <td style={{ padding: '15px', textAlign: 'right' }}>
                       {(status.text === 'BAJA' || status.text === 'Pendiente' || status.text === 'Desactivado') ? (
                         <button onClick={async () => {
-                          const ok = await dialog.confirm(`⚠️ ¿Estás seguro de eliminar PERMANENTEMENTE a ${client.name}?\n\nSu suscripción ha caducado. Esta acción no se puede deshacer y se borrarán todos sus datos.`, { title: 'Eliminar cliente' });
+                          const ok = await dialog.confirm(`⚠️ ¿Estás seguro de eliminar PERMANENTEMENTE a ${fullName}?\n\nSu suscripción ha caducado. Esta acción no se puede deshacer y se borrarán todos sus datos.`, { title: 'Eliminar cliente' });
                           if (ok) {
                             setClients(prev => prev.filter(c => c.id !== client.id));
-                            showToast(`🗑️ Cliente ${client.name} eliminado permanentemente`);
+                            showToast(`🗑️ Cliente ${fullName} eliminado permanentemente`);
                           }
                         }} style={{ background: 'rgba(255,0,0,0.1)', border: '1px solid #ff0000', color: '#ff0000', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}>❌ Borrar</button>
                       ) : (
@@ -251,14 +256,14 @@ export default function BillingManager({ clients, setClients, billingPlans, setB
                         onClick={async () => {
                           const period = document.getElementById(`grace-period-${client.id}`).value;
                           if (period === 'Desactivar') {
-                            const ok = await dialog.confirm(`¿Desactivar a ${client.name}? No podrá acceder a sus rutinas hasta que renueve.`, { title: 'Desactivar cliente' });
+                            const ok = await dialog.confirm(`¿Desactivar a ${fullName}? No podrá acceder a sus rutinas hasta que renueve.`, { title: 'Desactivar cliente' });
                             if (ok) {
                               setClients(prev => prev.map(c => c.id === client.id ? { ...c, status: 'Inactivo' } : c));
-                              showToast(`🛑 Cliente ${client.name} desactivado`);
+                              showToast(`🛑 Cliente ${fullName} desactivado`);
                             }
                           } else if (period === 'Reactivar') {
                             setClients(prev => prev.map(c => c.id === client.id ? { ...c, status: 'Activo' } : c));
-                            showToast(`🟢 Cliente ${client.name} reactivado manualmente`);
+                            showToast(`🟢 Cliente ${fullName} reactivado manualmente`);
                           } else {
                             handleApplyGrace(client.id, period);
                           }

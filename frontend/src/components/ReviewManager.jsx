@@ -250,7 +250,7 @@ export default function ReviewManager({ clients, setClients }) {
             pendingReviews.map(client => (
               <div key={client.id} style={{ background: 'rgba(0,0,0,0.5)', padding: '15px', borderRadius: '8px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <p style={{ fontWeight: 'bold' }}>{client.name}</p>
+                  <p style={{ fontWeight: 'bold' }}>{client.name} {client.lastName || ''}</p>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Meta: {client.goal} | Adherencia: {client.adherenceHistory[client.adherenceHistory.length-1]}%</p>
                 </div>
                 <button 
@@ -290,7 +290,7 @@ export default function ReviewManager({ clients, setClients }) {
             upcomingReviews.map(client => (
               <div key={client.id} style={{ background: 'rgba(0,0,0,0.5)', padding: '15px', borderRadius: '8px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <p style={{ fontWeight: 'bold' }}>{client.name}</p>
+                  <p style={{ fontWeight: 'bold' }}>{client.name} {client.lastName || ''}</p>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Fecha programada: {client.nextReview}</p>
                 </div>
                 <button 
@@ -328,7 +328,7 @@ export default function ReviewManager({ clients, setClients }) {
           <div className="glass-panel" style={{ width: '100%', maxWidth: '800px', background: 'rgba(20, 20, 24, 0.98)', padding: '30px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border-light)', paddingBottom: '15px' }}>
               <div>
-                <h3 style={{ fontSize: '1.5rem', color: 'var(--accent-primary)' }}>Evaluar Revisión: {selectedClientForReview.name}</h3>
+                <h3 style={{ fontSize: '1.5rem', color: 'var(--accent-primary)' }}>Evaluar Revisión: {selectedClientForReview.name} {selectedClientForReview.lastName || ''}</h3>
                 <p style={{ color: 'var(--text-muted)' }}>Analiza los datos biométricos antes de ajustar su rutina.</p>
               </div>
               <button onClick={() => setSelectedClientForReview(null)} style={{ background: 'transparent', border: 'none', color: '#ff4500', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
@@ -557,7 +557,7 @@ export default function ReviewManager({ clients, setClients }) {
 
                       // (Mock sync removed)
 
-                      await dialog.alert(`Evaluación de ${selectedClientForReview.name} enviada con éxito.`, { title: 'Evaluación enviada' });
+                      await dialog.alert(`Evaluación de ${selectedClientForReview.name} ${selectedClientForReview.lastName || ''} enviada con éxito.`, { title: 'Evaluación enviada' });
                       setSelectedClientForReview(null);
                     }}
                   >

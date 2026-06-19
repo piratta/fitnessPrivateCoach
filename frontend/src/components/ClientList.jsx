@@ -28,7 +28,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
   };
 
   const filteredClients = clients.filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || c.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || (c.lastName && c.lastName.toLowerCase().includes(searchTerm.toLowerCase())) || c.email.toLowerCase().includes(searchTerm.toLowerCase());
     
     let matchesStatus = true;
     if (!isChatMode) {
@@ -216,6 +216,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
       setClients([...clients, {
         id: createdUser.id,
         name: createdUser.name,
+        lastName: createdUser.lastName,
         email: createdUser.email,
         username: createdUser.username,
         status: 'Activo',
@@ -252,9 +253,15 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
   const handleSaveClientEdits = async () => {
     if (!editingClient) return;
     const name = (editingClient.name || '').trim();
+    const lastName = (editingClient.lastName || '').trim();
     const email = (editingClient.email || '').trim();
-    if (name.split(/\s+/).length < 3) {
-      await dialog.alert('Indica nombre y ambos apellidos.', { title: 'Datos incompletos' });
+    if (!name) {
+      await dialog.alert('El nombre es obligatorio.', { title: 'Datos incompletos' });
+      return;
+    }
+    const parts = lastName.split(/\s+/);
+    if (parts.length < 2) {
+      await dialog.alert('Se requieren ambos apellidos.', { title: 'Datos incompletos' });
       return;
     }
     if (!/^\S+@\S+\.\S+$/.test(email)) {
@@ -262,9 +269,9 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
       return;
     }
     try {
-      const updated = await usersApi.updateClient(selectedClient.id, { name, email });
-      setSelectedClient(prev => ({ ...prev, name: updated.name, email: updated.email }));
-      setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, name: updated.name, email: updated.email } : c));
+      const updated = await usersApi.updateClient(selectedClient.id, { name, lastName, email });
+      setSelectedClient(prev => ({ ...prev, name: updated.name, lastName: updated.lastName, email: updated.email }));
+      setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, name: updated.name, lastName: updated.lastName, email: updated.email } : c));
       setEditingClient(null);
       dialog.toast('Datos del cliente actualizados', { variant: 'success' });
     } catch (e) {
@@ -273,7 +280,8 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
   };
 
   const handleResetPassword = async () => {
-    const ok = await dialog.confirm(`Se generará una nueva contraseña temporal para ${selectedClient.name}. La actual dejará de funcionar. ¿Continuar?`, { danger: true, confirmText: 'Regenerar' });
+    const fullName = `${selectedClient.name} ${selectedClient.lastName || ''}`.trim();
+    const ok = await dialog.confirm(`Se generará una nueva contraseña temporal para ${fullName}. La actual dejará de funcionar. ¿Continuar?`, { danger: true, confirmText: 'Regenerar' });
     if (!ok) return;
     try {
       const creds = await usersApi.resetClientPassword(selectedClient.id);
@@ -294,7 +302,8 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
 
   const handleToggleStatus = async () => {
     const isActivo = selectedClient.status === 'Activo';
-    const msg = isActivo ? `¿Estás seguro de que deseas desactivar a ${selectedClient.name}? No podrá recibir nuevas rutinas.` : `¿Deseas volver a activar a ${selectedClient.name}?`;
+    const fullName = `${selectedClient.name} ${selectedClient.lastName || ''}`.trim();
+    const msg = isActivo ? `¿Estás seguro de que deseas desactivar a ${fullName}? No podrá recibir nuevas rutinas.` : `¿Deseas volver a activar a ${fullName}?`;
     const ok = await dialog.confirm(msg, { danger: isActivo, confirmText: isActivo ? 'Desactivar' : 'Activar' });
     if (ok) {
       const newStatus = isActivo ? 'Inactivo' : 'Activo';
@@ -501,7 +510,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
         <tbody>
           {filteredClients.map(client => (
             <tr key={client.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <td style={{ padding: '15px 0', fontWeight: '600' }}>{client.name}</td>
+              <td style={{ padding: '15px 0', fontWeight: '600' }}>{client.name} {client.lastName || ''}</td>
               <td style={{ padding: '15px 0', color: 'var(--text-muted)' }}>{client.email}</td>
               {!isChatMode && (
                 <>
@@ -638,7 +647,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
             {/* Header del Modal */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '1px solid var(--border-light)', paddingBottom: '15px' }}>
               <div>
-                <h3 style={{ fontSize: '2rem', color: 'var(--accent-primary)', fontWeight: '800' }}>{selectedClient.name}</h3>
+                <h3 style={{ fontSize: '2rem', color: 'var(--accent-primary)', fontWeight: '800' }}>{selectedClient.name} {selectedClient.lastName || ''}</h3>
                 <p style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>{selectedClient.email} • Premium</p>
               </div>
               <button onClick={() => setSelectedClient(null)} style={{ background: 'transparent', border: '1px solid var(--border-light)', borderRadius: '50%', width: '40px', height: '40px', color: 'var(--text-main)', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
@@ -648,15 +657,19 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
             {editingClient ? (
               <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--accent-primary)', borderRadius: '12px', padding: '20px', marginBottom: '25px' }}>
                 <h4 style={{ color: 'var(--accent-primary)', marginBottom: '15px' }}>Editar datos</h4>
-                <div className="responsive-grid-2" style={{ gap: '12px', marginBottom: '15px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '15px' }}>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Nombre y apellidos</label>
+                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Nombre</label>
                     <input className="input-field" style={{ margin: 0, width: '100%' }} value={editingClient.name} onChange={e => setEditingClient({ ...editingClient, name: e.target.value })} />
                   </div>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Email</label>
-                    <input type="email" className="input-field" style={{ margin: 0, width: '100%' }} value={editingClient.email} onChange={e => setEditingClient({ ...editingClient, email: e.target.value })} />
+                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Apellidos</label>
+                    <input className="input-field" style={{ margin: 0, width: '100%' }} value={editingClient.lastName} onChange={e => setEditingClient({ ...editingClient, lastName: e.target.value })} />
                   </div>
+                </div>
+                <div style={{ marginBottom: '15px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Email</label>
+                  <input type="email" className="input-field" style={{ margin: 0, width: '100%' }} value={editingClient.email} onChange={e => setEditingClient({ ...editingClient, email: e.target.value })} />
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button onClick={() => setEditingClient(null)} style={{ flex: 1, padding: '10px', background: 'transparent', border: '1px solid var(--border-light)', color: '#fff', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Cancelar</button>
@@ -665,7 +678,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
               </div>
             ) : (
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '25px' }}>
-                <button onClick={() => setEditingClient({ name: selectedClient.name, email: selectedClient.email })} style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-light)', color: '#fff', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}>✏️ Editar nombre / email</button>
+                <button onClick={() => setEditingClient({ name: selectedClient.name, lastName: selectedClient.lastName || '', email: selectedClient.email })} style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-light)', color: '#fff', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}>✏️ Editar nombre / email</button>
                 <button onClick={handleResetPassword} style={{ padding: '8px 16px', background: 'rgba(255,170,0,0.1)', border: '1px solid #ffaa00', color: '#ffaa00', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}>🔑 Regenerar contraseña</button>
               </div>
             )}
@@ -851,7 +864,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
         }}>
           <div className="glass-panel" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '1000px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '20px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', flexShrink: 0 }}>
-              <h3 style={{ fontSize: '1.5rem', color: 'var(--text-main)' }}>Gráficas de <span style={{ color: 'var(--accent-primary)' }}>{selectedClient.name}</span></h3>
+              <h3 style={{ fontSize: '1.5rem', color: 'var(--text-main)' }}>Gráficas de <span style={{ color: 'var(--accent-primary)' }}>{selectedClient.name} {selectedClient.lastName || ''}</span></h3>
               <button onClick={() => setShowChartModal(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
             </div>
             

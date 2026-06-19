@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
+import { useDialog } from './ui/Dialog';
+import { API_BASE_URL } from '../config';
 import '../index.css';
 
 export default function TemplateManager({ templates, setTemplates, onCreateNew, onEditTemplate }) {
+  const dialog = useDialog();
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredTemplates = templates.filter(t => t.title.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -44,7 +47,33 @@ export default function TemplateManager({ templates, setTemplates, onCreateNew, 
               >
                 ✏️ Editar Plantilla
               </button>
-              <button style={{ background: 'transparent', border: '1px solid #ff4500', color: '#ff4500', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer' }} title="Eliminar">🗑️</button>
+              <button 
+                onClick={async () => {
+                  const ok = await dialog.confirm(`¿Estás seguro de que deseas eliminar la plantilla "${template.title}"?`, { danger: true, confirmText: 'Eliminar' });
+                  if (!ok) return;
+                  const token = localStorage.getItem('token');
+                  try {
+                    const response = await fetch(`${API_BASE_URL}/api/templates/${template.id}`, {
+                      method: 'DELETE',
+                      headers: {
+                        'Authorization': `Bearer ${token}`
+                      }
+                    });
+                    if (response.ok) {
+                      setTemplates(prev => prev.filter(t => t.id !== template.id));
+                      dialog.toast("Plantilla eliminada con éxito.", { variant: 'success' });
+                    } else {
+                      await dialog.alert("Error al eliminar la plantilla.", { title: "Error" });
+                    }
+                  } catch (err) {
+                    await dialog.alert("Error de red al eliminar la plantilla.", { title: "Error de red" });
+                  }
+                }}
+                style={{ background: 'transparent', border: '1px solid #ff4500', color: '#ff4500', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer' }} 
+                title="Eliminar"
+              >
+                🗑️
+              </button>
             </div>
           </div>
         ))}

@@ -69,7 +69,7 @@ public class UserService {
         String username = generateUniqueUsername(firstName, surnames);
 
         User client = new User();
-        client.setName(fullName);
+        client.setName(firstName);
         client.setLastName(surnames);
         client.setEmail(clientDto.getEmail());
         client.setGoal(clientDto.getGoal());
@@ -94,6 +94,7 @@ public class UserService {
         }
 
         if (clientDto.getName() != null && !clientDto.getName().isBlank()) client.setName(clientDto.getName().trim());
+        if (clientDto.getLastName() != null && !clientDto.getLastName().isBlank()) client.setLastName(clientDto.getLastName().trim());
         if (clientDto.getEmail() != null && !clientDto.getEmail().isBlank() && !clientDto.getEmail().equalsIgnoreCase(client.getEmail())) {
             String newEmail = clientDto.getEmail().trim();
             userRepository.findByEmail(newEmail).ifPresent(existing -> {

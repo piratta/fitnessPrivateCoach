@@ -39,6 +39,20 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
 
   const [templates, setTemplates] = useState([]);
 
+  // Fetch templates from backend database
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    fetch(`${API_BASE_URL}/api/templates`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    .then(res => res.ok ? res.json() : [])
+    .then(data => setTemplates(data))
+    .catch(err => console.error("Error loading templates:", err));
+  }, []);
+
 
   const [billingPlans, setBillingPlans] = useState([
     { id: 'bp1', name: 'Mensual', months: 1 },
@@ -83,6 +97,7 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
         return {
           id: u.id,
           name: u.name,
+          lastName: u.lastName || '',
           email: u.email,
           username: u.username,
           status: u.status || 'undefined',
@@ -238,12 +253,12 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
         )}
 
         {activeTab === 'clientes' && <ClientList clients={clients} setClients={setClients} billingPlans={billingPlans} onPlanRoutine={(client) => {
-          if (client) setWorkoutClient(client.name);
+          if (client) setWorkoutClient(`${client.name} ${client.lastName || ''}`.trim());
           setActiveTab('rutinas');
           setTemplateMode(false);
         }} />}
         {activeTab === 'mensajes' && <ClientList clients={clients} setClients={setClients} isChatMode={true} />}
-        {activeTab === 'rutinas' && <WorkoutBuilder clients={clients} templates={templates} isTemplateMode={templateMode} editingTemplate={editingTemplate} initialClient={workoutClient} setClients={setClients} />}
+        {activeTab === 'rutinas' && <WorkoutBuilder clients={clients} templates={templates} isTemplateMode={templateMode} editingTemplate={editingTemplate} initialClient={workoutClient} setClients={setClients} setTemplates={setTemplates} setActiveTab={setActiveTab} />}
         {activeTab === 'plantillas' && <TemplateManager 
             templates={templates} 
             setTemplates={setTemplates} 
