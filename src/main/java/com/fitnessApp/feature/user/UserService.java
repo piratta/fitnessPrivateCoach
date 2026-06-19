@@ -106,7 +106,13 @@ public class UserService {
         if (clientDto.getProgressionStrategy() != null) client.setProgressionStrategy(clientDto.getProgressionStrategy());
         if (clientDto.getGoal() != null) client.setGoal(clientDto.getGoal());
         if (clientDto.getStatus() != null) client.setStatus(clientDto.getStatus());
-        if (clientDto.getRoutineJson() != null) client.setRoutineJson(clientDto.getRoutineJson());
+        if (clientDto.getRoutineJson() != null) {
+            client.setRoutineJson(clientDto.getRoutineJson());
+            client.setRoutineUpdatedAt(java.time.LocalDateTime.now());
+        }
+        if (clientDto.getNextRoutineJson() != null) {
+            client.setNextRoutineJson(clientDto.getNextRoutineJson());
+        }
 
         return userRepository.save(client);
     }

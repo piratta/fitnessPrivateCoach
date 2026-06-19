@@ -114,8 +114,11 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
           messages: [],
           routineJson: u.routineJson,
           routine: u.routineJson ? JSON.parse(u.routineJson) : null,
+          nextRoutineJson: u.nextRoutineJson,
+          nextRoutine: u.nextRoutineJson ? JSON.parse(u.nextRoutineJson) : null,
           progressionStrategy: u.progressionStrategy || 'No definida',
-          reviewFrequency: u.reviewFrequency || 'Semanal'
+          reviewFrequency: u.reviewFrequency || 'Semanal',
+          routineUpdatedAt: u.routineUpdatedAt
         };
       });
       setClients(formattedClients);

@@ -104,6 +104,13 @@ public class WorkoutService {
         return getHistory(client.getId());
     }
 
+    private String cleanExerciseName(Object nameObj) {
+        if (nameObj == null) return "";
+        return nameObj.toString().toLowerCase()
+                .replaceAll("[^a-záéíóúüñ0-9]", "")
+                .trim();
+    }
+
     public String enrichRoutineWithSuggestedWeights(User client, String routineJson) {
         if (routineJson == null || routineJson.isBlank()) return routineJson;
         try {
@@ -115,31 +122,80 @@ public class WorkoutService {
                 String dayName = entry.getKey();
                 List<Map<String, Object>> exercises = entry.getValue();
 
-                WorkoutSession lastSession = history.stream()
-                        .filter(s -> dayName.equals(s.getDayName()) && s.getLogsJson() != null && !s.getLogsJson().isBlank())
-                        .findFirst().orElse(null);
-
-                if (lastSession != null) {
-                    Map<String, Object> logs = mapper.readValue(lastSession.getLogsJson(), new TypeReference<Map<String, Object>>() {});
+                for (int i = 0; i < exercises.size(); i++) {
+                    Map<String, Object> exercise = exercises.get(i);
+                    String exName = exercise.get("name") == null ? "" : exercise.get("name").toString();
+                    String targetClean = cleanExerciseName(exName);
                     
-                    for (int i = 0; i < exercises.size(); i++) {
-                        Object exLogsObj = logs.get(String.valueOf(i));
-                        if (exLogsObj instanceof List) {
-                            List<Map<String, Object>> exLogs = (List<Map<String, Object>>) exLogsObj;
-                            // Find the last completed set with a weight
-                            String lastWeight = null;
-                            for (Map<String, Object> setLog : exLogs) {
-                                if (Boolean.TRUE.equals(setLog.get("completed")) && setLog.get("weight") != null) {
-                                    String w = String.valueOf(setLog.get("weight"));
-                                    if (!w.isBlank() && !w.equals("null")) {
-                                        lastWeight = w;
+                    String lastWeight = null;
+                    boolean foundByName = false;
+
+                    // 1. Try to find the most recent set log in history matching the exercise name
+                    if (!targetClean.isEmpty()) {
+                        for (WorkoutSession s : history) {
+                            if (s.getLogsJson() == null || s.getLogsJson().isBlank()) continue;
+                            try {
+                                Map<String, Object> logs = mapper.readValue(s.getLogsJson(), new TypeReference<Map<String, Object>>() {});
+                                for (Object logVal : logs.values()) {
+                                    if (logVal instanceof List<?> exLogs) {
+                                        boolean matchesName = false;
+                                        String tempLastWeight = null;
+                                        
+                                        for (Object setLogObj : exLogs) {
+                                            if (setLogObj instanceof Map<?, ?> setLog) {
+                                                Object nameVal = setLog.get("exerciseName");
+                                                if (nameVal != null && cleanExerciseName(nameVal).equals(targetClean)) {
+                                                    matchesName = true;
+                                                }
+                                                if (Boolean.TRUE.equals(setLog.get("completed")) && setLog.get("weight") != null) {
+                                                    String w = String.valueOf(setLog.get("weight"));
+                                                    if (!w.isBlank() && !w.equals("null")) {
+                                                        tempLastWeight = w;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        
+                                        if (matchesName && tempLastWeight != null) {
+                                            lastWeight = tempLastWeight;
+                                            foundByName = true;
+                                            break;
+                                        }
                                     }
                                 }
-                            }
-                            if (lastWeight != null) {
-                                exercises.get(i).put("suggestedWeight", lastWeight);
-                            }
+                            } catch (Exception ignored) {}
+                            if (foundByName) break;
                         }
+                    }
+
+                    // 2. Fallback to index-based matching in the last session for the same day name (legacy)
+                    if (lastWeight == null) {
+                        WorkoutSession lastSession = history.stream()
+                                .filter(s -> dayName.equals(s.getDayName()) && s.getLogsJson() != null && !s.getLogsJson().isBlank())
+                                .findFirst().orElse(null);
+
+                        if (lastSession != null) {
+                            try {
+                                Map<String, Object> logs = mapper.readValue(lastSession.getLogsJson(), new TypeReference<Map<String, Object>>() {});
+                                Object exLogsObj = logs.get(String.valueOf(i));
+                                if (exLogsObj instanceof List<?> exLogs) {
+                                    for (Object setLogObj : exLogs) {
+                                        if (setLogObj instanceof Map<?, ?> setLog) {
+                                            if (Boolean.TRUE.equals(setLog.get("completed")) && setLog.get("weight") != null) {
+                                                String w = String.valueOf(setLog.get("weight"));
+                                                if (!w.isBlank() && !w.equals("null")) {
+                                                    lastWeight = w;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch (Exception ignored) {}
+                        }
+                    }
+
+                    if (lastWeight != null) {
+                        exercise.put("suggestedWeight", lastWeight);
                     }
                 }
             }

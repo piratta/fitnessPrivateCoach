@@ -7,6 +7,33 @@ import '../index.css';
 
 const DAYS_OF_WEEK = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
+const parseRoutineJson = (routineSource) => {
+  const emptyRoutine = {
+    Lunes: [], Martes: [], Miércoles: [], Jueves: [], Viernes: [], Sábado: [], Domingo: []
+  };
+  const emptyNotes = {
+    Lunes: '', Martes: '', Miércoles: '', Jueves: '', Viernes: '', Sábado: '', Domingo: ''
+  };
+  
+  if (!routineSource) {
+    return { exercises: emptyRoutine, notes: emptyNotes };
+  }
+  
+  try {
+    const parsed = typeof routineSource === 'string' ? JSON.parse(routineSource) : routineSource;
+    const exercises = {};
+    const notes = {};
+    DAYS_OF_WEEK.forEach(day => {
+      exercises[day] = Array.isArray(parsed[day]) ? parsed[day] : [];
+      notes[day] = parsed[`${day}_notes`] || '';
+    });
+    return { exercises, notes };
+  } catch (e) {
+    console.error("Error parsing routineJson", e);
+    return { exercises: emptyRoutine, notes: emptyNotes };
+  }
+};
+
 export default function WorkoutBuilder({ clients = [], templates = [], isTemplateMode = false, editingTemplate = null, initialClient = '', setClients, setTemplates, setActiveTab }) {
   const dialog = useDialog();
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -16,6 +43,8 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
   const [routineStartDate, setRoutineStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const dropdownRef = useRef(null);
+  const [assignAs, setAssignAs] = useState('current');
+  const lastLoadedRef = useRef({ clientName: '', assignAs: '', templateId: '' });
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -26,49 +55,85 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [dropdownRef]);
+
   // Estado para la rutina organizada por días
   const [weeklyRoutine, setWeeklyRoutine] = useState(() => {
     if (editingTemplate) {
-      if (editingTemplate.routine) return editingTemplate.routine;
-      if (editingTemplate.routineJson) {
-        try {
-          return typeof editingTemplate.routineJson === 'string'
-            ? JSON.parse(editingTemplate.routineJson)
-            : editingTemplate.routineJson;
-        } catch (e) {
-          console.error("Error parsing routineJson", e);
-        }
-      }
+      const { exercises } = parseRoutineJson(editingTemplate.routineJson || editingTemplate.routine);
+      return exercises;
     }
     return {
-      Lunes: [],
-      Martes: [],
-      Miércoles: [],
-      Jueves: [],
-      Viernes: [],
-      Sábado: [],
-      Domingo: []
+      Lunes: [], Martes: [], Miércoles: [], Jueves: [], Viernes: [], Sábado: [], Domingo: []
     };
   });
 
   const [activeDay, setActiveDay] = useState('Lunes');
   const [selectedClient, setSelectedClient] = useState(initialClient);
-  const [dailyNotes, setDailyNotes] = useState({
-    Lunes: '', Martes: '', Miércoles: '', Jueves: '', Viernes: '', Sábado: '', Domingo: ''
+  const [dailyNotes, setDailyNotes] = useState(() => {
+    if (editingTemplate) {
+      const { notes } = parseRoutineJson(editingTemplate.routineJson || editingTemplate.routine);
+      return notes;
+    }
+    return {
+      Lunes: '', Martes: '', Miércoles: '', Jueves: '', Viernes: '', Sábado: '', Domingo: ''
+    };
   });
 
   useEffect(() => {
-    if (!isTemplateMode && selectedClient) {
-      const clientObj = clients.find(c => `${c.name} ${c.lastName || ''}`.trim() === selectedClient);
-      if (clientObj && clientObj.routine) {
-        setWeeklyRoutine(JSON.parse(JSON.stringify(clientObj.routine)));
+    const currentTemplateId = editingTemplate ? editingTemplate.id : '';
+    
+    if (isTemplateMode) {
+      if (lastLoadedRef.current.templateId !== currentTemplateId) {
+        lastLoadedRef.current = { clientName: '', assignAs: '', templateId: currentTemplateId };
+        if (editingTemplate) {
+          const { exercises, notes } = parseRoutineJson(editingTemplate.routineJson || editingTemplate.routine);
+          setWeeklyRoutine(exercises);
+          setDailyNotes(notes);
+          setTemplateTitle(editingTemplate.title || '');
+          setTemplateDescription(editingTemplate.description || '');
+        } else {
+          setWeeklyRoutine({
+            Lunes: [], Martes: [], Miércoles: [], Jueves: [], Viernes: [], Sábado: [], Domingo: []
+          });
+          setDailyNotes({
+            Lunes: '', Martes: '', Miércoles: '', Jueves: '', Viernes: '', Sábado: '', Domingo: ''
+          });
+          setTemplateTitle('');
+          setTemplateDescription('');
+        }
+      }
+    } else {
+      if (selectedClient) {
+        if (lastLoadedRef.current.clientName !== selectedClient || lastLoadedRef.current.assignAs !== assignAs) {
+          lastLoadedRef.current = { clientName: selectedClient, assignAs: assignAs, templateId: '' };
+          const clientObj = clients.find(c => `${c.name} ${c.lastName || ''}`.trim() === selectedClient);
+          if (clientObj) {
+            const routineSource = assignAs === 'next' ? clientObj.nextRoutineJson : clientObj.routineJson;
+            const { exercises, notes } = parseRoutineJson(routineSource);
+            setWeeklyRoutine(exercises);
+            setDailyNotes(notes);
+          } else {
+            setWeeklyRoutine({
+              Lunes: [], Martes: [], Miércoles: [], Jueves: [], Viernes: [], Sábado: [], Domingo: []
+            });
+            setDailyNotes({
+              Lunes: '', Martes: '', Miércoles: '', Jueves: '', Viernes: '', Sábado: '', Domingo: ''
+            });
+          }
+        }
       } else {
-        setWeeklyRoutine({
-          Lunes: [], Martes: [], Miércoles: [], Jueves: [], Viernes: [], Sábado: [], Domingo: []
-        });
+        if (lastLoadedRef.current.clientName !== '') {
+          lastLoadedRef.current = { clientName: '', assignAs: 'current', templateId: '' };
+          setWeeklyRoutine({
+            Lunes: [], Martes: [], Miércoles: [], Jueves: [], Viernes: [], Sábado: [], Domingo: []
+          });
+          setDailyNotes({
+            Lunes: '', Martes: '', Miércoles: '', Jueves: '', Viernes: '', Sábado: '', Domingo: ''
+          });
+        }
       }
     }
-  }, [selectedClient, clients, isTemplateMode]);
+  }, [selectedClient, clients, isTemplateMode, assignAs, editingTemplate]);
 
   const addExercise = (day) => {
     setWeeklyRoutine({
@@ -241,6 +306,19 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
                 </div>
               )}
             </div>
+          </div>
+
+          <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Tipo de asignación</label>
+            <select
+              className="input-field"
+              value={assignAs}
+              onChange={(e) => setAssignAs(e.target.value)}
+              style={{ width: '100%', marginBottom: 0, cursor: 'pointer' }}
+            >
+              <option value="current">💪 Rutina Actual</option>
+              <option value="next">📅 Siguiente Rutina</option>
+            </select>
           </div>
           
           <div style={{ flex: '1 1 180px', minWidth: 0 }}>
@@ -461,7 +539,12 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
               return;
             }
             const token = localStorage.getItem('token');
-            const routineStr = JSON.stringify(weeklyRoutine);
+            const payloadRoutine = {};
+            DAYS_OF_WEEK.forEach(day => {
+              payloadRoutine[day] = weeklyRoutine[day] || [];
+              payloadRoutine[`${day}_notes`] = dailyNotes[day] || '';
+            });
+            const routineStr = JSON.stringify(payloadRoutine);
             try {
               const url = editingTemplate 
                 ? `${API_BASE_URL}/api/templates/${editingTemplate.id}` 
@@ -514,23 +597,46 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
               return;
             }
             const token = localStorage.getItem('token');
-            const routineStr = JSON.stringify(weeklyRoutine);
+            const payloadRoutine = {};
+            DAYS_OF_WEEK.forEach(day => {
+              payloadRoutine[day] = weeklyRoutine[day] || [];
+              payloadRoutine[`${day}_notes`] = dailyNotes[day] || '';
+            });
+            const routineStr = JSON.stringify(payloadRoutine);
             try {
+              const bodyPayload = assignAs === 'next' 
+                ? { nextRoutineJson: routineStr }
+                : { routineJson: routineStr };
+
               const response = await fetch(`${API_BASE_URL}/api/users/clients/${clientObj.id}`, {
                 method: 'PUT',
                 headers: {
                   'Content-Type': 'application/json',
                   'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ routineJson: routineStr })
+                body: JSON.stringify(bodyPayload)
               });
               if (response.ok) {
+                const updatedClientData = await response.json();
                 if (setClients) {
                   setClients(prev => prev.map(c => 
-                    c.id === clientObj.id ? { ...c, hasRoutine: true, routineJson: routineStr, routine: JSON.parse(routineStr) } : c
+                    c.id === clientObj.id ? { 
+                      ...c, 
+                      hasRoutine: !!(updatedClientData.routineJson),
+                      routineJson: updatedClientData.routineJson,
+                      routine: updatedClientData.routineJson ? JSON.parse(updatedClientData.routineJson) : null,
+                      nextRoutineJson: updatedClientData.nextRoutineJson,
+                      nextRoutine: updatedClientData.nextRoutineJson ? JSON.parse(updatedClientData.nextRoutineJson) : null,
+                      routineUpdatedAt: updatedClientData.routineUpdatedAt
+                    } : c
                   ));
                 }
-                dialog.toast(`Rutina asignada con éxito a ${selectedClient}.`, { variant: 'success' });
+                dialog.toast(
+                  assignAs === 'next' 
+                    ? `Siguiente rutina programada con éxito para ${selectedClient}.`
+                    : `Rutina asignada con éxito a ${selectedClient}.`, 
+                  { variant: 'success' }
+                );
               } else {
                 await dialog.alert("Error al guardar la rutina en el servidor.", { title: "Error" });
               }
@@ -568,16 +674,9 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
                 <div 
                   key={t.id} 
                   onClick={() => {
-                    const fallbackRoutine = { Lunes: [], Martes: [], Miércoles: [], Jueves: [], Viernes: [], Sábado: [], Domingo: [] };
-                    let selectedRoutine = t.routine;
-                    if (!selectedRoutine && t.routineJson) {
-                      try {
-                        selectedRoutine = typeof t.routineJson === 'string' ? JSON.parse(t.routineJson) : t.routineJson;
-                      } catch (e) {
-                        console.error("Error parsing t.routineJson", e);
-                      }
-                    }
-                    setWeeklyRoutine(selectedRoutine ? JSON.parse(JSON.stringify(selectedRoutine)) : fallbackRoutine);
+                    const { exercises, notes } = parseRoutineJson(t.routineJson || t.routine);
+                    setWeeklyRoutine(exercises);
+                    setDailyNotes(notes);
                     dialog.toast(`Plantilla "${t.title}" cargada.`, { variant: 'success' });
                     setShowTemplateModal(false);
                   }}

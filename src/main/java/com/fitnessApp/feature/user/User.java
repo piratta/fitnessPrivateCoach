@@ -73,6 +73,11 @@ public class User {
     @Column(columnDefinition = "TEXT")
     private String routineJson;
 
+    @Column(columnDefinition = "TEXT")
+    private String nextRoutineJson;
+
+    private LocalDateTime routineUpdatedAt;
+
     @Column(nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

@@ -42,13 +42,24 @@ public class UserController {
         User user = userService.getUserByPrincipal(auth.getName());
         UserDto dto = new UserDto(user);
         dto.setRoutineJson(workoutService.enrichRoutineWithSuggestedWeights(user, dto.getRoutineJson()));
+        if (dto.getNextRoutineJson() != null) {
+            dto.setNextRoutineJson(workoutService.enrichRoutineWithSuggestedWeights(user, dto.getNextRoutineJson()));
+        }
         return ResponseEntity.ok(dto);
     }
 
     @GetMapping("/clients")
     public ResponseEntity<List<UserDto>> getMyClients() {
         String principal = SecurityContextHolder.getContext().getAuthentication().getName();
-        return ResponseEntity.ok(userService.getMyClients(principal));
+        List<UserDto> clients = userService.getMyClients(principal);
+        for (UserDto dto : clients) {
+            User client = userService.getUserByPrincipal(dto.getEmail());
+            dto.setRoutineJson(workoutService.enrichRoutineWithSuggestedWeights(client, dto.getRoutineJson()));
+            if (dto.getNextRoutineJson() != null) {
+                dto.setNextRoutineJson(workoutService.enrichRoutineWithSuggestedWeights(client, dto.getNextRoutineJson()));
+            }
+        }
+        return ResponseEntity.ok(clients);
     }
 
     @PostMapping("/create-client")

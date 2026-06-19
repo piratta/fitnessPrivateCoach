@@ -29,6 +29,8 @@ public class UserDto {
     private String reviewFrequency;
     private String billingPlanId;
     private String routineJson;
+    private String nextRoutineJson;
+    private LocalDateTime routineUpdatedAt;
     private LocalDateTime lastReviewDate;
     private LocalDateTime nextReviewAt;
     private LocalDateTime createdAt;
@@ -50,6 +52,8 @@ public class UserDto {
         this.onboardingCompleted = Boolean.TRUE.equals(user.getOnboardingCompleted());
         this.reviewFrequency = user.getReviewFrequency();
         this.routineJson = user.getRoutineJson();
+        this.nextRoutineJson = user.getNextRoutineJson();
+        this.routineUpdatedAt = user.getRoutineUpdatedAt();
         this.lastReviewDate = user.getLastReviewDate();
         this.nextReviewAt = user.getNextReviewAt();
         this.createdAt = user.getCreatedAt();

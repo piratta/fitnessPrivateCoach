@@ -45,6 +45,7 @@ export default function ClientDashboard({ user, onLogout}) {
   const [showProfile, setShowProfile] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [activeTab, setActiveTab] = useState('workout');
+  const [viewingNextRoutine, setViewingNextRoutine] = useState(false);
 
   // Capture the browser back button so it does not exit the app. We seed a history entry per
   // tab change, and on popstate we either switch back to a previous tab or, if we are already
@@ -89,7 +90,11 @@ export default function ClientDashboard({ user, onLogout}) {
   });
 
   // Workout Tracker States
-  const routineDays = clientData?.routine ? Object.keys(clientData.routine) : [];
+  const currentRoutineObj = (viewingNextRoutine && clientData?.nextRoutine)
+    ? clientData.nextRoutine
+    : clientData?.routine;
+  const activeDayNotes = currentRoutineObj ? currentRoutineObj[`${selectedDay}_notes`] : '';
+  const routineDays = currentRoutineObj ? Object.keys(currentRoutineObj).filter(day => !day.endsWith('_notes')) : [];
   const [selectedDay, setSelectedDay] = useState('');
   const [skippedDays, setSkippedDays] = useState({});
 
@@ -129,12 +134,23 @@ export default function ClientDashboard({ user, onLogout}) {
               console.error("Error al parsear la rutina", e);
             }
           }
+          
+          let parsedNextRoutine = null;
+          if (data.nextRoutineJson) {
+            try {
+              parsedNextRoutine = JSON.parse(data.nextRoutineJson);
+            } catch (e) {
+              console.error("Error al parsear la siguiente rutina", e);
+            }
+          }
+          
           const hasRoutine = !!(parsedRoutine && Object.keys(parsedRoutine).some(day => parsedRoutine[day] && parsedRoutine[day].length > 0));
 
           setClientData(prev => ({
             ...prev,
             ...data,
             routine: parsedRoutine,
+            nextRoutine: parsedNextRoutine,
             hasRoutine: hasRoutine
           }));
         })
@@ -374,16 +390,31 @@ export default function ClientDashboard({ user, onLogout}) {
       const now = new Date();
       const dow = now.getDay(); // 0=Sun, 1=Mon, ... 6=Sat
       const offsetToMonday = (dow + 6) % 7;
+      
       const monday = new Date(now);
       monday.setHours(0, 0, 0, 0);
       monday.setDate(monday.getDate() - offsetToMonday);
+      
       const sunday = new Date(monday);
       sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+
+      let limitDate = monday;
+      if (clientData?.routineUpdatedAt) {
+        const updateDate = new Date(clientData.routineUpdatedAt);
+        updateDate.setHours(0, 0, 0, 0);
+        if (updateDate > limitDate) {
+          limitDate = updateDate;
+        }
+      }
+
       const inWeek = (iso) => {
         if (!iso) return false;
         const d = new Date(iso);
-        return d >= monday && d <= sunday;
+        d.setHours(0, 0, 0, 0);
+        return d >= limitDate && d <= sunday;
       };
+
       const weekdayOf = (iso) => {
         if (!iso) return null;
         const d = new Date(iso);
@@ -404,8 +435,7 @@ export default function ClientDashboard({ user, onLogout}) {
       }
       setTodaySessionsByDay(byDay);
     });
-    // eslint-disable-next-line
-  }, [clientData?.routine]);
+  }, [clientData?.routine, clientData?.routineUpdatedAt]);
 
   // Whenever the user navigates to a different day, rehydrate the workout-state flags ONLY for
   // that day. If the day has a session finished today we restore logs + summary; otherwise we
@@ -485,13 +515,15 @@ export default function ClientDashboard({ user, onLogout}) {
 
   // Initialize selectedDay when routine is loaded
   useEffect(() => {
-    if (clientData?.routine) {
-      const days = Object.keys(clientData.routine);
-      if (days.length > 0 && !selectedDay) {
-        setSelectedDay(days[0]);
+    if (currentRoutineObj) {
+      const days = Object.keys(currentRoutineObj).filter(day => !day.endsWith('_notes'));
+      if (days.length > 0) {
+        if (!selectedDay || !days.includes(selectedDay)) {
+          setSelectedDay(days[0]);
+        }
       }
     }
-  }, [clientData?.routine]);
+  }, [currentRoutineObj]);
 
   // Local storage key for the in-progress workout. We keep it per user so a shared device with
   // multiple accounts does not cross-contaminate state.
@@ -507,7 +539,7 @@ export default function ClientDashboard({ user, onLogout}) {
   useEffect(() => {
     if (!clientData?.routine) return;
     const initialLogs = {};
-    Object.keys(clientData.routine).forEach(day => {
+    Object.keys(clientData.routine).filter(day => !day.endsWith('_notes')).forEach(day => {
       initialLogs[day] = {};
       const exercises = clientData.routine[day] || [];
       const sorted = [...exercises].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
@@ -518,6 +550,7 @@ export default function ClientDashboard({ user, onLogout}) {
           reps: s.reps || '10',
           completed: false,
           skipped: false,
+          exerciseName: ex.name,
         }));
       });
     });
@@ -624,7 +657,7 @@ export default function ClientDashboard({ user, onLogout}) {
       const sorted = [...exercises].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
       sorted.forEach((ex, exIdx) => {
         const sets = normalizeExerciseSets(ex);
-        fresh[exIdx] = sets.map(s => ({ weight: '', reps: s.reps || '10', completed: false, skipped: false }));
+        fresh[exIdx] = sets.map(s => ({ weight: '', reps: s.reps || '10', completed: false, skipped: false, exerciseName: ex.name }));
       });
       setLogs(prev => ({ ...prev, [selectedDay]: fresh }));
     }
@@ -661,11 +694,13 @@ export default function ClientDashboard({ user, onLogout}) {
     : (clientData?.routine?.[selectedDay]?.length > 0)
       ? selectedDay
       : (completedSessionToday?.dayName || selectedDay);
-  const activeWorkout = (isDayConsumedElsewhere && !loadedRoutineHere)
-    ? []
-    : (clientData?.routine && routineDayForRender && clientData.routine[routineDayForRender])
-      ? [...clientData.routine[routineDayForRender]].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1))
-      : [];
+  const activeWorkout = viewingNextRoutine
+    ? (clientData?.nextRoutine?.[selectedDay] ? [...clientData.nextRoutine[selectedDay]].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1)) : [])
+    : (isDayConsumedElsewhere && !loadedRoutineHere)
+      ? []
+      : (clientData?.routine && routineDayForRender && clientData.routine[routineDayForRender])
+        ? [...clientData.routine[routineDayForRender]].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1))
+        : [];
 
   // Plans claimed somewhere in the UI: either already trained (saved session this week) OR
   // loaded into another tab through pickPendingDay (e.g. Lunes tab has Jueves loaded, even
@@ -691,7 +726,7 @@ export default function ClientDashboard({ user, onLogout}) {
     const fresh = {};
     sorted.forEach((ex, exIdx) => {
       const sets = normalizeExerciseSets(ex);
-      fresh[exIdx] = sets.map(s => ({ weight: '', reps: s.reps || '10', completed: false, skipped: false }));
+      fresh[exIdx] = sets.map(s => ({ weight: '', reps: s.reps || '10', completed: false, skipped: false, exerciseName: ex.name }));
     });
     setLogs(prev => ({ ...prev, [selectedDay]: fresh }));
     setLoadedRoutineByTab(prev => ({ ...prev, [selectedDay]: day }));
@@ -963,12 +998,12 @@ export default function ClientDashboard({ user, onLogout}) {
           // Reinitialise the day's logs so all sets come back empty.
           if (clientData?.routine) {
             const fresh = {};
-            Object.keys(clientData.routine).forEach(day => {
+            Object.keys(clientData.routine).filter(day => !day.endsWith('_notes')).forEach(day => {
               fresh[day] = {};
               const sorted = [...(clientData.routine[day] || [])].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
               sorted.forEach((ex, exIdx) => {
                 const sets = normalizeExerciseSets(ex);
-                fresh[day][exIdx] = sets.map(s => ({ weight: '', reps: s.reps || '10', completed: false, skipped: false }));
+                fresh[day][exIdx] = sets.map(s => ({ weight: '', reps: s.reps || '10', completed: false, skipped: false, exerciseName: ex.name }));
               });
             });
             setLogs(fresh);
@@ -1612,8 +1647,35 @@ export default function ClientDashboard({ user, onLogout}) {
                 </div>
               ) : (
                 <div>
+                  
+                  {clientData?.nextRoutineJson && (
+                    <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                      <button
+                        onClick={() => setViewingNextRoutine(false)}
+                        style={{
+                          flex: 1, padding: '12px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s',
+                          background: !viewingNextRoutine ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)',
+                          color: !viewingNextRoutine ? '#000' : 'var(--text-muted)',
+                          border: !viewingNextRoutine ? '1px solid var(--accent-primary)' : '1px solid var(--border-light)'
+                        }}
+                      >
+                        💪 Rutina Actual
+                      </button>
+                      <button
+                        onClick={() => setViewingNextRoutine(true)}
+                        style={{
+                          flex: 1, padding: '12px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s',
+                          background: viewingNextRoutine ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)',
+                          color: viewingNextRoutine ? '#000' : 'var(--text-muted)',
+                          border: viewingNextRoutine ? '1px solid var(--accent-primary)' : '1px solid var(--border-light)'
+                        }}
+                      >
+                        📅 Siguiente Rutina
+                      </button>
+                    </div>
+                  )}
 
-                 {/* Estrategia asignada y botón de tabla */}
+                  {/* Estrategia asignada y botón de tabla */}
                  <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
                    <div style={{ flex: 1, minWidth: '200px', background: 'rgba(224, 248, 0, 0.05)', border: '1px dashed var(--accent-primary)', padding: '10px 15px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 0 }}>
                      <span style={{ fontSize: '1.5rem' }}>🎯</span>
@@ -1760,39 +1822,69 @@ export default function ClientDashboard({ user, onLogout}) {
                   </div>
                 ) : (
                   <div className="fade-in" style={{ display: 'grid', gap: '25px' }}>
+                    
+                    {activeDayNotes && (
+                      <div style={{
+                        background: 'rgba(224, 248, 0, 0.05)',
+                        border: '1px solid var(--accent-primary)',
+                        borderRadius: '8px',
+                        padding: '15px',
+                        marginBottom: '10px',
+                        lineHeight: '1.5',
+                        fontSize: '0.9rem',
+                        boxShadow: 'inset 0 0 10px rgba(224, 248, 0, 0.05)'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--accent-primary)', fontWeight: 'bold' }}>
+                          <span>📋</span> Recomendaciones del Entrenador:
+                        </div>
+                        <div style={{ color: 'var(--text-main)', whiteSpace: 'pre-wrap' }}>
+                          {activeDayNotes}
+                        </div>
+                      </div>
+                    )}
+
                     {!isWorkoutStarted && !isWorkoutLocked ? (
                       <div>
-                        {hasResumableWorkout && resumableDayName === selectedDay && (
-                          <div style={{ background: 'rgba(255, 170, 0, 0.1)', border: '1px solid #ffaa00', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-                              <span style={{ fontSize: '1.4rem' }}>⏱️</span>
-                              <strong style={{ color: '#ffaa00' }}>Entrenamiento sin terminar</strong>
-                            </div>
-                            <p style={{ color: 'var(--text-main)', fontSize: '0.9rem', marginBottom: '12px' }}>
-                              Tienes un entrenamiento empezado hoy ({selectedDay}). ¿Quieres continuarlo?
-                            </p>
-                            <div style={{ display: 'flex', gap: '10px' }}>
-                              <button onClick={resumeWorkout} className="btn-primary" style={{ flex: 1, padding: '12px', fontWeight: 'bold' }}>▶ Reanudar</button>
-                              <button onClick={discardResumableWorkout} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid #ff4500', color: '#ff4500', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Descartar</button>
-                            </div>
+                        {viewingNextRoutine ? (
+                          <div style={{ background: 'rgba(224, 248, 0, 0.05)', border: '1px dashed var(--accent-primary)', borderRadius: '8px', padding: '12px 15px', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '1.2rem' }}>📅</span>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Esta es tu siguiente rutina programada. Todavía no está activa para entrenar.</span>
                           </div>
-                        )}
-                        <div style={{ textAlign: 'center', padding: '20px 0 30px' }}>
-                          <button
-                            onClick={handleStartWorkout}
-                            className="btn-primary"
-                            style={{ padding: '25px 40px', fontSize: '1.5rem', borderRadius: '50px', boxShadow: '0 10px 30px rgba(224, 248, 0, 0.3)' }}
-                          >
-                            ▶ EMPEZAR ENTRENAMIENTO
-                          </button>
-                          <p style={{ marginTop: '20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Pulsa para activar el cronómetro y registrar marcas.</p>
-                        </div>
+                        ) : (
+                          <>
+                            {hasResumableWorkout && resumableDayName === selectedDay && (
+                              <div style={{ background: 'rgba(255, 170, 0, 0.1)', border: '1px solid #ffaa00', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                                  <span style={{ fontSize: '1.4rem' }}>⏱️</span>
+                                  <strong style={{ color: '#ffaa00' }}>Entrenamiento sin terminar</strong>
+                                </div>
+                                <p style={{ color: 'var(--text-main)', fontSize: '0.9rem', marginBottom: '12px' }}>
+                                  Tienes un entrenamiento empezado hoy ({selectedDay}). ¿Quieres continuarlo?
+                                </p>
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                  <button onClick={resumeWorkout} className="btn-primary" style={{ flex: 1, padding: '12px', fontWeight: 'bold' }}>▶ Reanudar</button>
+                                  <button onClick={discardResumableWorkout} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid #ff4500', color: '#ff4500', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Descartar</button>
+                                </div>
+                              </div>
+                            )}
+                            <div style={{ textAlign: 'center', padding: '20px 0 30px' }}>
+                              <button
+                                onClick={handleStartWorkout}
+                                className="btn-primary"
+                                style={{ padding: '25px 40px', fontSize: '1.5rem', borderRadius: '50px', boxShadow: '0 10px 30px rgba(224, 248, 0, 0.3)' }}
+                              >
+                                ▶ EMPEZAR ENTRENAMIENTO
+                              </button>
+                              <p style={{ marginTop: '20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Pulsa para activar el cronómetro y registrar marcas.</p>
+                            </div>
 
-                        {/* Previsualización solo-lectura de los ejercicios del día */}
-                        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--border-light)', borderRadius: '8px', padding: '12px 15px', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{ fontSize: '1.2rem' }}>👁️</span>
-                          <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Vista previa del entrenamiento. Empieza el entrenamiento para registrar tus marcas.</span>
-                        </div>
+                            {/* Previsualización solo-lectura de los ejercicios del día */}
+                            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--border-light)', borderRadius: '8px', padding: '12px 15px', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span style={{ fontSize: '1.2rem' }}>👁️</span>
+                              <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Vista previa del entrenamiento. Empieza el entrenamiento para registrar tus marcas.</span>
+                            </div>
+                          </>
+                        )}
                         <div style={{ display: 'grid', gap: '12px' }}>
                           {activeWorkout.map((ex, exIdx) => {
                             const previewSets = normalizeExerciseSets(ex);
