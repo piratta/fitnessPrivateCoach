@@ -32,17 +32,17 @@ export default function AdminDashboard({ user, onLogout }) {
         
         <div className="glass-panel" style={{ padding: '25px', borderTop: '3px solid var(--accent-primary)' }}>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>Usuarios Activos</p>
-          <h3 style={{ fontSize: '2.5rem', fontWeight: '800' }}>1,248</h3>
+          <h3 style={{ fontSize: '2.5rem', fontWeight: '800' }}>-</h3>
         </div>
         
         <div className="glass-panel" style={{ padding: '25px' }}>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>Entrenadores</p>
-          <h3 style={{ fontSize: '2.5rem', fontWeight: '800' }}>42</h3>
+          <h3 style={{ fontSize: '2.5rem', fontWeight: '800' }}>-</h3>
         </div>
 
         <div className="glass-panel" style={{ padding: '25px' }}>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>Sesiones Hoy</p>
-          <h3 style={{ fontSize: '2.5rem', fontWeight: '800' }}>856</h3>
+          <h3 style={{ fontSize: '2.5rem', fontWeight: '800' }}>-</h3>
         </div>
       </div>
 
@@ -51,18 +51,7 @@ export default function AdminDashboard({ user, onLogout }) {
         <h3 style={{ fontSize: '1.2rem', marginBottom: '20px', borderBottom: '1px solid var(--border-light)', paddingBottom: '15px' }}>Actividad Reciente</h3>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-          <div style={{ padding: '15px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', borderLeft: '3px solid var(--accent-primary)' }}>
-            <p style={{ fontWeight: '600' }}>Nuevo Entrenador Registrado</p>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Hace 5 minutos</p>
-          </div>
-          <div style={{ padding: '15px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px' }}>
-            <p style={{ fontWeight: '600' }}>Límite superado por Free User #8432</p>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Hace 1 hora</p>
-          </div>
-          <div style={{ padding: '15px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px' }}>
-            <p style={{ fontWeight: '600' }}>Backup de base de datos completado</p>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Hace 3 horas</p>
-          </div>
+          <p style={{ color: 'var(--text-muted)' }}>Sin actividad reciente.</p>
         </div>
       </div>
 

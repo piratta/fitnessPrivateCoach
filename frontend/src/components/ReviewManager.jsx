@@ -555,16 +555,7 @@ export default function ReviewManager({ clients, setClients }) {
                         return c;
                       }));
 
-                      // Mutate MOCK_CLIENTS so ClientDashboard can see it in this session
-                      const mockIdx = MOCK_CLIENTS.findIndex(c => c.id === selectedClientForReview.id);
-                      if (mockIdx !== -1) {
-                        const clientObj = MOCK_CLIENTS[mockIdx];
-                        if (!clientObj.reviewHistory) clientObj.reviewHistory = [];
-                        if (clientObj.lastCompletedReview) clientObj.reviewHistory.push(clientObj.lastCompletedReview);
-                        clientObj.nextReview = '15/08/2026';
-                        clientObj.pendingReviewData = null;
-                        clientObj.lastCompletedReview = reviewDataToSave;
-                      }
+                      // (Mock sync removed)
 
                       await dialog.alert(`Evaluación de ${selectedClientForReview.name} enviada con éxito.`, { title: 'Evaluación enviada' });
                       setSelectedClientForReview(null);
