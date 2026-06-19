@@ -413,6 +413,7 @@ export default function ClientDashboard({ user, onLogout}) {
       if (!Array.isArray(list)) return;
       // Compute the [Monday, Sunday] window for the current week (week starts on Monday in ES).
       const now = new Date();
+      now.setDate(now.getDate() + weekOffset * 7);
       const dow = now.getDay(); // 0=Sun, 1=Mon, ... 6=Sat
       const offsetToMonday = (dow + 6) % 7;
       
@@ -470,7 +471,7 @@ export default function ClientDashboard({ user, onLogout}) {
       }
       setTodaySessionsByDay(byDay);
     });
-  }, [clientData?.routine, clientData?.routineUpdatedAt]);
+  }, [clientData?.routine, clientData?.routineUpdatedAt, weekOffset]);
 
   // Whenever the user navigates to a different day, rehydrate the workout-state flags ONLY for
   // that day. If the day has a session finished today we restore logs + summary; otherwise we
