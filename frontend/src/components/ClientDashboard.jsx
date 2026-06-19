@@ -140,6 +140,7 @@ export default function ClientDashboard({ user, onLogout}) {
   // Workout Tracker States
   const [selectedDay, setSelectedDay] = useState('');
   const [skippedDays, setSkippedDays] = useState({});
+  const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, +1 = next week, -1 = previous
 
   const currentRoutineObj = (viewingNextRoutine && clientData?.nextRoutine)
     ? clientData.nextRoutine
@@ -2064,7 +2065,75 @@ export default function ClientDashboard({ user, onLogout}) {
                    </button>
                  </div>
 
-                {/* Selector de Días */}
+                {/* Week Navigation + Selector de Días */}
+                {(() => {
+                  // Compute the Monday of the displayed week
+                  const now = new Date();
+                  const currentDow = (now.getDay() + 6) % 7; // 0=Mon
+                  const displayedMonday = new Date(now);
+                  displayedMonday.setHours(0, 0, 0, 0);
+                  displayedMonday.setDate(now.getDate() - currentDow + weekOffset * 7);
+                  const displayedSunday = new Date(displayedMonday);
+                  displayedSunday.setDate(displayedMonday.getDate() + 6);
+
+                  // Parse routine date limits
+                  const parseLD = (s) => { if (!s) return null; const p = String(s).split('T')[0].split('-'); return p.length === 3 ? new Date(+p[0], +p[1]-1, +p[2]) : null; };
+                  const rStart = parseLD(clientData?.routineStartDate);
+                  const rEnd = parseLD(clientData?.routineEndDate);
+
+                  // Check if prev/next is allowed
+                  const prevMonday = new Date(displayedMonday); prevMonday.setDate(prevMonday.getDate() - 7);
+                  const nextMonday = new Date(displayedMonday); nextMonday.setDate(nextMonday.getDate() + 7);
+                  const canGoPrev = !rStart || prevMonday >= rStart || weekOffset > 0;
+                  const canGoNext = !rEnd || nextMonday <= rEnd;
+                  const isCurrentWeek = weekOffset === 0;
+
+                  // Format date range for display
+                  const fmtShort = (d) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+                  const weekLabel = isCurrentWeek ? 'Esta semana' : `${fmtShort(displayedMonday)} — ${fmtShort(displayedSunday)}`;
+
+                  return (
+                    <>
+                      {(rStart || rEnd) && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '8px' }}>
+                          <button
+                            disabled={!canGoPrev}
+                            onClick={() => setWeekOffset(w => w - 1)}
+                            style={{
+                              background: canGoPrev ? 'rgba(255,255,255,0.05)' : 'transparent',
+                              border: `1px solid ${canGoPrev ? 'var(--border-light)' : 'rgba(255,255,255,0.03)'}`,
+                              color: canGoPrev ? 'var(--text-main)' : 'rgba(255,255,255,0.15)',
+                              padding: '8px 14px', borderRadius: '8px', cursor: canGoPrev ? 'pointer' : 'default',
+                              fontWeight: 'bold', fontSize: '0.85rem', transition: 'all 0.2s'
+                            }}
+                          >◀</button>
+                          <div style={{ textAlign: 'center', flex: 1 }}>
+                            <span style={{ color: isCurrentWeek ? 'var(--accent-primary)' : 'var(--text-main)', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                              {weekLabel}
+                            </span>
+                            {!isCurrentWeek && (
+                              <button
+                                onClick={() => setWeekOffset(0)}
+                                style={{ marginLeft: '10px', background: 'transparent', border: 'none', color: 'var(--accent-primary)', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }}
+                              >Hoy</button>
+                            )}
+                          </div>
+                          <button
+                            disabled={!canGoNext}
+                            onClick={() => setWeekOffset(w => w + 1)}
+                            style={{
+                              background: canGoNext ? 'rgba(255,255,255,0.05)' : 'transparent',
+                              border: `1px solid ${canGoNext ? 'var(--border-light)' : 'rgba(255,255,255,0.03)'}`,
+                              color: canGoNext ? 'var(--text-main)' : 'rgba(255,255,255,0.15)',
+                              padding: '8px 14px', borderRadius: '8px', cursor: canGoNext ? 'pointer' : 'default',
+                              fontWeight: 'bold', fontSize: '0.85rem', transition: 'all 0.2s'
+                            }}
+                          >▶</button>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
                 <div className="scrollable-tabs" style={{ marginBottom: '15px', borderBottom: '1px solid var(--border-light)' }}>
                     {routineDays.map(day => {
                       const isCompleted = trainedTemplateDays.has(day);

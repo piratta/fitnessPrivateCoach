@@ -41,6 +41,11 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
   const [templateDescription, setTemplateDescription] = useState(editingTemplate ? editingTemplate.description : '');
   const [periodStr, setPeriodStr] = useState('');
   const [routineStartDate, setRoutineStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const defaultEndDate = () => {
+    const d = new Date(); d.setDate(d.getDate() + 28);
+    return d.toISOString().split('T')[0];
+  };
+  const [routineEndDate, setRoutineEndDate] = useState(defaultEndDate());
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const dropdownRef = useRef(null);
   const [assignAs, setAssignAs] = useState('current');
@@ -112,6 +117,9 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
             const { exercises, notes } = parseRoutineJson(routineSource);
             setWeeklyRoutine(exercises);
             setDailyNotes(notes);
+            // Pre-populate routine date range from existing client data
+            if (clientObj.routineStartDate) setRoutineStartDate(clientObj.routineStartDate);
+            if (clientObj.routineEndDate) setRoutineEndDate(clientObj.routineEndDate);
           } else {
             setWeeklyRoutine({
               Lunes: [], Martes: [], Miércoles: [], Jueves: [], Viernes: [], Sábado: [], Domingo: []
@@ -333,15 +341,33 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
             />
           </div>
 
-          <div style={{ flex: '1 1 160px', minWidth: 0 }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Inicio (Activación)</label>
+          <div style={{ flex: '1 1 140px', minWidth: 0 }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Fecha Inicio</label>
             <input 
               type="date" 
               className="input-field" 
               value={routineStartDate} 
-              onChange={(e) => setRoutineStartDate(e.target.value)} 
+              onChange={(e) => {
+                setRoutineStartDate(e.target.value);
+                // Auto-adjust end date if it falls before start
+                if (routineEndDate && e.target.value > routineEndDate) {
+                  setRoutineEndDate(e.target.value);
+                }
+              }} 
               style={{ width: '100%', marginBottom: 0, colorScheme: 'dark' }}
-              title="La rutina reemplazará a la actual automáticamente este día"
+              title="La rutina empieza este día"
+            />
+          </div>
+          <div style={{ flex: '1 1 140px', minWidth: 0 }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>Fecha Fin</label>
+            <input 
+              type="date" 
+              className="input-field" 
+              value={routineEndDate} 
+              min={routineStartDate}
+              onChange={(e) => setRoutineEndDate(e.target.value)} 
+              style={{ width: '100%', marginBottom: 0, colorScheme: 'dark' }}
+              title="La rutina termina este día"
             />
           </div>
 
@@ -603,10 +629,17 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
               payloadRoutine[`${day}_notes`] = dailyNotes[day] || '';
             });
             const routineStr = JSON.stringify(payloadRoutine);
+
+            // Validate date range
+            if (routineStartDate && routineEndDate && routineEndDate < routineStartDate) {
+              dialog.toast('La fecha de fin no puede ser anterior a la fecha de inicio.', { variant: 'error' });
+              return;
+            }
+
             try {
               const bodyPayload = assignAs === 'next' 
                 ? { nextRoutineJson: routineStr }
-                : { routineJson: routineStr };
+                : { routineJson: routineStr, routineStartDate: routineStartDate || null, routineEndDate: routineEndDate || null };
 
               const response = await fetch(`${API_BASE_URL}/api/users/clients/${clientObj.id}`, {
                 method: 'PUT',
