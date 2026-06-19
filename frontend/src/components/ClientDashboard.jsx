@@ -1091,19 +1091,27 @@ export default function ClientDashboard({ user, onLogout}) {
 
 
   const updateSet = (exIdx, setIdx, field, value) => {
-    const newLogs = { ...logs };
-    if (field === 'weight') {
-      const parsed = parseFloat(value);
-      newLogs[selectedDay][exIdx][setIdx][field] = (parsed < 0) ? 0 : value;
-    } else {
-      newLogs[selectedDay][exIdx][setIdx][field] = value;
-    }
-    setLogs(newLogs);
+    setLogs(prev => {
+      const newLogs = { ...prev };
+      const dayLogs = { ...newLogs[selectedDay] };
+      const exSets = [...dayLogs[exIdx]];
+      const updatedSet = { ...exSets[setIdx] };
+      if (field === 'weight') {
+        const parsed = parseFloat(value);
+        updatedSet[field] = (parsed < 0) ? 0 : value;
+      } else {
+        updatedSet[field] = value;
+      }
+      exSets[setIdx] = updatedSet;
+      dayLogs[exIdx] = exSets;
+      newLogs[selectedDay] = dayLogs;
+      return newLogs;
+    });
   };
 
   const toggleComplete = (exIdx, setIdx) => {
-    const newLogs = { ...logs };
-    const currentSet = newLogs[selectedDay][exIdx][setIdx];
+    const currentSet = logs?.[selectedDay]?.[exIdx]?.[setIdx];
+    if (!currentSet) return;
 
     // Prevent completing if weight is empty
     if (!currentSet.completed && (!currentSet.weight || currentSet.weight.toString().trim() === '')) {
@@ -1112,8 +1120,16 @@ export default function ClientDashboard({ user, onLogout}) {
     }
 
     const isNowCompleted = !currentSet.completed;
-    currentSet.completed = isNowCompleted;
-    setLogs(newLogs);
+
+    setLogs(prev => {
+      const newLogs = { ...prev };
+      const dayLogs = { ...newLogs[selectedDay] };
+      const exSets = [...dayLogs[exIdx]];
+      exSets[setIdx] = { ...exSets[setIdx], completed: isNowCompleted };
+      dayLogs[exIdx] = exSets;
+      newLogs[selectedDay] = dayLogs;
+      return newLogs;
+    });
 
     if (isNowCompleted && isWorkoutStarted) {
       setRestSeconds(180); // 3-minute rest timer between sets
@@ -1121,22 +1137,33 @@ export default function ClientDashboard({ user, onLogout}) {
   };
 
   const toggleSkipSet = (exIdx, setIdx) => {
-    const newLogs = { ...logs };
-    const currentSet = newLogs[selectedDay][exIdx][setIdx];
-    currentSet.skipped = !currentSet.skipped;
-    if (currentSet.skipped) currentSet.completed = false; // can't be completed and skipped
-    setLogs(newLogs);
+    setLogs(prev => {
+      const newLogs = { ...prev };
+      const dayLogs = { ...newLogs[selectedDay] };
+      const exSets = [...dayLogs[exIdx]];
+      const oldSet = exSets[setIdx];
+      const nowSkipped = !oldSet.skipped;
+      exSets[setIdx] = { ...oldSet, skipped: nowSkipped, completed: nowSkipped ? false : oldSet.completed };
+      dayLogs[exIdx] = exSets;
+      newLogs[selectedDay] = dayLogs;
+      return newLogs;
+    });
   };
 
   const toggleSkipExercise = (exIdx) => {
-    const newLogs = { ...logs };
-    const sets = newLogs[selectedDay][exIdx];
-    const allSkipped = sets.every(s => s.skipped);
-    sets.forEach(s => {
-      s.skipped = !allSkipped;
-      if (!allSkipped) s.completed = false;
+    setLogs(prev => {
+      const newLogs = { ...prev };
+      const dayLogs = { ...newLogs[selectedDay] };
+      const sets = dayLogs[exIdx];
+      const allSkipped = sets.every(s => s.skipped);
+      dayLogs[exIdx] = sets.map(s => ({
+        ...s,
+        skipped: !allSkipped,
+        completed: !allSkipped ? false : s.completed,
+      }));
+      newLogs[selectedDay] = dayLogs;
+      return newLogs;
     });
-    setLogs(newLogs);
   };
 
   const toggleSkipDay = () => {
@@ -2041,6 +2068,9 @@ export default function ClientDashboard({ user, onLogout}) {
                 <div className="scrollable-tabs" style={{ marginBottom: '15px', borderBottom: '1px solid var(--border-light)' }}>
                     {routineDays.map(day => {
                       const isCompleted = trainedTemplateDays.has(day);
+                      // Also consider a day "completed" if a session is stored under its tab key
+                      const isTabCompleted = !!todaySessionsByDay[day];
+                      const hasLoadedRoutine = !!loadedRoutineByTab[day];
                       const daysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
                       const todayIdx = daysOfWeek.indexOf(todayWeekday);
                       const dayIdx = daysOfWeek.indexOf(day);
@@ -2054,7 +2084,14 @@ export default function ClientDashboard({ user, onLogout}) {
                         bgColor = 'var(--accent-primary)';
                         borderColor = 'var(--accent-primary)';
                         textColor = '#000';
-                      } else if (isCompleted) {
+                      } else if (isCompleted || isTabCompleted) {
+                        bgColor = 'rgba(0, 230, 118, 0.15)';
+                        borderColor = 'rgba(0, 230, 118, 0.6)';
+                        textColor = '#00e676';
+                      } else if (hasLoadedRoutine) {
+                        bgColor = 'rgba(0, 195, 255, 0.1)';
+                        borderColor = 'rgba(0, 195, 255, 0.5)';
+                        textColor = '#00c3ff';
                       } else if (isPast) {
                         bgColor = 'rgba(255, 0, 0, 0.1)';
                         borderColor = 'rgba(255, 0, 0, 0.5)';
