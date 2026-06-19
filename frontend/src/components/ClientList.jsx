@@ -12,7 +12,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
   const [selectedClient, setSelectedClient] = useState(null);
   const [editingClient, setEditingClient] = useState(null); // { name, email }
   const [isAddingClient, setIsAddingClient] = useState(false);
-  const [newClient, setNewClient] = useState({ name: '', email: '', goal: 'Hipertrofia', reviewFrequency: 'Semanal', billingPlanId: 'bp1' });
+  const [newClient, setNewClient] = useState({ name: '', lastName: '', email: '', goal: 'Hipertrofia', reviewFrequency: 'Semanal', billingPlanId: 'bp1' });
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
@@ -177,11 +177,14 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
   }, [showChatModal, selectedClient?.email, setClients]);
 
   const handleAddClient = async () => {
-    if (!newClient.name || !newClient.email) return;
+    if (!newClient.name || !newClient.lastName || !newClient.email) {
+      await dialog.alert("Por favor rellene todos los campos obligatorios (Nombre, Apellidos y Email).", { title: "Campos incompletos" });
+      return;
+    }
     
-    const parts = newClient.name.trim().split(/\s+/);
-    if (parts.length < 3) {
-      await dialog.alert("Se requiere el nombre y ambos apellidos (ej. Ana Gómez Pérez) para generar el usuario.", { title: "Nombre incompleto" });
+    const parts = newClient.lastName.trim().split(/\s+/);
+    if (parts.length < 2) {
+      await dialog.alert("Se requieren ambos apellidos (ej. Gómez Pérez) para generar el usuario.", { title: "Apellidos incompletos" });
       return;
     }
 
@@ -195,6 +198,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
         },
         body: JSON.stringify({
           name: newClient.name,
+          lastName: newClient.lastName,
           email: newClient.email,
           goal: newClient.goal,
           reviewFrequency: newClient.reviewFrequency
@@ -238,7 +242,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
         username: createdUser.username
       });
       setIsAddingClient(false);
-      setNewClient({ name: '', email: '', weight: '', goal: 'Hipertrofia', reviewFrequency: 'Semanal', billingPlanId: billingPlans?.[0]?.id || 'bp1' });
+      setNewClient({ name: '', lastName: '', email: '', weight: '', goal: 'Hipertrofia', reviewFrequency: 'Semanal', billingPlanId: billingPlans?.[0]?.id || 'bp1' });
     } catch (err) {
       console.error(err);
       await dialog.alert("Error de red al crear el cliente en el servidor.", { title: "Error de red" });
@@ -574,9 +578,15 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
             </div>
             
             <div style={{ display: 'grid', gap: '20px', flex: 1, overflowY: 'auto' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 'bold' }}>Nombre y Ambos Apellidos (Obligatorio)</label>
-                <input type="text" className="input-field" value={newClient.name} onChange={e => setNewClient({...newClient, name: e.target.value})} placeholder="Ej. Ana Gómez Pérez" />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 'bold' }}>Nombre (Obligatorio)</label>
+                  <input type="text" className="input-field" value={newClient.name} onChange={e => setNewClient({...newClient, name: e.target.value})} placeholder="Ej. Ana" />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 'bold' }}>Apellidos (Obligatorio)</label>
+                  <input type="text" className="input-field" value={newClient.lastName} onChange={e => setNewClient({...newClient, lastName: e.target.value})} placeholder="Ej. Gómez Pérez" />
+                </div>
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 'bold' }}>Correo Electrónico</label>

@@ -55,15 +55,22 @@ public class UserService {
     public User createClient(String coachEmail, UserDto clientDto) {
         User coach = userRepository.findByEmail(coachEmail).orElseThrow();
 
-        String name = clientDto.getName() == null ? "" : clientDto.getName().trim();
-        if (name.split("\\s+").length < 3) {
-            throw new IllegalArgumentException("Se requiere el nombre y ambos apellidos.");
+        String firstName = clientDto.getName() == null ? "" : clientDto.getName().trim();
+        String surnames = clientDto.getLastName() == null ? "" : clientDto.getLastName().trim();
+
+        if (firstName.isEmpty()) {
+            throw new IllegalArgumentException("Se requiere el nombre.");
+        }
+        if (surnames.split("\\s+").length < 2) {
+            throw new IllegalArgumentException("Se requieren ambos apellidos.");
         }
 
-        String username = generateUniqueUsername(name);
+        String fullName = firstName + " " + surnames;
+        String username = generateUniqueUsername(firstName, surnames);
 
         User client = new User();
-        client.setName(name);
+        client.setName(fullName);
+        client.setLastName(surnames);
         client.setEmail(clientDto.getEmail());
         client.setGoal(clientDto.getGoal());
         client.setReviewFrequency(clientDto.getReviewFrequency() != null ? clientDto.getReviewFrequency() : "Semanal");
@@ -170,25 +177,45 @@ public class UserService {
 
     // --- Private Helper Methods ---
 
-    private String generateUniqueUsername(String fullName) {
-        String normalized = java.text.Normalizer.normalize(fullName.toLowerCase(), java.text.Normalizer.Form.NFD).replaceAll("[^a-z\\s]", "");
-        String[] parts = normalized.split("\\s+");
-        String firstSurname = parts[parts.length - 2];
-
-        StringBuilder initialsBuilder = new StringBuilder();
-        for (int i = 0; i < parts.length - 2; i++) {
-            if (!parts[i].isEmpty()) initialsBuilder.append(parts[i].charAt(0));
+    private String generateUniqueUsername(String firstName, String surnames) {
+        String cleanFirst = normalizeAndClean(firstName);
+        if (cleanFirst.isEmpty()) {
+            cleanFirst = "u";
         }
-        String initials = initialsBuilder.toString();
-        int surnameLen = Math.max(1, 7 - initials.length());
-        String username = initials + firstSurname.substring(0, Math.min(firstSurname.length(), surnameLen));
+        char firstLetter = cleanFirst.charAt(0);
+
+        String cleanSurnames = normalizeAndClean(surnames);
+        String[] surnameParts = cleanSurnames.split("\\s+");
+
+        StringBuilder surnameBuilder = new StringBuilder();
+        if (surnameParts.length > 0) {
+            String firstSurname = surnameParts[0];
+            surnameBuilder.append(firstSurname);
+            if (firstSurname.length() < 5 && surnameParts.length > 1) {
+                String secondSurname = surnameParts[1];
+                surnameBuilder.append(secondSurname);
+            }
+        }
+
+        String combinedSurnames = surnameBuilder.toString();
+        int takeLength = Math.min(combinedSurnames.length(), 5);
+        String surnamePart = combinedSurnames.substring(0, takeLength);
+
+        String baseUsername = firstLetter + surnamePart;
+
+        String username = baseUsername;
         int num = 1;
-        String temp = username;
         while (userRepository.existsByUsernameIgnoreCase(username) || userRepository.findByEmailIgnoreCase(username).isPresent()) {
-            username = temp + num;
+            username = baseUsername + num;
             num++;
         }
         return username;
+    }
+
+    private String normalizeAndClean(String text) {
+        if (text == null) return "";
+        String normalized = java.text.Normalizer.normalize(text.toLowerCase(), java.text.Normalizer.Form.NFD);
+        return normalized.replaceAll("[^a-z\\s]", "").replaceAll("\\s+", " ").trim();
     }
 
     private String generateTempPassword() {
