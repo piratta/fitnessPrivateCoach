@@ -1,3 +1,5 @@
+com\fitnessApp\core\exception\ClientNotFoundException.class
+com\fitnessApp\core\exception\ErrorResponse$ErrorResponseBuilder.class
 com\fitnessApp\core\security\CustomUserDetailsService.class
 com\fitnessApp\feature\review\ReviewService.class
 com\fitnessApp\feature\user\User.class
@@ -12,7 +14,9 @@ com\fitnessApp\feature\user\UserService$1.class
 com\fitnessApp\feature\user\UserDto.class
 com\fitnessApp\feature\user\UserRepository.class
 com\fitnessApp\feature\progress\ProgressLogRepository.class
+com\fitnessApp\feature\review\ImageOptimizationService.class
 com\fitnessApp\feature\workout\WorkoutService.class
+com\fitnessApp\core\exception\ErrorResponse.class
 com\fitnessApp\feature\user\Role.class
 com\fitnessApp\feature\chat\ChatController.class
 com\fitnessApp\PrivateFitnessApplication.class
@@ -22,6 +26,7 @@ com\fitnessApp\feature\review\Review.class
 com\fitnessApp\feature\workout\ExerciseController.class
 com\fitnessApp\feature\review\ReviewDto.class
 com\fitnessApp\feature\user\UserDto$UserDtoBuilder.class
+com\fitnessApp\core\exception\WorkoutNotFoundException.class
 com\fitnessApp\core\security\JwtTokenProvider.class
 com\fitnessApp\feature\auth\ChangePasswordRequest.class
 com\fitnessApp\feature\progress\ProgressLog.class
@@ -61,5 +66,6 @@ com\fitnessApp\feature\workout\WorkoutSession.class
 com\fitnessApp\feature\auth\AuthController.class
 com\fitnessApp\feature\user\UserService.class
 com\fitnessApp\feature\workout\Routine.class
+com\fitnessApp\core\exception\GlobalExceptionHandler.class
 com\fitnessApp\feature\review\ReviewImageRepository.class
 com\fitnessApp\feature\workout\WorkoutDto.class

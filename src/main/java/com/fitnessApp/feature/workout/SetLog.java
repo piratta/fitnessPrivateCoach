@@ -1,6 +1,8 @@
 package com.fitnessApp.feature.workout;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import java.util.UUID;
 
 @Entity
@@ -22,6 +24,15 @@ public class SetLog {
     private double weightLifted;
     private String repsDone; 
     private boolean isCompleted;
+
+    @Min(value = 0, message = "El RIR no puede ser negativo")
+    private Integer rir;
+
+    @Min(value = 1, message = "El RPE debe ser al menos 1")
+    @Max(value = 10, message = "El RPE no puede ser mayor a 10")
+    private Double rpe;
+
+    private String tempo;
 
     public SetLog() {}
 
@@ -45,4 +56,13 @@ public class SetLog {
 
     public boolean isCompleted() { return isCompleted; }
     public void setCompleted(boolean completed) { isCompleted = completed; }
+
+    public Integer getRir() { return rir; }
+    public void setRir(Integer rir) { this.rir = rir; }
+
+    public Double getRpe() { return rpe; }
+    public void setRpe(Double rpe) { this.rpe = rpe; }
+
+    public String getTempo() { return tempo; }
+    public void setTempo(String tempo) { this.tempo = tempo; }
 }

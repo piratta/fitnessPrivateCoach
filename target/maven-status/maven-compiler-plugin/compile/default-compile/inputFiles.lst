@@ -1,5 +1,9 @@
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\core\config\DataSeeder.java
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\core\config\WebSocketConfig.java
+C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\core\exception\ClientNotFoundException.java
+C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\core\exception\ErrorResponse.java
+C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\core\exception\GlobalExceptionHandler.java
+C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\core\exception\WorkoutNotFoundException.java
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\core\security\CustomUserDetailsService.java
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\core\security\JwtAuthenticationFilter.java
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\core\security\JwtProperties.java
@@ -18,6 +22,7 @@ C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\progress\ProgressLog.java
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\progress\ProgressLogController.java
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\progress\ProgressLogRepository.java
+C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\review\ImageOptimizationService.java
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\review\Review.java
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\review\ReviewController.java
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\review\ReviewDto.java
