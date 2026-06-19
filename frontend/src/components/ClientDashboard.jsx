@@ -37,6 +37,54 @@ function normalizeExerciseSets(ex) {
   }));
 }
 
+function initializeLogsForTab(rName, tName, clientData, currentLogs, currentComments, currentVideoLinks) {
+  const exercises = clientData?.routine?.[rName] || [];
+  const sorted = [...exercises].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
+  const fresh = {};
+  const sourceLogs = currentLogs[rName] || {};
+
+  sorted.forEach((ex, exIdx) => {
+    const sets = normalizeExerciseSets(ex);
+    if (sourceLogs[exIdx] && Array.isArray(sourceLogs[exIdx]) && sourceLogs[exIdx].length === sets.length) {
+      fresh[exIdx] = sourceLogs[exIdx].map((s, sIdx) => ({
+        weight: s.weight != null ? s.weight : '',
+        reps: s.reps || sets[sIdx].reps || '10',
+        completed: s.completed || false,
+        skipped: s.skipped || false,
+        exerciseName: ex.name,
+        intensity: s.intensity || sets[sIdx].intensity || '',
+        notes: s.notes || sets[sIdx].notes || ''
+      }));
+    } else {
+      fresh[exIdx] = sets.map(s => ({
+        weight: '',
+        reps: s.reps || '10',
+        completed: false,
+        skipped: false,
+        exerciseName: ex.name,
+        intensity: s.intensity || '',
+        notes: s.notes || ''
+      }));
+    }
+  });
+
+  // Map comments and video links from original template indices to target tab indices
+  const newComments = { ...currentComments };
+  const newVideoLinks = { ...currentVideoLinks };
+  sorted.forEach((ex, exIdx) => {
+    const sourceKey = `${rName}_${exIdx}`;
+    const targetKey = `${tName}_${exIdx}`;
+    if (currentComments[sourceKey] !== undefined) {
+      newComments[targetKey] = currentComments[sourceKey];
+    }
+    if (currentVideoLinks[sourceKey] !== undefined) {
+      newVideoLinks[targetKey] = currentVideoLinks[sourceKey];
+    }
+  });
+
+  return { logs: fresh, comments: newComments, videoLinks: newVideoLinks };
+}
+
 export default function ClientDashboard({ user, onLogout}) {
   const dialog = useDialog();
   // null = unknown (still loading from backend). The badge only shows when explicitly false.
@@ -416,18 +464,27 @@ export default function ClientDashboard({ user, onLogout}) {
         return d >= limitDate && d <= sunday;
       };
 
+      // Indexamos por el slot de ejecución guardado en logsJson. Si no existe (entrenos antiguos),
+      // usamos el día físico real. Si tampoco, usamos el dayName.
       const weekdayOf = (iso) => {
         if (!iso) return null;
         const d = new Date(iso);
         return ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][d.getDay()];
       };
-      // Index by the REAL execution weekday (sessionDate), not by the template column name,
-      // so a workout planned for "Lunes" but executed on Tuesday shows up under "Martes" with
-      // its summary + logs, and the original "Lunes" tab stays empty (no work done that day).
+      
       const byDay = {};
       for (const s of list) {
         if (!inWeek(s.sessionDate)) continue;
-        const key = weekdayOf(s.sessionDate);
+        
+        let slot = null;
+        if (s.logsJson) {
+           try {
+              const parsed = JSON.parse(s.logsJson);
+              slot = parsed._executionSlot;
+           } catch(e) {}
+        }
+        
+        const key = slot || weekdayOf(s.sessionDate) || s.dayName;
         if (!key) continue;
         const prev = byDay[key];
         if (!prev || new Date(s.sessionDate) > new Date(prev.sessionDate)) {
@@ -542,7 +599,8 @@ export default function ClientDashboard({ user, onLogout}) {
     const initialLogs = {};
     Object.keys(clientData.routine).filter(day => !day.endsWith('_notes')).forEach(day => {
       initialLogs[day] = {};
-      const exercises = clientData.routine[day] || [];
+      const sourceDay = loadedRoutineByTab[day] || day;
+      const exercises = clientData.routine[sourceDay] || [];
       const sorted = [...exercises].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
       sorted.forEach((ex, exIdx) => {
         const sets = normalizeExerciseSets(ex);
@@ -552,6 +610,8 @@ export default function ClientDashboard({ user, onLogout}) {
           completed: false,
           skipped: false,
           exerciseName: ex.name,
+          intensity: s.intensity || '',
+          notes: s.notes || '',
         }));
       });
     });
@@ -583,7 +643,7 @@ export default function ClientDashboard({ user, onLogout}) {
     } else {
       setLogs(initialLogs);
     }
-  }, [clientData?.routine]);
+  }, [clientData?.routine, loadedRoutineByTab]);
 
   // Autosave the in-progress workout whenever the relevant slices change. Only while the
   // workout is running — once it is finished or locked we let the backend be the source of
@@ -654,11 +714,20 @@ export default function ClientDashboard({ user, onLogout}) {
     // Restore the day to fresh empty logs.
     if (clientData?.routine && selectedDay) {
       const fresh = {};
-      const exercises = clientData.routine[selectedDay] || [];
+      const sourceDay = loadedRoutineByTab[selectedDay] || selectedDay;
+      const exercises = clientData.routine[sourceDay] || [];
       const sorted = [...exercises].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
       sorted.forEach((ex, exIdx) => {
         const sets = normalizeExerciseSets(ex);
-        fresh[exIdx] = sets.map(s => ({ weight: '', reps: s.reps || '10', completed: false, skipped: false, exerciseName: ex.name }));
+        fresh[exIdx] = sets.map(s => ({
+          weight: '',
+          reps: s.reps || '10',
+          completed: false,
+          skipped: false,
+          exerciseName: ex.name,
+          intensity: s.intensity || '',
+          notes: s.notes || ''
+        }));
       });
       setLogs(prev => ({ ...prev, [selectedDay]: fresh }));
     }
@@ -681,15 +750,28 @@ export default function ClientDashboard({ user, onLogout}) {
     ? Object.values(todaySessionsByDay).find(s => s && s.dayName === selectedDay)
     : null;
   const isDayConsumedElsewhere = !!consumedElsewhereSession && !overrideConsumed.has(selectedDay);
+  // A "loaded routine" wins over the regular fallback: the user explicitly picked a pending
+  // day's routine to execute from THIS tab, so render and finishWorkout must use it.
+  const loadedRoutineHere = selectedDay ? loadedRoutineByTab[selectedDay] : null;
+  const targetTabWhereLoaded = selectedDay
+    ? Object.keys(loadedRoutineByTab).find(k => k !== selectedDay && loadedRoutineByTab[k] === selectedDay)
+    : null;
+  const targetTabActiveOrLocked = targetTabWhereLoaded
+    ? (!!todaySessionsByDay[targetTabWhereLoaded]
+       || (isWorkoutStarted && selectedDay === targetTabWhereLoaded)
+       || (hasResumableWorkout && resumableDayName === targetTabWhereLoaded))
+    : false;
+  const isLoadedElsewhere = !!targetTabWhereLoaded && !loadedRoutineHere;
+  const realExecutionTab = consumedElsewhereSession
+    ? Object.keys(todaySessionsByDay).find(k => todaySessionsByDay[k] === consumedElsewhereSession)
+    : null;
   const realExecutionDay = consumedElsewhereSession
     ? (() => {
         const d = new Date(consumedElsewhereSession.sessionDate);
         return ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][d.getDay()];
       })()
     : null;
-  // A "loaded routine" wins over the regular fallback: the user explicitly picked a pending
-  // day's routine to execute from THIS tab, so render and finishWorkout must use it.
-  const loadedRoutineHere = selectedDay ? loadedRoutineByTab[selectedDay] : null;
+  const displayExecutionName = realExecutionTab || realExecutionDay;
   const routineDayForRender = loadedRoutineHere
     ? loadedRoutineHere
     : (clientData?.routine?.[selectedDay]?.length > 0)
@@ -697,41 +779,102 @@ export default function ClientDashboard({ user, onLogout}) {
       : (completedSessionToday?.dayName || selectedDay);
   const activeWorkout = viewingNextRoutine
     ? (clientData?.nextRoutine?.[selectedDay] ? [...clientData.nextRoutine[selectedDay]].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1)) : [])
-    : (isDayConsumedElsewhere && !loadedRoutineHere)
+    : ((isDayConsumedElsewhere || isLoadedElsewhere) && !loadedRoutineHere)
       ? []
       : (clientData?.routine && routineDayForRender && clientData.routine[routineDayForRender])
         ? [...clientData.routine[routineDayForRender]].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1))
         : [];
 
-  // Plans claimed somewhere in the UI: either already trained (saved session this week) OR
-  // loaded into another tab through pickPendingDay (e.g. Lunes tab has Jueves loaded, even
-  // if the user has not started it yet). Without this second source the same plan would
-  // appear as pending in every other day's swapped-day card and could be picked twice.
-  const claimedTemplateDays = new Set(trainedTemplateDays);
-  Object.values(loadedRoutineByTab).forEach(plan => { if (plan) claimedTemplateDays.add(plan); });
-  // Days that have a routine assigned but no completed session this week AND nobody else has
-  // already picked them into a tab.
-  const pendingDays = clientData?.routine
-    ? Object.keys(clientData.routine).filter(d =>
-        Array.isArray(clientData.routine[d])
-        && clientData.routine[d].length > 0
-        && !claimedTemplateDays.has(d))
+  // Days that have a routine assigned but no completed session this week.
+  const pendingOptions = clientData?.routine
+    ? Object.keys(clientData.routine)
+        .filter(d => Array.isArray(clientData.routine[d]) && clientData.routine[d].length > 0 && !trainedTemplateDays.has(d))
+        .map(d => {
+          const loadedAt = Object.keys(loadedRoutineByTab).find(k => loadedRoutineByTab[k] === d);
+          return {
+            originalDay: d,
+            currentTab: loadedAt || d,
+            isMoved: !!loadedAt
+          };
+        })
+        .filter(opt => opt.currentTab !== selectedDay)
     : [];
 
-  // Action wired to each "Hacer el entreno del X" button on the swapped-day card. Loads the
-  // picked day's routine into the current tab and unblocks the training UI.
+  // Action wired to each "Hacer el entreno del X" button on the swapped-day card.
   const pickPendingDay = (day) => {
     if (!clientData?.routine || !clientData.routine[day]) return;
-    const exercises = clientData.routine[day] || [];
-    const sorted = [...exercises].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
-    const fresh = {};
-    sorted.forEach((ex, exIdx) => {
-      const sets = normalizeExerciseSets(ex);
-      fresh[exIdx] = sets.map(s => ({ weight: '', reps: s.reps || '10', completed: false, skipped: false, exerciseName: ex.name }));
+
+    const targetTab = selectedDay;
+    const sourceTab = Object.keys(loadedRoutineByTab).find(k => loadedRoutineByTab[k] === day) || day;
+    const displacedRoutineRaw = loadedRoutineByTab[targetTab] || targetTab;
+    const displacedRoutine = displacedRoutineRaw === day ? sourceTab : displacedRoutineRaw;
+    const hasDisplacedRoutine = clientData.routine[displacedRoutine]
+      && clientData.routine[displacedRoutine].length > 0
+      && !trainedTemplateDays.has(displacedRoutine);
+
+    // 1. Prepare logs, comments, video links for targetTab (loading day's routine)
+    const targetData = initializeLogsForTab(day, targetTab, clientData, logs, comments, videoLinks);
+
+    let finalLogs = { ...logs, [targetTab]: targetData.logs };
+    let finalComments = targetData.comments;
+    let finalVideoLinks = targetData.videoLinks;
+
+    // 2. If there is a displaced routine, load it on sourceTab (swap!)
+    if (hasDisplacedRoutine) {
+      const sourceData = initializeLogsForTab(displacedRoutine, sourceTab, clientData, finalLogs, finalComments, finalVideoLinks);
+      finalLogs[sourceTab] = sourceData.logs;
+      finalComments = sourceData.comments;
+      finalVideoLinks = sourceData.videoLinks;
+    } else {
+      // Clear logs of sourceTab since it's now empty/rest day
+      finalLogs[sourceTab] = {};
+    }
+
+    setComments(finalComments);
+    setVideoLinks(finalVideoLinks);
+    setLogs(finalLogs);
+
+    setLoadedRoutineByTab(prev => {
+      const copy = { ...prev };
+      // Remove old references to day and displacedRoutine
+      Object.keys(copy).forEach(k => {
+        if (copy[k] === day || copy[k] === displacedRoutine) {
+          delete copy[k];
+        }
+      });
+      // Assign new mappings if they actually move
+      if (targetTab !== day) {
+        copy[targetTab] = day;
+      } else {
+        delete copy[targetTab];
+      }
+      if (hasDisplacedRoutine) {
+        if (sourceTab !== displacedRoutine) {
+          copy[sourceTab] = displacedRoutine;
+        } else {
+          delete copy[sourceTab];
+        }
+      }
+      return copy;
     });
-    setLogs(prev => ({ ...prev, [selectedDay]: fresh }));
-    setLoadedRoutineByTab(prev => ({ ...prev, [selectedDay]: day }));
-    setOverrideConsumed(prev => { const n = new Set(prev); n.add(selectedDay); return n; });
+
+    setOverrideConsumed(prev => {
+      const n = new Set(prev);
+      if (targetTab !== day) {
+        n.add(targetTab);
+      } else {
+        n.delete(targetTab);
+      }
+      if (hasDisplacedRoutine) {
+        if (sourceTab !== displacedRoutine) {
+          n.add(sourceTab);
+        } else {
+          n.delete(sourceTab);
+        }
+      }
+      return n;
+    });
+
     setWorkoutSeconds(0);
     setRestSeconds(0);
     setWorkoutSummary(null);
@@ -739,6 +882,134 @@ export default function ClientDashboard({ user, onLogout}) {
     setIsWorkoutLocked(false);
     setHasFinishedSession(false);
   };
+
+  const cancelLoadedRoutine = () => {
+    const loadedRoutine = loadedRoutineByTab[selectedDay];
+    if (!loadedRoutine) return;
+
+    setLoadedRoutineByTab(prev => {
+      const copy = { ...prev };
+      // Delete the mapping for the current tab
+      delete copy[selectedDay];
+      // Find if the current tab's original routine was mapped somewhere else, and delete that too
+      Object.keys(copy).forEach(k => {
+        if (copy[k] === selectedDay) {
+          delete copy[k];
+        }
+      });
+      return copy;
+    });
+
+    setOverrideConsumed(prev => {
+      const copy = new Set(prev);
+      copy.delete(selectedDay);
+      // Also delete the reciprocal tab if it was overridden
+      Object.keys(loadedRoutineByTab).forEach(k => {
+        if (loadedRoutineByTab[k] === selectedDay) {
+          copy.delete(k);
+        }
+      });
+      return copy;
+    });
+
+    // Reset logs back to original for this day and the reciprocal day
+    if (clientData?.routine) {
+      setLogs(prev => {
+        const copy = { ...prev };
+        
+        // Reset selectedDay
+        const freshSelected = {};
+        const exercisesSelected = clientData.routine[selectedDay] || [];
+        const sortedSelected = [...exercisesSelected].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
+        sortedSelected.forEach((ex, exIdx) => {
+          const sets = normalizeExerciseSets(ex);
+          freshSelected[exIdx] = sets.map(s => ({
+            weight: '',
+            reps: s.reps || '10',
+            completed: false,
+            skipped: false,
+            exerciseName: ex.name,
+            intensity: s.intensity || '',
+            notes: s.notes || ''
+          }));
+        });
+        copy[selectedDay] = freshSelected;
+
+        // Reset reciprocal day if it was loaded somewhere
+        const reciprocalTab = Object.keys(loadedRoutineByTab).find(k => loadedRoutineByTab[k] === selectedDay);
+        if (reciprocalTab) {
+          const freshReciprocal = {};
+          const exercisesReciprocal = clientData.routine[reciprocalTab] || [];
+          const sortedReciprocal = [...exercisesReciprocal].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
+          sortedReciprocal.forEach((ex, exIdx) => {
+            const sets = normalizeExerciseSets(ex);
+            freshReciprocal[exIdx] = sets.map(s => ({
+              weight: '',
+              reps: s.reps || '10',
+              completed: false,
+              skipped: false,
+              exerciseName: ex.name,
+              intensity: s.intensity || '',
+              notes: s.notes || ''
+            }));
+          });
+          copy[reciprocalTab] = freshReciprocal;
+        }
+
+        return copy;
+      });
+    }
+  };
+
+  const retrieveRoutine = () => {
+    const targetTab = targetTabWhereLoaded;
+    if (!targetTab) return;
+
+    setLoadedRoutineByTab(prev => {
+      const copy = { ...prev };
+      delete copy[targetTab];
+      delete copy[selectedDay];
+      return copy;
+    });
+
+    setOverrideConsumed(prev => {
+      const copy = new Set(prev);
+      copy.delete(targetTab);
+      copy.delete(selectedDay);
+      return copy;
+    });
+
+    // Reset logs for both
+    if (clientData?.routine) {
+      setLogs(prev => {
+        const copy = { ...prev };
+        
+        [selectedDay, targetTab].forEach(dayName => {
+          const fresh = {};
+          const exercises = clientData.routine[dayName] || [];
+          const sorted = [...exercises].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
+          sorted.forEach((ex, exIdx) => {
+            const sets = normalizeExerciseSets(ex);
+            fresh[exIdx] = sets.map(s => ({
+              weight: '',
+              reps: s.reps || '10',
+              completed: false,
+              skipped: false,
+              exerciseName: ex.name,
+              intensity: s.intensity || '',
+              notes: s.notes || ''
+            }));
+          });
+          copy[dayName] = fresh;
+        });
+
+        return copy;
+      });
+    }
+
+    dialog.toast(`Rutina de ${selectedDay} devuelta a su día original`, { variant: 'success' });
+  };
+
   const currentLogs = (logs && selectedDay) ? logs[selectedDay] : null;
   const isDaySkipped = skippedDays[selectedDay];
 
@@ -904,54 +1175,104 @@ export default function ClientDashboard({ user, onLogout}) {
 
   const moveRoutineToToday = async () => {
     if (!clientData?.routine || selectedDay === todayWeekday) return;
-    const sourceDay = selectedDay;
-    const newRoutine = { ...clientData.routine };
-    const sourceExercises = [...(newRoutine[sourceDay] || [])];
-    const targetExercises = [...(newRoutine[todayWeekday] || [])];
+    const sourceTab = selectedDay;
+    const targetTab = todayWeekday;
+    const incomingRoutine = loadedRoutineByTab[sourceTab] || sourceTab;
+    const displacedRoutineRaw = loadedRoutineByTab[targetTab] || targetTab;
+    const displacedRoutine = displacedRoutineRaw === incomingRoutine ? sourceTab : displacedRoutineRaw;
+    const hasDisplacedRoutine = clientData.routine[displacedRoutine]
+      && clientData.routine[displacedRoutine].length > 0
+      && !trainedTemplateDays.has(displacedRoutine);
 
-    let mode = 'replace';
-    if (targetExercises.length > 0) {
-      // The target day already has a routine — let the user decide what to do with it.
-      const swap = await dialog.confirm(
-        `Hoy (${todayWeekday}) ya tiene una rutina con ${targetExercises.length} ejercicio(s). ¿Cómo quieres combinarla con la de ${sourceDay}?`,
-        { title: 'Hacer hoy', confirmText: '🔁 Intercambiar', cancelText: '➕ Añadir al final' }
+    if (hasDisplacedRoutine) {
+      const ok = await dialog.confirm(
+        `Hoy (${todayWeekday}) ya tiene una rutina con ${clientData.routine[displacedRoutine].length} ejercicio(s). ¿Quieres intercambiar los entrenos para hacer el de "${incomingRoutine}" hoy y mover el de "${displacedRoutine}" a "${sourceTab}"?`,
+        { title: 'Intercambiar entrenos', confirmText: 'Sí, intercambiar', cancelText: 'Cancelar' }
       );
-      mode = swap ? 'swap' : 'append';
+      if (!ok) return;
     } else {
       const ok = await dialog.confirm(
-        `Vamos a mover los ejercicios de "${sourceDay}" al día de hoy (${todayWeekday}).`,
-        { title: 'Hacer hoy', confirmText: 'Mover a hoy' }
+        `Vamos a cargar los ejercicios de "${incomingRoutine}" para hacerlos hoy (${todayWeekday}).`,
+        { title: 'Hacer hoy', confirmText: 'Empezar entreno', cancelText: 'Cancelar' }
       );
       if (!ok) return;
     }
 
-    if (mode === 'swap') {
-      // Cross-swap: the source day takes today's routine so nothing is lost.
-      newRoutine[todayWeekday] = sourceExercises;
-      newRoutine[sourceDay] = targetExercises;
-    } else if (mode === 'append') {
-      newRoutine[todayWeekday] = [...targetExercises, ...sourceExercises];
-      newRoutine[sourceDay] = [];
+    // 1. Prepare logs, comments, video links for targetTab (loading incomingRoutine)
+    const targetData = initializeLogsForTab(incomingRoutine, targetTab, clientData, logs, comments, videoLinks);
+
+    let finalLogs = { ...logs, [targetTab]: targetData.logs };
+    let finalComments = targetData.comments;
+    let finalVideoLinks = targetData.videoLinks;
+
+    // 2. Load displacedRoutine on sourceTab (swap!)
+    if (hasDisplacedRoutine) {
+      const sourceData = initializeLogsForTab(displacedRoutine, sourceTab, clientData, finalLogs, finalComments, finalVideoLinks);
+      finalLogs[sourceTab] = sourceData.logs;
+      finalComments = sourceData.comments;
+      finalVideoLinks = sourceData.videoLinks;
     } else {
-      newRoutine[todayWeekday] = sourceExercises;
-      newRoutine[sourceDay] = [];
+      finalLogs[sourceTab] = {};
     }
 
-    setClientData({ ...clientData, routine: newRoutine });
-    setSelectedDay(todayWeekday);
+    setComments(finalComments);
+    setVideoLinks(finalVideoLinks);
+    setLogs(finalLogs);
 
-    // Persist so the rearrangement survives F5. The coach can overwrite later if they assign
-    // a new plan.
-    try {
-      await usersApi.updateMe({ routineJson: JSON.stringify(newRoutine) });
-      const msg = mode === 'swap'
-        ? `Intercambiados ${sourceDay} ↔ ${todayWeekday}`
-        : mode === 'append'
-          ? `Rutina añadida al final de ${todayWeekday}`
-          : `Rutina movida a ${todayWeekday}`;
-      dialog.toast(msg, { variant: 'success' });
-    } catch (e) {
-      await dialog.alert(`El cambio se aplicó localmente pero no se pudo guardar en el servidor: ${e.message || ''}`, { title: 'Aviso' });
+    setLoadedRoutineByTab(prev => {
+      const copy = { ...prev };
+      // Remove old references to incomingRoutine and displacedRoutine
+      Object.keys(copy).forEach(k => {
+        if (copy[k] === incomingRoutine || copy[k] === displacedRoutine) {
+          delete copy[k];
+        }
+      });
+      // Assign new mappings if they actually move
+      if (targetTab !== incomingRoutine) {
+        copy[targetTab] = incomingRoutine;
+      } else {
+        delete copy[targetTab];
+      }
+      if (hasDisplacedRoutine) {
+        if (sourceTab !== displacedRoutine) {
+          copy[sourceTab] = displacedRoutine;
+        } else {
+          delete copy[sourceTab];
+        }
+      }
+      return copy;
+    });
+
+    setOverrideConsumed(prev => {
+      const n = new Set(prev);
+      if (targetTab !== incomingRoutine) {
+        n.add(targetTab);
+      } else {
+        n.delete(targetTab);
+      }
+      if (hasDisplacedRoutine) {
+        if (sourceTab !== displacedRoutine) {
+          n.add(sourceTab);
+        } else {
+          n.delete(sourceTab);
+        }
+      }
+      return n;
+    });
+
+    setWorkoutSeconds(0);
+    setRestSeconds(0);
+    setWorkoutSummary(null);
+    setActiveSessionId(null);
+    setIsWorkoutLocked(false);
+    setHasFinishedSession(false);
+
+    setSelectedDay(targetTab);
+
+    if (hasDisplacedRoutine) {
+      dialog.toast(`Rutinas intercambiadas: "${incomingRoutine}" en ${targetTab} y "${displacedRoutine}" en ${sourceTab}`, { variant: 'success' });
+    } else {
+      dialog.toast(`Rutina de ${incomingRoutine} cargada para hoy (${targetTab})`, { variant: 'success' });
     }
   };
 
@@ -1001,10 +1322,20 @@ export default function ClientDashboard({ user, onLogout}) {
             const fresh = {};
             Object.keys(clientData.routine).filter(day => !day.endsWith('_notes')).forEach(day => {
               fresh[day] = {};
-              const sorted = [...(clientData.routine[day] || [])].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
+              const sourceDay = loadedRoutineByTab[day] || day;
+              const exercises = clientData.routine[sourceDay] || [];
+              const sorted = [...exercises].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
               sorted.forEach((ex, exIdx) => {
                 const sets = normalizeExerciseSets(ex);
-                fresh[day][exIdx] = sets.map(s => ({ weight: '', reps: s.reps || '10', completed: false, skipped: false, exerciseName: ex.name }));
+                fresh[day][exIdx] = sets.map(s => ({
+                  weight: '',
+                  reps: s.reps || '10',
+                  completed: false,
+                  skipped: false,
+                  exerciseName: ex.name,
+                  intensity: s.intensity || '',
+                  notes: s.notes || ''
+                }));
               });
             });
             setLogs(fresh);
@@ -1037,18 +1368,20 @@ export default function ClientDashboard({ user, onLogout}) {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          // If the user picked a pending day from the swapped-day card, the workout they just
-          // finished belongs to THAT plan (e.g. Jueves) even though they did it from the
-          // Lunes tab. Save it under the real plan's dayName so history + hydration credit
-          // it correctly.
+          // Guardamos la sesión bajo el nombre original de la rutina para que conste
+          // como completada y no se sugiera repetirla en la pestaña de origen.
           dayName: loadedRoutineHere || selectedDay,
           durationSeconds: workoutSeconds,
           totalVolume: totalVolume,
           completedSets: completedSets.length,
           completionPercentage: completionPercentage,
-          // Persist the inner per-exercise slot under the real plan key so the hydration
-          // effect (which looks up parsed[todays.dayName]) finds it on the next reload.
-          logsJson: JSON.stringify({ ...logs, [(loadedRoutineHere || selectedDay)]: logs[selectedDay] }),
+          // Guardamos también el slot de ejecución real en el JSON para que el UI pueda
+          // anclarlo firmemente a esa pestaña (e.g. Jueves) al cargar el historial.
+          logsJson: JSON.stringify({ 
+            ...logs, 
+            [(loadedRoutineHere || selectedDay)]: logs[selectedDay],
+            _executionSlot: selectedDay 
+          }),
           commentsJson: JSON.stringify(comments),
           videoLinksJson: JSON.stringify(videoLinks),
           stress: workoutEval.stress,
@@ -1071,14 +1404,15 @@ export default function ClientDashboard({ user, onLogout}) {
     setIsWorkoutStarted(false);
     setIsWorkoutLocked(true);
     setIsFinished(true);
+    setHasResumableWorkout(false);
+    setResumableDayName(null);
 
-    // Register this day as completed today so navigating away and back keeps the locked view
-    // without re-fetching the history, and so other days do not inherit it.
     const realDayName = loadedRoutineHere || selectedDay;
-    const todayWeekdayLocal = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][new Date().getDay()];
+    // Registramos este día como completado en la pestaña actual (selectedDay)
+    // para que la vista bloqueada se mantenga en el slot que el usuario eligió.
     setTodaySessionsByDay(prev => ({
       ...prev,
-      [todayWeekdayLocal]: {
+      [selectedDay]: {
         id: activeSessionId,
         dayName: realDayName,
         sessionDate: new Date().toISOString().split('T')[0],
@@ -1086,14 +1420,16 @@ export default function ClientDashboard({ user, onLogout}) {
         totalVolume,
         completedSets: completedSets.length,
         completionPercentage,
-        logsJson: JSON.stringify({ ...logs, [realDayName]: logs[selectedDay] }),
+        logsJson: JSON.stringify({ 
+           ...logs, 
+           [realDayName]: logs[selectedDay],
+           _executionSlot: selectedDay
+        }),
         commentsJson: JSON.stringify(comments),
         videoLinksJson: JSON.stringify(videoLinks),
       }
     }));
-    // Once the workout is recorded, the override is no longer needed; the day is now
-    // legitimately "consumed elsewhere" by the freshly saved session. Drop both flags so the
-    // pestaña shows the up-to-date placeholder on next render.
+    // Al registrar el entreno en este slot, eliminamos los overrides temporales.
     setLoadedRoutineByTab(prev => {
       if (!prev[selectedDay]) return prev;
       const copy = { ...prev };
@@ -1106,6 +1442,8 @@ export default function ClientDashboard({ user, onLogout}) {
       copy.delete(selectedDay);
       return copy;
     });
+    // Mantenemos al usuario en la misma pestaña donde acaba de terminar.
+    setSelectedDay(selectedDay);
   };
 
   const updateBackendSession = async (currentLogsToSave, currentCommentsToSave, currentLinksToSave) => {
@@ -1124,12 +1462,16 @@ export default function ClientDashboard({ user, onLogout}) {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          dayName: selectedDay,
+          dayName: loadedRoutineHere || selectedDay,
           durationSeconds: workoutSeconds,
           totalVolume: totalVolume,
           completedSets: completedSets.length,
           completionPercentage: completionPercentage,
-          logsJson: JSON.stringify(currentLogsToSave),
+          logsJson: JSON.stringify({
+            ...currentLogsToSave,
+            [(loadedRoutineHere || selectedDay)]: currentLogsToSave[selectedDay],
+            _executionSlot: selectedDay
+          }),
           commentsJson: JSON.stringify(currentCommentsToSave),
           videoLinksJson: JSON.stringify(currentLinksToSave)
         })
@@ -1697,31 +2039,55 @@ export default function ClientDashboard({ user, onLogout}) {
 
                 {/* Selector de Días */}
                 <div className="scrollable-tabs" style={{ marginBottom: '15px', borderBottom: '1px solid var(--border-light)' }}>
-                  {routineDays.map(day => (
-                    <button
-                      key={day}
-                      onClick={() => setSelectedDay(day)}
-                      style={{
-                        padding: '10px 20px', whiteSpace: 'nowrap', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem', transition: 'all 0.3s',
-                        background: selectedDay === day ? 'var(--accent-primary)' : 'transparent',
-                        color: selectedDay === day ? '#000' : 'var(--text-muted)',
-                        border: selectedDay === day ? '1px solid var(--accent-primary)' : '1px solid var(--border-light)'
-                      }}
-                    >
-                      {day.split(' - ')[0]}
-                    </button>
-                  ))}
-                </div>
+                    {routineDays.map(day => {
+                      const isCompleted = trainedTemplateDays.has(day);
+                      const daysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+                      const todayIdx = daysOfWeek.indexOf(todayWeekday);
+                      const dayIdx = daysOfWeek.indexOf(day);
+                      const isPast = dayIdx !== -1 && todayIdx !== -1 && dayIdx < todayIdx;
+                      
+                      let bgColor = 'transparent';
+                      let borderColor = 'var(--border-light)';
+                      let textColor = 'var(--text-muted)';
+                      
+                      if (selectedDay === day) {
+                        bgColor = 'var(--accent-primary)';
+                        borderColor = 'var(--accent-primary)';
+                        textColor = '#000';
+                      } else if (isCompleted) {
+                      } else if (isPast) {
+                        bgColor = 'rgba(255, 0, 0, 0.1)';
+                        borderColor = 'rgba(255, 0, 0, 0.5)';
+                        textColor = '#ff4444';
+                      }
+
+                      return (
+                        <button
+                          key={day}
+                          onClick={() => setSelectedDay(day)}
+                          style={{
+                            padding: '10px 20px', whiteSpace: 'nowrap', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem', transition: 'all 0.3s',
+                            background: bgColor,
+                            color: textColor,
+                            border: `1px solid ${borderColor}`
+                          }}
+                        >
+                          {day.split(' - ')[0]}
+                        </button>
+                      );
+                    })}
+                  </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '10px', flexWrap: 'wrap' }}>
                   <div>
                     <h3 style={{ fontSize: '1.6rem', fontWeight: '800' }}>{selectedDay}</h3>
-                    {isPastPendingDay && activeWorkout.length > 0 && !isDayConsumedElsewhere && (
+                    {isPastPendingDay && activeWorkout.length > 0 && !isDayConsumedElsewhere && !targetTabActiveOrLocked && (
                       <button onClick={moveRoutineToToday}
                         style={{ marginTop: '6px', background: 'rgba(255,170,0,0.1)', border: '1px solid #ffaa00', color: '#ffaa00', padding: '6px 12px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.75rem' }}>
                         ⏩ Hacer hoy ({todayWeekday})
                       </button>
                     )}
+
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     {!isDaySkipped && (
@@ -1741,7 +2107,7 @@ export default function ClientDashboard({ user, onLogout}) {
 
                 {/* Botón Saltar Día — solo si no se ha empezado, NO está bloqueado y NO se ha
                     consumido en otro día. */}
-                {!isWorkoutStarted && !isWorkoutLocked && !isDayConsumedElsewhere && (
+                {!isWorkoutStarted && !isWorkoutLocked && !isDayConsumedElsewhere && !isLoadedElsewhere && (
                   <button onClick={toggleSkipDay} style={{ width: '100%', padding: '15px', background: isDaySkipped ? 'rgba(255,255,255,0.05)' : 'rgba(255, 69, 0, 0.1)', border: isDaySkipped ? '1px solid var(--border-light)' : '1px solid #ff4500', color: isDaySkipped ? 'var(--text-main)' : '#ff4500', borderRadius: '8px', marginBottom: '25px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer' }}>
                     {isDaySkipped ? '↩️ Deshacer Descanso y Entrenar' : '🛋️ Marcar día como Descanso'}
                   </button>
@@ -1754,35 +2120,32 @@ export default function ClientDashboard({ user, onLogout}) {
                     <p style={{ color: 'var(--text-muted)' }}>El descanso es donde ocurre la magia. Aliméntate bien y prepárate para la próxima sesión. ¡Buen trabajo!</p>
                   </div>
                 ) : isDayConsumedElsewhere ? (
-                  // The plan for this weekday was already executed elsewhere this week. Offer
-                  // the user the list of pending routines (days with exercises assigned that
-                  // have NOT been trained yet this week) so they can grab one and do it here
-                  // instead of repeating the same workout.
+                  // The plan for this weekday was already executed elsewhere this week.
                   <div className="glass-panel fade-in" style={{ padding: '32px 20px', textAlign: 'center', borderTop: '4px solid var(--accent-primary)' }}>
                     <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🔁</div>
                     <h3 style={{ marginBottom: '8px', color: '#fff' }}>Días intercambiados</h3>
                     <p style={{ color: 'var(--text-muted)', maxWidth: '420px', margin: '0 auto 18px', lineHeight: 1.5 }}>
-                      Hiciste la rutina de {selectedDay} el {realExecutionDay}. El detalle del entreno está en esa pestaña.
+                      Hiciste la rutina de <strong>{selectedDay}</strong> el <strong>{displayExecutionName}</strong>. El detalle del entreno está en esa pestaña.
                     </p>
-                    {realExecutionDay && (
-                      <button onClick={() => setSelectedDay(realExecutionDay)} className="btn-primary" style={{ padding: '12px 22px', marginBottom: '20px' }}>
-                        Ver entreno del {realExecutionDay}
+                    {displayExecutionName && (
+                      <button onClick={() => setSelectedDay(displayExecutionName)} className="btn-primary" style={{ padding: '12px 22px', marginBottom: '20px' }}>
+                        Ver entreno del {displayExecutionName}
                       </button>
                     )}
 
                     <div style={{ marginTop: '10px', borderTop: '1px solid var(--border-light)', paddingTop: '20px', textAlign: 'left', maxWidth: '420px', marginLeft: 'auto', marginRight: 'auto' }}>
                       <h4 style={{ color: 'var(--accent-primary)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', textAlign: 'center' }}>Entrenos pendientes esta semana</h4>
-                      {pendingDays.length === 0 ? (
+                      {pendingOptions.length === 0 ? (
                         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', margin: 0 }}>
                           🎉 No te queda ningún entreno por hacer esta semana.
                         </p>
                       ) : (
                         <div style={{ display: 'grid', gap: '8px' }}>
-                          {pendingDays.map(d => (
-                            <button key={d} onClick={() => pickPendingDay(d)}
+                          {pendingOptions.map(opt => (
+                            <button key={opt.originalDay} onClick={() => pickPendingDay(opt.originalDay)}
                               style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'rgba(224,248,0,0.05)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', textAlign: 'left' }}>
-                              <span>📋 Entreno del {d}</span>
-                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{(clientData?.routine?.[d] || []).length} ejercicios →</span>
+                              <span>📋 Entreno del {opt.currentTab}</span>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{(clientData?.routine?.[opt.originalDay] || []).length} ejercicios →</span>
                             </button>
                           ))}
                           <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '8px', textAlign: 'center' }}>
@@ -1791,6 +2154,28 @@ export default function ClientDashboard({ user, onLogout}) {
                         </div>
                       )}
                     </div>
+                  </div>
+                ) : isLoadedElsewhere ? (
+                  // The routine for this day was moved to another tab, but hasn't been finished yet.
+                  <div className="glass-panel fade-in" style={{ padding: '32px 20px', textAlign: 'center', borderTop: '4px solid #ffaa00' }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🔀</div>
+                    <h3 style={{ marginBottom: '8px', color: '#fff' }}>Rutina movida</h3>
+                    <p style={{ color: 'var(--text-muted)', maxWidth: '420px', margin: '0 auto 18px', lineHeight: 1.5 }}>
+                      Has movido la rutina de <strong>{selectedDay}</strong> al <strong>{targetTabWhereLoaded}</strong>. Ve a esa pestaña para entrenar.
+                    </p>
+                    <button onClick={() => setSelectedDay(targetTabWhereLoaded)} className="btn-primary" style={{ padding: '12px 22px', marginBottom: '20px' }}>
+                      Ir al {targetTabWhereLoaded}
+                    </button>
+                    <br/>
+                    <button onClick={() => {
+                        setLoadedRoutineByTab(prev => {
+                          const copy = {...prev};
+                          delete copy[targetTabWhereLoaded];
+                          return copy;
+                        });
+                    }} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-muted)', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem' }}>
+                      Deshacer cambio
+                    </button>
                   </div>
                 ) : (!isWorkoutStarted && !isWorkoutLocked && activeWorkout.length === 0) ? (
                   // The day has no exercises in the routine AND it has not been trained — show
@@ -1804,17 +2189,17 @@ export default function ClientDashboard({ user, onLogout}) {
                     </p>
                     <div style={{ marginTop: '10px', borderTop: '1px solid var(--border-light)', paddingTop: '20px', textAlign: 'left', maxWidth: '420px', marginLeft: 'auto', marginRight: 'auto' }}>
                       <h4 style={{ color: 'var(--accent-primary)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', textAlign: 'center' }}>Entrenos pendientes esta semana</h4>
-                      {pendingDays.length === 0 ? (
+                      {pendingOptions.length === 0 ? (
                         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', margin: 0 }}>
                           🎉 No te queda ningún entreno por hacer esta semana.
                         </p>
                       ) : (
                         <div style={{ display: 'grid', gap: '8px' }}>
-                          {pendingDays.map(d => (
-                            <button key={d} onClick={() => pickPendingDay(d)}
+                          {pendingOptions.map(opt => (
+                            <button key={opt.originalDay} onClick={() => pickPendingDay(opt.originalDay)}
                               style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'rgba(224,248,0,0.05)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', textAlign: 'left' }}>
-                              <span>📋 Entreno del {d}</span>
-                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{(clientData?.routine?.[d] || []).length} ejercicios →</span>
+                              <span>📋 Entreno del {opt.currentTab}</span>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{(clientData?.routine?.[opt.originalDay] || []).length} ejercicios →</span>
                             </button>
                           ))}
                         </div>
@@ -2123,7 +2508,7 @@ export default function ClientDashboard({ user, onLogout}) {
                 <div className="glass-panel" style={{ padding: '25px', marginBottom: '25px' }}>
                   <h4 style={{ color: 'var(--accent-primary)', marginBottom: '15px' }}>⚖️ Registro Diario</h4>
                   <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <input type="number" step="0.1" value={dailyWeight} onChange={(e) => setDailyWeight(e.target.value)} style={{ width: '100px', padding: '15px', fontSize: '1.5rem', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '8px', color: '#fff', textAlign: 'center' }} />
+                    <input type="number" step="0.1" min="0" value={dailyWeight} onChange={(e) => setDailyWeight(e.target.value)} style={{ width: '100px', padding: '15px', fontSize: '1.5rem', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '8px', color: '#fff', textAlign: 'center' }} />
                     <span style={{ fontSize: '1.2rem', color: 'var(--text-muted)' }}>kg</span>
                     <button
                       onClick={async () => {
@@ -2249,7 +2634,9 @@ export default function ClientDashboard({ user, onLogout}) {
                           { label: 'Espalda', key: 'espalda', data: espaldaHistory, unit: 'cm', lowerIsBetter: false },
                           { label: 'Pierna', key: 'pierna', data: piernaHistory, unit: 'cm', lowerIsBetter: false },
                           { label: 'Gemelo', key: 'gemelo', data: gemeloHistory, unit: 'cm', lowerIsBetter: false },
-                        ].map((row, idx) => (
+                        ]
+                        .filter(row => selectedMonths.some(m => row.data[m] > 0))
+                        .map((row, idx) => (
                           <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                             <td style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold' }}>{row.label}</td>
                             {selectedMonths.map((m, i) => {
@@ -2259,7 +2646,7 @@ export default function ClientDashboard({ user, onLogout}) {
                               let diffColor = 'var(--text-muted)';
                               let diffText = '-';
 
-                              if (currentVal !== undefined && nextVal !== undefined) {
+                              if (currentVal !== undefined && nextVal !== undefined && currentVal > 0 && nextVal > 0) {
                                 const diff = parseFloat((nextVal - currentVal).toFixed(2));
                                 if (diff > 0) {
                                   diffColor = row.lowerIsBetter ? '#ff4500' : '#00e676';
@@ -2361,48 +2748,69 @@ export default function ClientDashboard({ user, onLogout}) {
                   <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>No hay entrenamientos registrados todavía.</div>
                 ) : (
                   <div style={{ display: 'grid', gap: '15px' }}>
-                    {historyData.map((session) => (
-                      <div key={session.id} onClick={() => {
-                        setActiveSessionId(session.id);
-                        if (session.logsJson) {
-                           try {
-                             const parsed = JSON.parse(session.logsJson);
-                             // Legacy sessions persisted only the inner per-exercise map for the
-                             // session day. Wrap it back into the {day: {exIdx: [...]}} shape so
-                             // currentLogs = logs[selectedDay] resolves correctly.
-                             const isFlat = parsed && typeof parsed === 'object' && Object.keys(parsed).every(k => /^\d+$/.test(k));
-                             setLogs(isFlat ? { [session.dayName]: parsed } : parsed);
-                           } catch(e){}
+                    {historyData.map((session) => {
+                      let executedTab = session.dayName;
+                      if (session.sessionDate) {
+                        const parts = session.sessionDate.split('-');
+                        if (parts.length === 3) {
+                          const d = new Date(parts[0], parts[1] - 1, parts[2]);
+                          const days = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+                          executedTab = days[d.getDay()];
                         }
-                        if (session.commentsJson) {
-                           try { setComments(JSON.parse(session.commentsJson)); } catch(e){}
-                        }
-                        if (session.videoLinksJson) {
-                           try { setVideoLinks(JSON.parse(session.videoLinksJson)); } catch(e){}
-                        }
-                        setSelectedDay(session.dayName);
-                        setWorkoutSeconds(session.durationSeconds || 0);
-                        setWorkoutSummary({
-                          time: formatTime(session.durationSeconds || 0),
-                          volume: session.totalVolume,
-                          sets: session.completedSets,
-                          percentage: session.completionPercentage
-                        });
-                        setIsWorkoutStarted(false);
-                        setIsWorkoutLocked(true);
-                        setHasFinishedSession(true);
-                        setActiveTab('workout');
-                      }} className="glass-panel" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
-                        <div>
-                          <h4 style={{ color: '#fff', marginBottom: '5px' }}>{session.dayName}</h4>
-                          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{session.sessionDate} • Completado {session.completionPercentage}%</p>
+                      } else if (session.logsJson) {
+                         try {
+                           const parsed = JSON.parse(session.logsJson);
+                           if (parsed._executionSlot) {
+                             executedTab = parsed._executionSlot;
+                           }
+                         } catch(e){}
+                      }
+                      
+                      return (
+                        <div key={session.id} onClick={() => {
+                          setActiveSessionId(session.id);
+                          if (session.logsJson) {
+                             try {
+                               const parsed = JSON.parse(session.logsJson);
+                               // Legacy sessions persisted only the inner per-exercise map for the
+                               // session day. Wrap it back into the {day: {exIdx: [...]}} shape so
+                               // currentLogs = logs[selectedDay] resolves correctly.
+                               const isFlat = parsed && typeof parsed === 'object' && Object.keys(parsed).every(k => /^\d+$/.test(k));
+                               setLogs(isFlat ? { [session.dayName]: parsed } : parsed);
+                             } catch(e){}
+                          }
+                          if (session.commentsJson) {
+                             try { setComments(JSON.parse(session.commentsJson)); } catch(e){}
+                          }
+                          if (session.videoLinksJson) {
+                             try { setVideoLinks(JSON.parse(session.videoLinksJson)); } catch(e){}
+                          }
+                          setSelectedDay(executedTab);
+                          setWorkoutSeconds(session.durationSeconds || 0);
+                          setWorkoutSummary({
+                            time: formatTime(session.durationSeconds || 0),
+                            volume: session.totalVolume,
+                            sets: session.completedSets,
+                            percentage: session.completionPercentage
+                          });
+                          setIsWorkoutStarted(false);
+                          setIsWorkoutLocked(true);
+                          setHasFinishedSession(true);
+                          setActiveTab('workout');
+                        }} className="glass-panel" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+                          <div>
+                            <h4 style={{ color: '#fff', marginBottom: '5px' }}>
+                              {executedTab} {executedTab !== session.dayName && <span style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>(Rutina de {session.dayName})</span>}
+                            </h4>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{session.sessionDate} • Completado {session.completionPercentage}%</p>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <span style={{ display: 'block', fontSize: '1rem', fontWeight: 'bold', color: 'var(--accent-primary)' }}>{session.totalVolume} kg</span>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Volumen</span>
+                          </div>
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <span style={{ display: 'block', fontSize: '1rem', fontWeight: 'bold', color: 'var(--accent-primary)' }}>{session.totalVolume} kg</span>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Volumen</span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -2722,43 +3130,43 @@ export default function ClientDashboard({ user, onLogout}) {
               <div className="responsive-grid-2" style={{ gap: '15px' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Peso (kg)</label>
-                  <input type="number" step="0.1" placeholder="Ej. 78.5" value={logForm.weight} onChange={e => setLogForm({...logForm, weight: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
+                  <input type="number" step="0.1" min="0" placeholder="Ej. 78.5" value={logForm.weight} onChange={e => setLogForm({...logForm, weight: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Cintura (cm)</label>
-                  <input type="number" step="0.1" placeholder="Ej. 84.0" value={logForm.waist} onChange={e => setLogForm({...logForm, waist: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
+                  <input type="number" step="0.1" min="0" placeholder="Ej. 84.0" value={logForm.waist} onChange={e => setLogForm({...logForm, waist: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Cadera (cm)</label>
-                  <input type="number" step="0.1" placeholder="Ej. 98.0" value={logForm.hip} onChange={e => setLogForm({...logForm, hip: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
+                  <input type="number" step="0.1" min="0" placeholder="Ej. 98.0" value={logForm.hip} onChange={e => setLogForm({...logForm, hip: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Cuello (cm)</label>
-                  <input type="number" step="0.1" placeholder="Ej. 38.0" value={logForm.neck} onChange={e => setLogForm({...logForm, neck: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
+                  <input type="number" step="0.1" min="0" placeholder="Ej. 38.0" value={logForm.neck} onChange={e => setLogForm({...logForm, neck: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Bíceps (cm)</label>
-                  <input type="number" step="0.1" placeholder="Ej. 36.5" value={logForm.biceps} onChange={e => setLogForm({...logForm, biceps: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
+                  <input type="number" step="0.1" min="0" placeholder="Ej. 36.5" value={logForm.biceps} onChange={e => setLogForm({...logForm, biceps: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Pierna (cm)</label>
-                  <input type="number" step="0.1" placeholder="Ej. 58.0" value={logForm.leg} onChange={e => setLogForm({...logForm, leg: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
+                  <input type="number" step="0.1" min="0" placeholder="Ej. 58.0" value={logForm.leg} onChange={e => setLogForm({...logForm, leg: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Pecho (cm)</label>
-                  <input type="number" step="0.1" placeholder="Ej. 102.0" value={logForm.chest} onChange={e => setLogForm({...logForm, chest: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
+                  <input type="number" step="0.1" min="0" placeholder="Ej. 102.0" value={logForm.chest} onChange={e => setLogForm({...logForm, chest: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Espalda (cm)</label>
-                  <input type="number" step="0.1" placeholder="Ej. 108.0" value={logForm.back} onChange={e => setLogForm({...logForm, back: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
+                  <input type="number" step="0.1" min="0" placeholder="Ej. 108.0" value={logForm.back} onChange={e => setLogForm({...logForm, back: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Antebrazo (cm)</label>
-                  <input type="number" step="0.1" placeholder="Ej. 30.0" value={logForm.forearm} onChange={e => setLogForm({...logForm, forearm: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
+                  <input type="number" step="0.1" min="0" placeholder="Ej. 30.0" value={logForm.forearm} onChange={e => setLogForm({...logForm, forearm: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Gemelo (cm)</label>
-                  <input type="number" step="0.1" placeholder="Ej. 40.0" value={logForm.calf} onChange={e => setLogForm({...logForm, calf: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
+                  <input type="number" step="0.1" min="0" placeholder="Ej. 40.0" value={logForm.calf} onChange={e => setLogForm({...logForm, calf: e.target.value})} className="input-field" style={{ margin: 0, width: '100%' }} />
                 </div>
               </div>
             </div>

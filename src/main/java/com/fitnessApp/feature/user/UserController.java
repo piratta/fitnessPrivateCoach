@@ -80,6 +80,13 @@ public class UserController {
         return ResponseEntity.ok(new UserDto(updatedClient));
     }
 
+    @DeleteMapping("/clients/{clientId}")
+    public ResponseEntity<?> deleteClient(@PathVariable UUID clientId) {
+        String principal = SecurityContextHolder.getContext().getAuthentication().getName();
+        userService.deleteClient(principal, clientId);
+        return ResponseEntity.ok(Map.of("message", "Client deleted successfully"));
+    }
+
     @PostMapping("/clients/{clientId}/reset-password")
     public ResponseEntity<?> resetClientPassword(@PathVariable UUID clientId) {
         String principal = SecurityContextHolder.getContext().getAuthentication().getName();

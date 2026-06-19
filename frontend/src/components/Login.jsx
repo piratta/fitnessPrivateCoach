@@ -3,8 +3,8 @@ import { API_BASE_URL } from '../config';
 import '../index.css';
 
 export default function Login({ onLogin }) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('antonio');
+  const [password, setPassword] = useState('1234');
   const [error, setError] = useState('');
 
   // States for password change on first use

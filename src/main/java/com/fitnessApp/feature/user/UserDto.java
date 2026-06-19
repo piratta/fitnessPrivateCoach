@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -22,6 +23,7 @@ public class UserDto {
     private String role;
     private String status;
     private String goal;
+    private List<String> strategies;
     private String progressionStrategy;
     private String username;
     private boolean mustChangePassword;
@@ -34,6 +36,8 @@ public class UserDto {
     private LocalDateTime lastReviewDate;
     private LocalDateTime nextReviewAt;
     private LocalDateTime createdAt;
+    private Double currentWeight;
+    private Integer compliance;
 
     public UserDto(User user) {
         this.id = user.getId();
@@ -46,6 +50,7 @@ public class UserDto {
         this.role = user.getRole().name();
         this.status = user.getStatus();
         this.goal = user.getGoal();
+        this.strategies = user.getStrategies();
         this.progressionStrategy = user.getProgressionStrategy();
         this.username = user.getUsername();
         this.mustChangePassword = user.isMustChangePassword();
@@ -57,5 +62,7 @@ public class UserDto {
         this.lastReviewDate = user.getLastReviewDate();
         this.nextReviewAt = user.getNextReviewAt();
         this.createdAt = user.getCreatedAt();
+        this.currentWeight = 0.0;
+        this.compliance = 0;
     }
 }

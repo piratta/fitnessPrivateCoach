@@ -19,6 +19,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fitnessApp.feature.workout.WorkoutSession;
+import com.fitnessApp.feature.workout.WorkoutSessionRepository;
 
 @Service
 public class UserService {
@@ -28,6 +34,9 @@ public class UserService {
 
     @Autowired
     private ProgressLogRepository progressLogRepository;
+
+    @Autowired
+    private WorkoutSessionRepository workoutSessionRepository;
 
     @Autowired
     private ReviewService reviewService;
@@ -45,10 +54,48 @@ public class UserService {
 
     public List<UserDto> getMyClients(String coachEmail) {
         User coach = userRepository.findByEmail(coachEmail).orElseThrow();
-        return userRepository.findAll().stream()
+        List<User> clients = userRepository.findAll().stream()
                 .filter(u -> u.getCoach() != null && u.getCoach().getId().equals(coach.getId()))
-                .map(UserDto::new)
                 .collect(Collectors.toList());
+
+        ObjectMapper mapper = new ObjectMapper();
+        List<UserDto> dtos = new ArrayList<>();
+
+        for (User u : clients) {
+            UserDto dto = new UserDto(u);
+
+            // 1. Get latest weight
+            progressLogRepository.findTopByClientOrderByLogDateDesc(u)
+                    .ifPresent(log -> dto.setCurrentWeight(log.getWeight() != null ? log.getWeight() : 0.0));
+
+            // 2. Calculate compliance
+            int compliance = 0;
+            if (u.getRoutineJson() != null && !u.getRoutineJson().isEmpty()) {
+                try {
+                    Map<String, Object> routine = mapper.readValue(u.getRoutineJson(), new TypeReference<Map<String, Object>>() {});
+                    int weeklySessions = routine.size();
+                    if (weeklySessions > 0) {
+                        int totalExpected = weeklySessions * 4; // last 28 days
+
+                        LocalDate thirtyDaysAgo = LocalDate.now().minusDays(28);
+                        List<WorkoutSession> recentSessions = workoutSessionRepository.findByClientIdOrderBySessionDateDesc(u.getId())
+                                .stream()
+                                .filter(s -> s.getSessionDate() != null && !s.getSessionDate().isBefore(thirtyDaysAgo))
+                                .collect(Collectors.toList());
+
+                        int completed = recentSessions.size();
+                        compliance = (int) Math.round((completed * 100.0) / totalExpected);
+                        compliance = Math.min(compliance, 100);
+                    }
+                } catch (Exception e) {
+                    // ignore mapping error
+                }
+            }
+            dto.setCompliance(compliance);
+
+            dtos.add(dto);
+        }
+        return dtos;
     }
 
     @Transactional
@@ -105,6 +152,7 @@ public class UserService {
         if (clientDto.getReviewFrequency() != null) client.setReviewFrequency(clientDto.getReviewFrequency());
         if (clientDto.getProgressionStrategy() != null) client.setProgressionStrategy(clientDto.getProgressionStrategy());
         if (clientDto.getGoal() != null) client.setGoal(clientDto.getGoal());
+        if (clientDto.getStrategies() != null) client.setStrategies(clientDto.getStrategies());
         if (clientDto.getStatus() != null) client.setStatus(clientDto.getStatus());
         if (clientDto.getRoutineJson() != null) {
             client.setRoutineJson(clientDto.getRoutineJson());
@@ -115,6 +163,22 @@ public class UserService {
         }
 
         return userRepository.save(client);
+    }
+
+    @Transactional
+    public void deleteClient(String coachEmail, UUID clientId) {
+        User coach = userRepository.findByEmail(coachEmail).orElseThrow();
+        User client = userRepository.findById(clientId)
+                .orElseThrow(() -> new RuntimeException("Client not found"));
+
+        if (client.getCoach() == null || !client.getCoach().getId().equals(coach.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes permisos.");
+        }
+
+        progressLogRepository.deleteAll(progressLogRepository.findByClientOrderByLogDateAsc(client));
+        workoutSessionRepository.deleteAll(workoutSessionRepository.findByClientIdOrderBySessionDateDesc(client.getId()));
+        
+        userRepository.delete(client);
     }
 
     public String resetClientPassword(String coachEmail, UUID clientId, User[] clientRef) {
@@ -166,7 +230,14 @@ public class UserService {
         if (body != null) {
             if (body.get("weight") != null) log.setWeight(readDouble(body.get("weight")));
             if (body.get("waist") != null) log.setWaist(readDouble(body.get("waist")));
-            // Add other measurements if needed
+            if (body.get("hip") != null) log.setHip(readDouble(body.get("hip")));
+            if (body.get("neck") != null) log.setNeck(readDouble(body.get("neck")));
+            if (body.get("biceps") != null) log.setBiceps(readDouble(body.get("biceps")));
+            if (body.get("leg") != null) log.setLeg(readDouble(body.get("leg")));
+            if (body.get("chest") != null) log.setChest(readDouble(body.get("chest")));
+            if (body.get("calf") != null) log.setCalf(readDouble(body.get("calf")));
+            if (body.get("forearm") != null) log.setForearm(readDouble(body.get("forearm")));
+            if (body.get("back") != null) log.setBack(readDouble(body.get("back")));
         }
         progressLogRepository.save(log);
 

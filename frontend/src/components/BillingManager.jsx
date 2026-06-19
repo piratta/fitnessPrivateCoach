@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getClientBillingStatus } from '../utils/statusUtils';
 import { useDialog } from './ui/Dialog';
+import { API_BASE_URL } from '../config';
 import '../index.css';
 
 export default function BillingManager({ clients, setClients, billingPlans, setBillingPlans }) {
   const dialog = useDialog();
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('Todos');
+  const [statusFilter, setStatusFilter] = useState('Todos (Activos)');
   const [showPlansModal, setShowPlansModal] = useState(false);
   const [newPlan, setNewPlan] = useState({ name: '', months: 1 });
 
@@ -19,7 +20,9 @@ export default function BillingManager({ clients, setClients, billingPlans, setB
     let matchesStatus = true;
     const billStatus = getClientBillingStatus(c).text;
     
-    if (statusFilter === 'Al Día') {
+    if (statusFilter === 'Todos (Activos)') {
+      matchesStatus = c.status === 'Activo';
+    } else if (statusFilter === 'Al Día') {
       matchesStatus = c.status === 'Activo' && (['Al Día', 'Gratuito', 'Vence Hoy'].includes(billStatus) || billStatus.includes('restante'));
     } else if (statusFilter === 'Desactivado') {
       matchesStatus = c.status === 'Inactivo' || billStatus === 'Desactivado';
@@ -114,9 +117,9 @@ export default function BillingManager({ clients, setClients, billingPlans, setB
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="input-field"
-            style={{ marginBottom: '0', width: '150px' }}
+            style={{ marginBottom: '0', width: '160px' }}
           >
-            <option value="Todos">Todos</option>
+            <option value="Todos (Activos)">Todos (Activos)</option>
             <option value="Al Día">Al Día</option>
             <option value="Desactivado">Desactivado</option>
             <option value="En Gracia">En Gracia</option>
@@ -225,8 +228,21 @@ export default function BillingManager({ clients, setClients, billingPlans, setB
                         <button onClick={async () => {
                           const ok = await dialog.confirm(`⚠️ ¿Estás seguro de eliminar PERMANENTEMENTE a ${fullName}?\n\nSu suscripción ha caducado. Esta acción no se puede deshacer y se borrarán todos sus datos.`, { title: 'Eliminar cliente' });
                           if (ok) {
-                            setClients(prev => prev.filter(c => c.id !== client.id));
-                            showToast(`🗑️ Cliente ${fullName} eliminado permanentemente`);
+                            const token = localStorage.getItem('token');
+                            try {
+                              const response = await fetch(`${API_BASE_URL}/api/users/clients/${client.id}`, {
+                                method: 'DELETE',
+                                headers: { 'Authorization': `Bearer ${token}` }
+                              });
+                              if (response.ok) {
+                                setClients(prev => prev.filter(c => c.id !== client.id));
+                                showToast(`🗑️ Cliente ${fullName} eliminado permanentemente`);
+                              } else {
+                                await dialog.alert("Error al eliminar el cliente del servidor.", { title: "Error" });
+                              }
+                            } catch (err) {
+                              await dialog.alert("Error de red al eliminar el cliente.", { title: "Error" });
+                            }
                           }
                         }} style={{ background: 'rgba(255,0,0,0.1)', border: '1px solid #ff0000', color: '#ff0000', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}>❌ Borrar</button>
                       ) : (

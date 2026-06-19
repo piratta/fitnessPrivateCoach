@@ -1,0 +1,44 @@
+# Bloque 1: Configuración Global (se aplica siempre)
+spring:
+  servlet:
+    multipart:
+      max-file-size: 8MB
+      max-request-size: 10MB
+  datasource:
+    url: jdbc:h2:file:./fitnessdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: password
+    driverClassName: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+jwt:
+  secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+  expiration: 86400000
+
+# Bloque 2: Configuración Específica para Producción
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://ep-muddy-poetry-ab2hlmw1-pooler.eu-west-2.aws.neon.tech/neondb?sslmod=require&prepareThreshold=0}
+    username: ${DATABASE_USERNAME:neondb_owner}
+    password: ${DATABASE_PASSWORD:npg_qhsvFmEC69eQ}
+    driverClassName: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    open-in-view: false

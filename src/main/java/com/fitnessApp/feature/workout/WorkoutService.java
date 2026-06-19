@@ -111,16 +111,24 @@ public class WorkoutService {
                 .trim();
     }
 
+    @SuppressWarnings("unchecked")
     public String enrichRoutineWithSuggestedWeights(User client, String routineJson) {
         if (routineJson == null || routineJson.isBlank()) return routineJson;
         try {
             ObjectMapper mapper = new ObjectMapper();
-            Map<String, List<Map<String, Object>>> routine = mapper.readValue(routineJson, new TypeReference<Map<String, List<Map<String, Object>>>>() {});
+            Map<String, Object> rawRoutine = mapper.readValue(routineJson, new TypeReference<Map<String, Object>>() {});
             List<WorkoutSession> history = workoutRepository.findByClientIdOrderBySessionDateDesc(client.getId());
 
-            for (Map.Entry<String, List<Map<String, Object>>> entry : routine.entrySet()) {
+            for (Map.Entry<String, Object> entry : rawRoutine.entrySet()) {
                 String dayName = entry.getKey();
-                List<Map<String, Object>> exercises = entry.getValue();
+                if (dayName.endsWith("_notes")) {
+                    continue;
+                }
+                Object val = entry.getValue();
+                if (!(val instanceof List)) {
+                    continue;
+                }
+                List<Map<String, Object>> exercises = (List<Map<String, Object>>) val;
 
                 for (int i = 0; i < exercises.size(); i++) {
                     Map<String, Object> exercise = exercises.get(i);
@@ -199,7 +207,7 @@ public class WorkoutService {
                     }
                 }
             }
-            return mapper.writeValueAsString(routine);
+            return mapper.writeValueAsString(rawRoutine);
         } catch (Exception e) {
             e.printStackTrace();
             return routineJson; // Return original on error

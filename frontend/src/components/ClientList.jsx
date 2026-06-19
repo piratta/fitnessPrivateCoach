@@ -13,6 +13,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
   const [editingClient, setEditingClient] = useState(null); // { name, email }
   const [isAddingClient, setIsAddingClient] = useState(false);
   const [newClient, setNewClient] = useState({ name: '', lastName: '', email: '', goal: 'Hipertrofia', reviewFrequency: 'Semanal', billingPlanId: 'bp1' });
+  const [newStrategyInput, setNewStrategyInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
@@ -684,11 +685,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
             )}
 
             {/* Tarjetas de Estadísticas */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '40px' }}>
-              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '20px', borderRadius: '12px', textAlign: 'center' }}>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Objetivo</p>
-                <h4 style={{ fontSize: '1.2rem', marginTop: '8px', fontWeight: '600' }}>{selectedClient.goal}</h4>
-              </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px', marginBottom: '30px' }}>
               <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '20px', borderRadius: '12px', textAlign: 'center' }}>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Peso Actual</p>
                 <h4 style={{ fontSize: '1.2rem', marginTop: '8px', fontWeight: '600' }}>
@@ -703,6 +700,104 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
               <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '20px', borderRadius: '12px', textAlign: 'center' }}>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Próx. Revisión</p>
                 <h4 style={{ fontSize: '1.1rem', marginTop: '8px', fontWeight: '600' }}>{selectedClient.nextReview}</h4>
+              </div>
+            </div>
+
+            {/* Objetivo Principal */}
+            <h4 style={{ marginBottom: '10px', color: 'var(--text-muted)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Objetivo Principal</h4>
+            <div style={{ marginBottom: '15px' }}>
+              <select 
+                className="input-field" 
+                value={selectedClient.goal || "Hipertrofia"}
+                onChange={async (e) => {
+                  const newGoal = e.target.value;
+                  const token = localStorage.getItem('token');
+                  try {
+                    const response = await fetch(`${API_BASE_URL}/api/users/clients/${selectedClient.id}`, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                      body: JSON.stringify({ goal: newGoal })
+                    });
+                    if (response.ok) {
+                      setSelectedClient(prev => ({ ...prev, goal: newGoal }));
+                      setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, goal: newGoal } : c));
+                    } else {
+                      await dialog.alert("Error al guardar el objetivo en el servidor.", { title: "Error" });
+                    }
+                  } catch (err) {
+                    await dialog.alert("Error de red al guardar el objetivo.", { title: "Error" });
+                  }
+                }}
+                style={{ width: '100%', marginBottom: 0 }}
+              >
+                <option value="Hipertrofia">Hipertrofia</option>
+                <option value="Fuerza Máxima">Fuerza Máxima</option>
+                <option value="Resistencia Aeróbica">Resistencia Aeróbica</option>
+                <option value="Fuerza-Resistencia y Control Corporal">Fuerza-Resistencia y Control Corporal</option>
+                <option value="Recomposición Corporal">Recomposición Corporal</option>
+                <option value="Potencia">Potencia</option>
+                <option value="HIIT">HIIT</option>
+                <option value="Movilidad y Flexibilidad">Movilidad y Flexibilidad</option>
+              </select>
+            </div>
+
+            {/* Estrategias */}
+            <h4 style={{ marginBottom: '10px', color: 'var(--text-muted)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Estrategias</h4>
+            <div style={{ marginBottom: '25px', background: 'rgba(255,255,255,0.03)', padding: '15px', borderRadius: '12px' }}>
+              <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 15px 0' }}>
+                {(selectedClient.strategies || []).map((strat, idx) => (
+                  <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255,255,255,0.05)', marginBottom: '8px', borderRadius: '6px' }}>
+                    <span>{strat}</span>
+                    <button onClick={async () => {
+                      const newStrategies = selectedClient.strategies.filter((_, i) => i !== idx);
+                      const token = localStorage.getItem('token');
+                      try {
+                        const response = await fetch(`${API_BASE_URL}/api/users/clients/${selectedClient.id}`, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                          body: JSON.stringify({ strategies: newStrategies })
+                        });
+                        if (response.ok) {
+                          setSelectedClient(prev => ({ ...prev, strategies: newStrategies }));
+                          setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, strategies: newStrategies } : c));
+                        }
+                      } catch (err) {}
+                    }} style={{ background: 'none', border: 'none', color: '#ff4444', cursor: 'pointer' }}>✕</button>
+                  </li>
+                ))}
+                {(!selectedClient.strategies || selectedClient.strategies.length === 0) && (
+                  <li style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No hay estrategias definidas.</li>
+                )}
+              </ul>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <input 
+                  type="text" 
+                  value={newStrategyInput} 
+                  onChange={(e) => setNewStrategyInput(e.target.value)} 
+                  className="input-field" 
+                  placeholder="Nueva estrategia..." 
+                  style={{ margin: 0, flex: 1 }}
+                />
+                <button 
+                  onClick={async () => {
+                    if (!newStrategyInput.trim()) return;
+                    const newStrategies = [...(selectedClient.strategies || []), newStrategyInput.trim()];
+                    const token = localStorage.getItem('token');
+                    try {
+                      const response = await fetch(`${API_BASE_URL}/api/users/clients/${selectedClient.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ strategies: newStrategies })
+                      });
+                      if (response.ok) {
+                        setSelectedClient(prev => ({ ...prev, strategies: newStrategies }));
+                        setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, strategies: newStrategies } : c));
+                        setNewStrategyInput('');
+                      }
+                    } catch (err) {}
+                  }}
+                  style={{ background: 'var(--accent-primary)', color: '#000', border: 'none', padding: '0 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
+                >Añadir</button>
               </div>
             </div>
 

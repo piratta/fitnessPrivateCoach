@@ -3,8 +3,6 @@ package com.fitnessApp.core.config;
 import com.fitnessApp.feature.user.Role;
 import com.fitnessApp.feature.user.User;
 import com.fitnessApp.feature.user.UserRepository;
-import com.fitnessApp.feature.workout.WorkoutSessionRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -12,14 +10,13 @@ import org.springframework.stereotype.Component;
 @Component
 public class DataSeeder implements CommandLineRunner {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    @Autowired
-    private WorkoutSessionRepository workoutSessionRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    public DataSeeder(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
 
     @Override
     public void run(String... args) throws Exception {

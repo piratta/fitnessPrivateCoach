@@ -84,7 +84,7 @@ export default function InitialQuestionnaire({ onComplete }) {
             {MEASURE_FIELDS.map(({ key, label, placeholder }) => (
               <div key={key}>
                 <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 'bold' }}>{label}</label>
-                <input type="number" step="0.1" className="input-field" style={{ margin: 0, width: '100%' }}
+                <input type="number" step="0.1" min="0" className="input-field" style={{ margin: 0, width: '100%' }}
                   value={formData[key]} placeholder={placeholder}
                   onChange={(e) => update(key, e.target.value)} />
               </div>

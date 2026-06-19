@@ -8,6 +8,8 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.List;
+import java.util.ArrayList;
 
 @Data // Genera automáticamente todos los Getters, Setters, toString, equals y hashCode
 @NoArgsConstructor // Genera el constructor vacío (requerido por JPA)
@@ -54,6 +56,12 @@ public class User {
 
     // --- New Fields for Fitness App ---
     private String goal;
+    
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_strategies", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "strategy")
+    @Builder.Default
+    private List<String> strategies = new ArrayList<>();
 
     @Builder.Default
     private String status = "Activo";
