@@ -49,7 +49,13 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
       }
     })
     .then(res => res.ok ? res.json() : [])
-    .then(data => setTemplates(data))
+    .then(data => {
+      const parsed = data.map(t => ({
+        ...t,
+        routine: t.routineJson ? (typeof t.routineJson === 'string' ? JSON.parse(t.routineJson) : t.routineJson) : null
+      }));
+      setTemplates(parsed);
+    })
     .catch(err => console.error("Error loading templates:", err));
   }, []);
 

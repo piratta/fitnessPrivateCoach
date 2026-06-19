@@ -28,7 +28,18 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
   }, [dropdownRef]);
   // Estado para la rutina organizada por días
   const [weeklyRoutine, setWeeklyRoutine] = useState(() => {
-    if (editingTemplate && editingTemplate.routine) return editingTemplate.routine;
+    if (editingTemplate) {
+      if (editingTemplate.routine) return editingTemplate.routine;
+      if (editingTemplate.routineJson) {
+        try {
+          return typeof editingTemplate.routineJson === 'string'
+            ? JSON.parse(editingTemplate.routineJson)
+            : editingTemplate.routineJson;
+        } catch (e) {
+          console.error("Error parsing routineJson", e);
+        }
+      }
+    }
     return {
       Lunes: [],
       Martes: [],
@@ -470,12 +481,16 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
               });
               if (response.ok) {
                 const saved = await response.json();
+                const savedWithRoutine = {
+                  ...saved,
+                  routine: saved.routineJson ? (typeof saved.routineJson === 'string' ? JSON.parse(saved.routineJson) : saved.routineJson) : null
+                };
                 if (setTemplates) {
                   setTemplates(prev => {
                     if (editingTemplate) {
-                      return prev.map(t => t.id === saved.id ? saved : t);
+                      return prev.map(t => t.id === saved.id ? savedWithRoutine : t);
                     } else {
-                      return [...prev, saved];
+                      return [...prev, savedWithRoutine];
                     }
                   });
                 }
@@ -554,7 +569,15 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
                   key={t.id} 
                   onClick={() => {
                     const fallbackRoutine = { Lunes: [], Martes: [], Miércoles: [], Jueves: [], Viernes: [], Sábado: [], Domingo: [] };
-                    setWeeklyRoutine(t.routine ? JSON.parse(JSON.stringify(t.routine)) : fallbackRoutine);
+                    let selectedRoutine = t.routine;
+                    if (!selectedRoutine && t.routineJson) {
+                      try {
+                        selectedRoutine = typeof t.routineJson === 'string' ? JSON.parse(t.routineJson) : t.routineJson;
+                      } catch (e) {
+                        console.error("Error parsing t.routineJson", e);
+                      }
+                    }
+                    setWeeklyRoutine(selectedRoutine ? JSON.parse(JSON.stringify(selectedRoutine)) : fallbackRoutine);
                     dialog.toast(`Plantilla "${t.title}" cargada.`, { variant: 'success' });
                     setShowTemplateModal(false);
                   }}
