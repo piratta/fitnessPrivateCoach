@@ -158,6 +158,12 @@ public class UserService {
             client.setRoutineJson(clientDto.getRoutineJson());
             client.setRoutineUpdatedAt(java.time.LocalDateTime.now());
         }
+        if (clientDto.getRoutineStartDate() != null) {
+            client.setRoutineStartDate(clientDto.getRoutineStartDate());
+        }
+        if (clientDto.getRoutineEndDate() != null) {
+            client.setRoutineEndDate(clientDto.getRoutineEndDate());
+        }
         if (clientDto.getNextRoutineJson() != null) {
             client.setNextRoutineJson(clientDto.getNextRoutineJson());
         }

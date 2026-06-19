@@ -33,6 +33,8 @@ public class UserDto {
     private String routineJson;
     private String nextRoutineJson;
     private LocalDateTime routineUpdatedAt;
+    private LocalDate routineStartDate;
+    private LocalDate routineEndDate;
     private LocalDateTime lastReviewDate;
     private LocalDateTime nextReviewAt;
     private LocalDateTime createdAt;
@@ -59,6 +61,8 @@ public class UserDto {
         this.routineJson = user.getRoutineJson();
         this.nextRoutineJson = user.getNextRoutineJson();
         this.routineUpdatedAt = user.getRoutineUpdatedAt();
+        this.routineStartDate = user.getRoutineStartDate();
+        this.routineEndDate = user.getRoutineEndDate();
         this.lastReviewDate = user.getLastReviewDate();
         this.nextReviewAt = user.getNextReviewAt();
         this.createdAt = user.getCreatedAt();

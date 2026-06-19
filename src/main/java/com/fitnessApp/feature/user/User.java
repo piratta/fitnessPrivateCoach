@@ -86,6 +86,9 @@ public class User {
 
     private LocalDateTime routineUpdatedAt;
 
+    private LocalDate routineStartDate;
+    private LocalDate routineEndDate;
+
     @Column(nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
