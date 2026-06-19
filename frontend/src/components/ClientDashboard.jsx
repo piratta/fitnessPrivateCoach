@@ -90,13 +90,14 @@ export default function ClientDashboard({ user, onLogout}) {
   });
 
   // Workout Tracker States
+  const [selectedDay, setSelectedDay] = useState('');
+  const [skippedDays, setSkippedDays] = useState({});
+
   const currentRoutineObj = (viewingNextRoutine && clientData?.nextRoutine)
     ? clientData.nextRoutine
     : clientData?.routine;
   const activeDayNotes = currentRoutineObj ? currentRoutineObj[`${selectedDay}_notes`] : '';
   const routineDays = currentRoutineObj ? Object.keys(currentRoutineObj).filter(day => !day.endsWith('_notes')) : [];
-  const [selectedDay, setSelectedDay] = useState('');
-  const [skippedDays, setSkippedDays] = useState({});
 
   const [comments, setComments] = useState({}); // { [day_exIdx]: string }
   const [videoLinks, setVideoLinks] = useState({});
