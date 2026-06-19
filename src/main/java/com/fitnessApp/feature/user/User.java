@@ -6,15 +6,18 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import java.util.List;
 import java.util.ArrayList;
 
-@Data // Genera automáticamente todos los Getters, Setters, toString, equals y hashCode
+@Data // Genera automáticamente todos los Getters, Setters, toString, equals y
+      // hashCode
 @NoArgsConstructor // Genera el constructor vacío (requerido por JPA)
 @AllArgsConstructor // Genera un constructor con todos los argumentos (requerido por Builder)
-@Builder // Permite crear objetos con el patrón Builder: User.builder().name("Juan").build();
+@Builder // Permite crear objetos con el patrón Builder:
+         // User.builder().name("Juan").build();
 @Entity
 @Table(name = "users")
 public class User {
@@ -46,7 +49,8 @@ public class User {
     @Builder.Default
     private boolean mustChangePassword = false;
 
-    // True until the client fills in the initial measurements questionnaire on first login.
+    // True until the client fills in the initial measurements questionnaire on
+    // first login.
     @Builder.Default
     private Boolean onboardingCompleted = false;
 
@@ -56,7 +60,7 @@ public class User {
 
     // --- New Fields for Fitness App ---
     private String goal;
-    
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_strategies", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "strategy")
@@ -69,14 +73,16 @@ public class User {
     private String videoLink;
     private LocalDateTime lastReviewDate;
 
-    // Moment from which the next review is allowed. Computed from lastReviewDate + reviewFrequency.
+    // Moment from which the next review is allowed. Computed from lastReviewDate +
+    // reviewFrequency.
     private LocalDateTime nextReviewAt;
 
     @Builder.Default
     private String reviewFrequency = "Semanal"; // Semanal, Bisemanal, 3 Semanas, Mensual, Bimensual
 
     @Builder.Default
-    private String progressionStrategy = "Sobrecarga Progresiva (Subir peso)"; // Mantenimiento, Descarga, Subir reps, etc.
+    private String progressionStrategy = "Sobrecarga Progresiva (Subir peso)"; // Mantenimiento, Descarga, Subir reps,
+                                                                               // etc.
 
     @Column(columnDefinition = "TEXT")
     private String routineJson;
