@@ -1,5 +1,6 @@
 package com.fitnessApp.feature.workout;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fitnessApp.feature.user.User;
 import jakarta.persistence.*;
 import java.time.LocalDate;
@@ -16,6 +17,7 @@ public class WorkoutSession {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "client_id", nullable = false)
+    @JsonIgnore
     private User client;
 
     @Column(nullable = false)
