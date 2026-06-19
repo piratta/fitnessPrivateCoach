@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import ClientList from './ClientList';
 import WorkoutBuilder from './WorkoutBuilder';
@@ -17,6 +17,48 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
   const [templateMode, setTemplateMode] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [workoutClient, setWorkoutClient] = useState('');
+  const [showEjerciciosDropdown, setShowEjerciciosDropdown] = useState(false);
+  const dropdownRef = useRef(null);
+  const portalRef = useRef(null);
+  const [dropdownCoords, setDropdownCoords] = useState({ top: 0, left: 0, width: 0 });
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      const clickedInsideTrigger = dropdownRef.current && dropdownRef.current.contains(event.target);
+      const clickedInsidePortal = portalRef.current && portalRef.current.contains(event.target);
+      if (!clickedInsideTrigger && !clickedInsidePortal) {
+        setShowEjerciciosDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    function handleScrollOrResize() {
+      setShowEjerciciosDropdown(false);
+    }
+    if (showEjerciciosDropdown) {
+      window.addEventListener('scroll', handleScrollOrResize, true);
+      window.addEventListener('resize', handleScrollOrResize);
+    }
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [showEjerciciosDropdown]);
+
+  const toggleDropdown = () => {
+    if (!showEjerciciosDropdown && dropdownRef.current) {
+      const rect = dropdownRef.current.getBoundingClientRect();
+      setDropdownCoords({
+        top: rect.bottom + window.scrollY,
+        left: rect.left + window.scrollX,
+        width: rect.width
+      });
+    }
+    setShowEjerciciosDropdown(!showEjerciciosDropdown);
+  };
   
   // Profile Editor State
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -198,6 +240,25 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
     fontSize: '0.9rem'
   });
 
+  const isEjerciciosActive = ['rutinas', 'plantillas', 'ejercicios'].includes(activeTab);
+
+  const ejerciciosTabStyle = {
+    padding: '10px 20px',
+    cursor: 'pointer',
+    background: isEjerciciosActive ? 'rgba(224, 248, 0, 0.1)' : 'transparent',
+    color: isEjerciciosActive ? 'var(--accent-primary)' : 'var(--text-main)',
+    borderBottom: isEjerciciosActive ? '2px solid var(--accent-primary)' : '2px solid transparent',
+    fontWeight: isEjerciciosActive ? '800' : '600',
+    transition: 'all 0.3s',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+    fontSize: '0.9rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    userSelect: 'none'
+  };
+
   return (
     <div className="fade-in" style={{ padding: '40px 20px', maxWidth: '1200px', margin: '0 auto' }}>
       
@@ -232,9 +293,20 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
           Mensajes
           {totalUnread > 0 && <span className="fade-in" style={{ background: '#ff4500', color: '#fff', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '10px', marginLeft: '8px', fontWeight: 'bold' }}>{totalUnread}</span>}
         </div>
-        <div style={navItemStyle('rutinas')} onClick={() => setActiveTab('rutinas')}>Asignar Rutina</div>
-        <div style={navItemStyle('plantillas')} onClick={() => setActiveTab('plantillas')}>Mis Plantillas</div>
-        <div style={navItemStyle('ejercicios')} onClick={() => setActiveTab('ejercicios')}>Ejercicios</div>
+        
+        {/* Dropdown de Ejercicios */}
+        <div 
+          ref={dropdownRef} 
+          style={{ position: 'relative', display: 'inline-block' }}
+        >
+          <div 
+            style={ejerciciosTabStyle} 
+            onClick={toggleDropdown}
+          >
+            Ejercicios <span style={{ fontSize: '0.75rem', transform: showEjerciciosDropdown ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▼</span>
+          </div>
+        </div>
+
         <div style={navItemStyle('revisiones')} onClick={() => setActiveTab('revisiones')}>
           Revisiones 
           {pendingReviews > 0 && <span style={{ background: '#ff4500', color: '#fff', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '10px', marginLeft: '8px', fontWeight: 'bold' }}>{pendingReviews}</span>}
@@ -356,6 +428,59 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
                 <button type="submit" className="btn-primary" style={{ flex: 2, padding: '12px' }}>💾 Guardar Cambios</button>
               </div>
             </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Portal del Dropdown de Ejercicios */}
+      {showEjerciciosDropdown && createPortal(
+        <div 
+          ref={portalRef}
+          className="dropdown-menu-portal"
+          style={{
+            position: 'absolute',
+            top: `${dropdownCoords.top}px`,
+            left: `${dropdownCoords.left}px`,
+            minWidth: '220px',
+            background: 'rgba(20, 20, 24, 0.98)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid var(--border-light)',
+            borderRadius: '8px',
+            marginTop: '5px',
+            zIndex: 9999,
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}
+        >
+          <div
+            className={`dropdown-item ${activeTab === 'rutinas' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('rutinas');
+              setShowEjerciciosDropdown(false);
+            }}
+          >
+            📋 Asignar Rutina
+          </div>
+          <div
+            className={`dropdown-item ${activeTab === 'plantillas' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('plantillas');
+              setShowEjerciciosDropdown(false);
+            }}
+          >
+            📥 Mis Plantillas
+          </div>
+          <div
+            className={`dropdown-item ${activeTab === 'ejercicios' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('ejercicios');
+              setShowEjerciciosDropdown(false);
+            }}
+          >
+            🏋️ Ejercicios
           </div>
         </div>,
         document.body
