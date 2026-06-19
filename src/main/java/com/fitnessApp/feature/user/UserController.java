@@ -1,6 +1,7 @@
 package com.fitnessApp.feature.user;
 
 import com.fitnessApp.feature.review.ReviewImage;
+import com.fitnessApp.feature.workout.WorkoutService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +22,9 @@ public class UserController {
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private WorkoutService workoutService;
+
     @GetMapping("/me/whoami")
     public ResponseEntity<Map<String, Object>> whoami() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -35,7 +39,10 @@ public class UserController {
     public ResponseEntity<UserDto> getMe() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || auth.getName() == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        return ResponseEntity.ok(new UserDto(userService.getUserByPrincipal(auth.getName())));
+        User user = userService.getUserByPrincipal(auth.getName());
+        UserDto dto = new UserDto(user);
+        dto.setRoutineJson(workoutService.enrichRoutineWithSuggestedWeights(user, dto.getRoutineJson()));
+        return ResponseEntity.ok(dto);
     }
 
     @GetMapping("/clients")

@@ -47,6 +47,9 @@ public class ReviewImage {
     @Column(nullable = false, updatable = false)
     private LocalDateTime uploadedAt = LocalDateTime.now();
 
+    @Column(nullable = false)
+    private boolean visibleForClient = true;
+
     public ReviewImage() {}
 
     public UUID getId() { return id; }
@@ -69,4 +72,7 @@ public class ReviewImage {
 
     public LocalDateTime getUploadedAt() { return uploadedAt; }
     public void setUploadedAt(LocalDateTime uploadedAt) { this.uploadedAt = uploadedAt; }
+
+    public boolean isVisibleForClient() { return visibleForClient; }
+    public void setVisibleForClient(boolean visibleForClient) { this.visibleForClient = visibleForClient; }
 }

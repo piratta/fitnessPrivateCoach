@@ -64,7 +64,15 @@ export default function ClientDashboard({ user, onLogout}) {
   }, []);
   const [clientData, setClientData] = useState(null);
   const [showRoutineTable, setShowRoutineTable] = useState(false);
+  const [pdfStyle, setPdfStyle] = useState('styled');
   const [showEvaluationModal, setShowEvaluationModal] = useState(false);
+  const [workoutEval, setWorkoutEval] = useState({
+    stress: 3,
+    fatigue: 3,
+    motivation: 3,
+    sleepHours: 7.5,
+    digestions: 3
+  });
   const [selectedMonths, setSelectedMonths] = useState([0]);
   const [largePhotoView, setLargePhotoView] = useState(null);
   const [toggledPhoto, setToggledPhoto] = useState(false);
@@ -1006,7 +1014,12 @@ export default function ClientDashboard({ user, onLogout}) {
           // effect (which looks up parsed[todays.dayName]) finds it on the next reload.
           logsJson: JSON.stringify({ ...logs, [(loadedRoutineHere || selectedDay)]: logs[selectedDay] }),
           commentsJson: JSON.stringify(comments),
-          videoLinksJson: JSON.stringify(videoLinks)
+          videoLinksJson: JSON.stringify(videoLinks),
+          stress: workoutEval.stress,
+          fatigue: workoutEval.fatigue,
+          motivation: workoutEval.motivation,
+          sleepHours: workoutEval.sleepHours,
+          digestions: workoutEval.digestions
         })
       });
 
@@ -1219,6 +1232,7 @@ export default function ClientDashboard({ user, onLogout}) {
       `;
     });
 
+    const isBasic = pdfStyle === 'basic';
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -1227,7 +1241,7 @@ export default function ClientDashboard({ user, onLogout}) {
         <meta charset="utf-8" />
         <style>
           body {
-            font-family: 'Outfit', -apple-system, sans-serif;
+            font-family: ${isBasic ? 'sans-serif' : "'Outfit', -apple-system, sans-serif"};
             color: #333;
             line-height: 1.4;
             padding: 30px;
@@ -1236,7 +1250,7 @@ export default function ClientDashboard({ user, onLogout}) {
           }
           .header {
             text-align: center;
-            border-bottom: 3px double #333;
+            border-bottom: ${isBasic ? '1px solid #333' : '3px double #333'};
             padding-bottom: 20px;
             margin-bottom: 30px;
           }
@@ -1255,7 +1269,7 @@ export default function ClientDashboard({ user, onLogout}) {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 15px;
-            background: #f9f9f9;
+            background: ${isBasic ? '#fff' : '#f9f9f9'};
             padding: 15px;
             border-radius: 8px;
             margin-bottom: 30px;
@@ -1891,7 +1905,7 @@ export default function ClientDashboard({ user, onLogout}) {
                                   return (
                                     <div key={setIdx} className="tracker-grid" style={{ display: 'grid', gridTemplateColumns: '40px 1fr 1fr 100px', gap: '10px', padding: '12px 15px', background: set.completed ? 'rgba(224, 248, 0, 0.03)' : (set.skipped ? 'rgba(255,255,255,0.02)' : 'transparent'), opacity: set.skipped ? 0.5 : 1, transition: 'all 0.3s' }}>
                                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: set.completed ? 'var(--accent-primary)' : 'var(--text-muted)', textDecoration: set.skipped ? 'line-through' : 'none' }}>{setIdx + 1}</div>
-                                      <div><input type="number" min="0" className="tracker-input" step="0.5" placeholder={exercise.expectedWeight ? `${exercise.expectedWeight}` : ''} value={set.weight} onChange={(e) => updateSet(exIdx, setIdx, 'weight', e.target.value)} disabled={inputDisabled} style={{ width: '100%', padding: '10px', background: isEditing ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)', border: isEditing ? '1px solid var(--accent-primary)' : 'none', borderRadius: '6px', color: '#fff', textAlign: 'center', textDecoration: set.skipped ? 'line-through' : 'none' }} /></div>
+                                      <div><input type="number" min="0" className="tracker-input" step="0.5" placeholder={exercise.suggestedWeight ? `${exercise.suggestedWeight}` : (exercise.expectedWeight ? `${exercise.expectedWeight}` : '')} value={set.weight} onChange={(e) => updateSet(exIdx, setIdx, 'weight', e.target.value)} disabled={inputDisabled} style={{ width: '100%', padding: '10px', background: isEditing ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)', border: isEditing ? '1px solid var(--accent-primary)' : 'none', borderRadius: '6px', color: '#fff', textAlign: 'center', textDecoration: set.skipped ? 'line-through' : 'none' }} /></div>
                                       <div><input type="text" className="tracker-input" placeholder={set.reps} value={set.reps} onChange={(e) => updateSet(exIdx, setIdx, 'reps', e.target.value)} disabled={inputDisabled} style={{ width: '100%', padding: '10px', background: isEditing ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)', border: isEditing ? '1px solid var(--accent-primary)' : 'none', borderRadius: '6px', color: '#fff', textAlign: 'center', textDecoration: set.skipped ? 'line-through' : 'none' }} /></div>
                                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
                                         {isWorkoutLocked ? (
@@ -1943,6 +1957,40 @@ export default function ClientDashboard({ user, onLogout}) {
 
                         {!isWorkoutLocked ? (
                           <div style={{ marginTop: '30px', marginBottom: '20px', display: 'grid', gap: '12px' }}>
+                            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '10px' }}>
+                              <h4 style={{ color: 'var(--text-main)', marginBottom: '15px', fontSize: '1rem' }}>Evaluación de la Sesión</h4>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '15px' }}>
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '5px' }}>Estrés (1-5)</label>
+                                  <select value={workoutEval.stress} onChange={e => setWorkoutEval({...workoutEval, stress: parseInt(e.target.value)})} className="input-field" style={{ width: '100%', margin: 0, padding: '10px', cursor: 'pointer' }}>
+                                    {[1,2,3,4,5].map(v => <option key={v} value={v}>{v}</option>)}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '5px' }}>Fatiga (1-5)</label>
+                                  <select value={workoutEval.fatigue} onChange={e => setWorkoutEval({...workoutEval, fatigue: parseInt(e.target.value)})} className="input-field" style={{ width: '100%', margin: 0, padding: '10px', cursor: 'pointer' }}>
+                                    {[1,2,3,4,5].map(v => <option key={v} value={v}>{v}</option>)}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '5px' }}>Motivación (1-5)</label>
+                                  <select value={workoutEval.motivation} onChange={e => setWorkoutEval({...workoutEval, motivation: parseInt(e.target.value)})} className="input-field" style={{ width: '100%', margin: 0, padding: '10px', cursor: 'pointer' }}>
+                                    {[1,2,3,4,5].map(v => <option key={v} value={v}>{v}</option>)}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '5px' }}>Digestiones (1-5)</label>
+                                  <select value={workoutEval.digestions} onChange={e => setWorkoutEval({...workoutEval, digestions: parseInt(e.target.value)})} className="input-field" style={{ width: '100%', margin: 0, padding: '10px', cursor: 'pointer' }}>
+                                    {[1,2,3,4,5].map(v => <option key={v} value={v}>{v}</option>)}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '5px' }}>Horas de sueño</label>
+                                  <input type="number" step="0.5" min="0" max="24" value={workoutEval.sleepHours} onChange={e => setWorkoutEval({...workoutEval, sleepHours: parseFloat(e.target.value)})} className="input-field" style={{ width: '100%', margin: 0, padding: '10px' }} />
+                                </div>
+                              </div>
+                            </div>
+
                             <button onClick={handleFinishWorkout} className="btn-primary" style={{ width: '100%', padding: '20px', fontSize: '1.2rem', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}>🏁 FINALIZAR ENTRENAMIENTO</button>
                             {isWorkoutStarted && (
                               <button
@@ -2683,10 +2731,14 @@ export default function ClientDashboard({ user, onLogout}) {
               })}
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', marginTop: '20px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px', flexShrink: 0, alignItems: 'center' }}>
               <button onClick={() => setShowRoutineTable(false)} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid var(--border-light)', color: '#fff', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Cerrar</button>
+              <select value={pdfStyle} onChange={(e) => setPdfStyle(e.target.value)} className="input-field" style={{ margin: 0, flex: 1 }}>
+                <option value="styled">Con Estilo</option>
+                <option value="basic">Básico</option>
+              </select>
               <button onClick={downloadRoutinePDF} className="btn-primary" style={{ flex: 2, padding: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
-                🖨️ Descargar PDF Personalizado
+                🖨️ Descargar PDF
               </button>
             </div>
           </div>

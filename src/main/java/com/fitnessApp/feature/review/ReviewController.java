@@ -94,9 +94,10 @@ public class ReviewController {
     public ResponseEntity<ReviewDto.ImageRef> uploadImage(
             @PathVariable("id") UUID reviewId,
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "view", required = false) String view) {
+            @RequestParam(value = "view", required = false) String view,
+            @RequestParam(value = "visibleForClient", required = false, defaultValue = "true") boolean visibleForClient) {
         User client = currentUser();
-        ReviewImage saved = reviewService.addImage(client, reviewId, view, file);
+        ReviewImage saved = reviewService.addImage(client, reviewId, view, visibleForClient, file);
         return ResponseEntity.ok(new ReviewDto.ImageRef(saved));
     }
 
@@ -125,6 +126,7 @@ public class ReviewController {
             m.put("id", img.getId());
             m.put("view", img.getView());
             m.put("uploadedAt", img.getUploadedAt());
+            m.put("visibleForClient", img.isVisibleForClient());
             return m;
         }).collect(Collectors.toList());
         return ResponseEntity.ok(body);

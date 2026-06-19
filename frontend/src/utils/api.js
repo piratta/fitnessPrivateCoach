@@ -47,10 +47,11 @@ export const reviewsApi = {
   history: () => request('/api/reviews/history'),
   gallery: () => request('/api/reviews/gallery'),
   create: (measurements) => request('/api/reviews', { method: 'POST', body: measurements }),
-  uploadImage: (reviewId, file, view) => {
+  uploadImage: (reviewId, file, view, visibleForClient = true) => {
     const form = new FormData();
     form.append('file', file);
     if (view) form.append('view', view);
+    form.append('visibleForClient', visibleForClient);
     return request(`/api/reviews/${reviewId}/images`, { method: 'POST', body: form, isForm: true });
   },
   deleteImage: (imageId) => request(`/api/reviews/images/${imageId}`, { method: 'DELETE' }),

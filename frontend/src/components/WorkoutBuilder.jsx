@@ -359,7 +359,7 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
                 <div style={{ marginTop: '15px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.5fr', gap: '15px', marginBottom: '12px' }}>
                     <SearchableExerciseSelect value={ex.name} onChange={(val) => updateExercise(activeDay, index, 'name', val)} />
-                    <input type="text" className="input-field" style={{ marginBottom: 0 }} placeholder="Peso esp. (kg)" value={ex.expectedWeight || ''} onChange={e => updateExercise(activeDay, index, 'expectedWeight', e.target.value)} />
+                    <input type="text" className="input-field" style={{ marginBottom: 0 }} placeholder={ex.suggestedWeight ? `Sugerido: ${ex.suggestedWeight} kg` : "Peso esp. (kg)"} value={ex.expectedWeight || ''} onChange={e => updateExercise(activeDay, index, 'expectedWeight', e.target.value)} />
                   </div>
                   <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', overflow: 'hidden' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 1.2fr 2fr 40px', gap: '10px', padding: '8px 12px', fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -420,7 +420,7 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
                       type="text"
                       className="input-field"
                       style={{ marginBottom: 0 }}
-                      placeholder="Peso esp. (kg)"
+                      placeholder={ex.suggestedWeight ? `Sugerido: ${ex.suggestedWeight} kg` : "Peso esp. (kg)"}
                       value={ex.expectedWeight || ''}
                       onChange={e => updateExercise(activeDay, index, 'expectedWeight', e.target.value)}
                     />

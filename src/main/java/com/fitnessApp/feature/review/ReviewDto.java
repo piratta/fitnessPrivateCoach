@@ -69,10 +69,12 @@ public class ReviewDto {
     public static class ImageRef {
         private UUID id;
         private String view;
+        private boolean visibleForClient;
 
         public ImageRef(ReviewImage img) {
             this.id = img.getId();
             this.view = img.getView();
+            this.visibleForClient = img.isVisibleForClient();
         }
     }
 }

@@ -165,7 +165,7 @@ public class UserService {
 
     public ReviewImage uploadInitialPhoto(String principal, String view, MultipartFile file) {
         User user = getUserByPrincipal(principal);
-        return reviewService.addStandaloneImage(user, view, file);
+        return reviewService.addStandaloneImage(user, view, true, file);
     }
 
     // --- Private Helper Methods ---

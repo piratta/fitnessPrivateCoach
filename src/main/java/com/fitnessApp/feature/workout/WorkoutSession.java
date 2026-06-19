@@ -26,6 +26,12 @@ public class WorkoutSession {
     private int completedSets;
     private int completionPercentage;
 
+    private Integer stress;
+    private Integer fatigue;
+    private Integer motivation;
+    private Float sleepHours;
+    private Integer digestions;
+
     @Column(nullable = false)
     private LocalDate sessionDate;
 
@@ -68,6 +74,21 @@ public class WorkoutSession {
 
     public int getCompletionPercentage() { return completionPercentage; }
     public void setCompletionPercentage(int completionPercentage) { this.completionPercentage = completionPercentage; }
+
+    public Integer getStress() { return stress; }
+    public void setStress(Integer stress) { this.stress = stress; }
+
+    public Integer getFatigue() { return fatigue; }
+    public void setFatigue(Integer fatigue) { this.fatigue = fatigue; }
+
+    public Integer getMotivation() { return motivation; }
+    public void setMotivation(Integer motivation) { this.motivation = motivation; }
+
+    public Float getSleepHours() { return sleepHours; }
+    public void setSleepHours(Float sleepHours) { this.sleepHours = sleepHours; }
+
+    public Integer getDigestions() { return digestions; }
+    public void setDigestions(Integer digestions) { this.digestions = digestions; }
 
     public LocalDate getSessionDate() { return sessionDate; }
     public void setSessionDate(LocalDate sessionDate) { this.sessionDate = sessionDate; }

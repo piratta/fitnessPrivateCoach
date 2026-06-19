@@ -23,4 +23,9 @@ public class WorkoutDto {
     private String logsJson;
     private String commentsJson;
     private String videoLinksJson;
+    private Integer stress;
+    private Integer fatigue;
+    private Integer motivation;
+    private Float sleepHours;
+    private Integer digestions;
 }

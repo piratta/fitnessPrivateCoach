@@ -63,7 +63,7 @@ export default function ReviewTab({ onLockChange }) {
   const [secondsLeft, setSecondsLeft] = useState(0);
 
   // Create form state
-  const [form, setForm] = useState({ weight: '', waist: '', hip: '', neck: '', biceps: '', leg: '', chest: '', calf: '', forearm: '', back: '', clientComments: '' });
+  const [form, setForm] = useState({ weight: '', waist: '', hip: '', neck: '', biceps: '', leg: '', chest: '', calf: '', forearm: '', back: '', clientComments: '', visibleForClient: true });
   const [photos, setPhotos] = useState({}); // { slot: { file, preview } }
   const fileInputs = useRef({});
 
@@ -142,11 +142,11 @@ export default function ReviewTab({ onLockChange }) {
       const review = await reviewsApi.create(measurements);
       const entries = Object.entries(photos);
       for (const [slot, { file }] of entries) {
-        await reviewsApi.uploadImage(review.id, file, slot);
+        await reviewsApi.uploadImage(review.id, file, slot, form.visibleForClient);
       }
       Object.values(photos).forEach((p) => p.preview && URL.revokeObjectURL(p.preview));
       setPhotos({});
-      setForm({ weight: '', waist: '', hip: '', neck: '', biceps: '', leg: '', chest: '', calf: '', forearm: '', back: '', clientComments: '' });
+      setForm({ weight: '', waist: '', hip: '', neck: '', biceps: '', leg: '', chest: '', calf: '', forearm: '', back: '', clientComments: '', visibleForClient: true });
       dialog.toast('Revisión enviada a tu entrenador', { variant: 'success' });
       await refresh();
     } catch (e) {
@@ -234,6 +234,11 @@ export default function ReviewTab({ onLockChange }) {
             placeholder="¿Cómo te has sentido? ¿Alguna molestia o sugerencia?"
             value={form.clientComments} onChange={(e) => setForm({ ...form, clientComments: e.target.value })} />
 
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', color: 'var(--text-main)', cursor: 'pointer' }}>
+            <input type="checkbox" checked={form.visibleForClient} onChange={(e) => setForm({ ...form, visibleForClient: e.target.checked })} />
+            Guardar en mi galería personal (visible para ti y tu entrenador)
+          </label>
+
           <button className="btn-primary" disabled={submitting} style={{ width: '100%', padding: '15px', marginTop: '10px', fontSize: '1.1rem', opacity: submitting ? 0.6 : 1 }} onClick={submitReview}>
             {submitting ? 'Enviando...' : '📤 Enviar Revisión'}
           </button>
@@ -282,6 +287,7 @@ function PhotoStrip({ images }) {
 
 function ActiveReview({ review, onAcknowledge, refresh }) {
   const dialog = useDialog();
+  const [visibleForClient, setVisibleForClient] = useState(true);
   const validated = review.status === 'VALIDATED';
   const fileInputs = useRef({});
 
@@ -300,7 +306,7 @@ function ActiveReview({ review, onAcknowledge, refresh }) {
     }
     try {
       dialog.toast('Subiendo imagen...', { variant: 'info' });
-      await reviewsApi.uploadImage(review.id, file, slot);
+      await reviewsApi.uploadImage(review.id, file, slot, visibleForClient);
       dialog.toast('Imagen subida correctamente', { variant: 'success' });
       if (refresh) refresh();
     } catch (err) {
@@ -356,6 +362,10 @@ function ActiveReview({ review, onAcknowledge, refresh }) {
       {!validated ? (
         <>
           <h4 style={{ marginBottom: '10px' }}>Tus Fotos (Puedes modificarlas mientras está pendiente)</h4>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px', color: 'var(--text-main)', cursor: 'pointer', fontSize: '0.9rem' }}>
+            <input type="checkbox" checked={visibleForClient} onChange={(e) => setVisibleForClient(e.target.checked)} />
+            Guardar nuevas fotos en mi galería personal
+          </label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px', marginBottom: '20px' }}>
             {PHOTO_SLOTS.map(({ key, label }) => {
               const img = review.images?.find((i) => i.view === key);

@@ -87,13 +87,13 @@ public class ReviewService {
 
     /** Persists an uploaded photo inside the same transaction as the review it belongs to. */
     @Transactional
-    public ReviewImage addImage(User client, UUID reviewId, String view, MultipartFile file) {
+    public ReviewImage addImage(User client, UUID reviewId, String view, boolean visibleForClient, MultipartFile file) {
         Review review = loadOwnedReview(client, reviewId);
         if (review.getStatus() != ReviewStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "No se pueden añadir fotos a una revisión ya enviada.");
         }
-        return persistImage(client, review, view, file);
+        return persistImage(client, review, view, visibleForClient, file);
     }
 
     /**
@@ -101,11 +101,11 @@ public class ReviewService {
      * pictures appear in the client's gallery and act as baseline references.
      */
     @Transactional
-    public ReviewImage addStandaloneImage(User client, String view, MultipartFile file) {
-        return persistImage(client, null, view, file);
+    public ReviewImage addStandaloneImage(User client, String view, boolean visibleForClient, MultipartFile file) {
+        return persistImage(client, null, view, visibleForClient, file);
     }
 
-    private ReviewImage persistImage(User client, Review review, String view, MultipartFile file) {
+    private ReviewImage persistImage(User client, Review review, String view, boolean visibleForClient, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Archivo vacío.");
         }
@@ -117,6 +117,7 @@ public class ReviewService {
         image.setReview(review);
         image.setClient(client);
         image.setView(view);
+        image.setVisibleForClient(visibleForClient);
         image.setContentType(contentType);
         try {
             image.setData(file.getBytes());
