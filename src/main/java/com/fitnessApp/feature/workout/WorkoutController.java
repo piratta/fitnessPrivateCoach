@@ -1,6 +1,5 @@
 package com.fitnessApp.feature.workout;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -8,12 +7,14 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
 @RequestMapping("/api/workouts")
+@RequiredArgsConstructor
 public class WorkoutController {
 
-    @Autowired
-    private WorkoutService workoutService;
+    private final WorkoutService workoutService;
 
     @PostMapping("/finish")
     public ResponseEntity<UUID> finishWorkout(@RequestBody WorkoutDto request) {

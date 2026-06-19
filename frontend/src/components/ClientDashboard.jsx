@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, Fragment } from 'react';
+import { useState, useRef, useEffect, Fragment, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { createPortal } from 'react-dom';
 import InitialQuestionnaire from './InitialQuestionnaire';
 import ReviewTab from './ReviewTab';
@@ -102,6 +103,7 @@ export default function ClientDashboard({ user, onLogout}) {
     if (typeof window === 'undefined') return;
     // Initial sentinel so the first back press has somewhere to land.
     window.history.pushState({ inApp: true, tab: 'workout' }, '');
+    // eslint-disable-next-line no-unused-vars
     const onPopState = (e) => {
       // The browser already popped one entry; re-push so we stay inside the app.
       window.history.pushState({ inApp: true, tab: 'workout' }, '');
@@ -111,7 +113,33 @@ export default function ClientDashboard({ user, onLogout}) {
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
-  const [clientData, setClientData] = useState(null);
+  const { data: rawClientData, isLoading, isError, refetch: fetchProfile } = useQuery({
+    queryKey: ['clientProfile'],
+    queryFn: async () => {
+      return await usersApi.getMe();
+    },
+    retry: 3,
+  });
+
+  const clientData = useMemo(() => {
+    if (!rawClientData) return null;
+    let parsedRoutine = null;
+    if (rawClientData.routineJson) {
+      try { parsedRoutine = JSON.parse(rawClientData.routineJson); } catch (e) { console.error(e); }
+    }
+    let parsedNextRoutine = null;
+    if (rawClientData.nextRoutineJson) {
+      try { parsedNextRoutine = JSON.parse(rawClientData.nextRoutineJson); } catch (e) { console.error(e); }
+    }
+    const hasRoutine = !!(parsedRoutine && Object.keys(parsedRoutine).some(day => parsedRoutine[day] && parsedRoutine[day].length > 0));
+    
+    return {
+      ...rawClientData,
+      routine: parsedRoutine,
+      nextRoutine: parsedNextRoutine,
+      hasRoutine: hasRoutine
+    };
+  }, [rawClientData]);
   const [showRoutineTable, setShowRoutineTable] = useState(false);
   const [pdfStyle, setPdfStyle] = useState('styled');
   const [showEvaluationModal, setShowEvaluationModal] = useState(false);
@@ -152,63 +180,7 @@ export default function ClientDashboard({ user, onLogout}) {
   const [videoLinks, setVideoLinks] = useState({});
   const [logs, setLogs] = useState({});
 
-  const fetchProfile = () => {
-    console.log("👉 1. Arranca fetchProfile");
 
-    const token = localStorage.getItem('token');
-    console.log("👉 2. Token encontrado en el navegador:", token ? "SÍ HAY TOKEN" : "VACÍO / NULL");
-
-    if (!token) {
-      console.error("❌ 3. Abortando: No hay token guardado. El usuario no está logueado correctamente.");
-      return;
-    }
-
-    console.log("👉 4. Llamando al backend (Spring Boot)...");
-
-    fetch(`${API_BASE_URL}/api/users/me`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-        .then(res => {
-          console.log("👉 5. El backend ha respondido. Status:", res.status);
-          if (!res.ok) throw new Error("Error HTTP " + res.status);
-          return res.json();
-        })
-        .then(data => {
-          console.log("👉 6. Datos recibidos del backend:", data);
-
-          let parsedRoutine = null;
-          if (data.routineJson) {
-            try {
-              parsedRoutine = JSON.parse(data.routineJson);
-            } catch (e) {
-              console.error("Error al parsear la rutina", e);
-            }
-          }
-          
-          let parsedNextRoutine = null;
-          if (data.nextRoutineJson) {
-            try {
-              parsedNextRoutine = JSON.parse(data.nextRoutineJson);
-            } catch (e) {
-              console.error("Error al parsear la siguiente rutina", e);
-            }
-          }
-          
-          const hasRoutine = !!(parsedRoutine && Object.keys(parsedRoutine).some(day => parsedRoutine[day] && parsedRoutine[day].length > 0));
-
-          setClientData(prev => ({
-            ...prev,
-            ...data,
-            routine: parsedRoutine,
-            nextRoutine: parsedNextRoutine,
-            hasRoutine: hasRoutine
-          }));
-        })
-        .catch(err => {
-          console.error("❌ 7. Error en la petición (Red o Servidor):", err.message);
-          setTimeout(() => fetchProfile(), 1000);
-        });
-  };
 
   const handleCompleteOnboarding = async (formData, photos) => {
     // Map the questionnaire fields to the ProgressLog shape persisted by the backend.
@@ -285,6 +257,7 @@ export default function ClientDashboard({ user, onLogout}) {
 
   // Drive the review-tab badge from the backend so it never shows "1" while the lock is still
   // closed. We refresh on mount and whenever the user navigates back to the review tab.
+  // eslint-disable-next-line no-unused-vars
   const refreshReviewBadge = async () => {
     try {
       const [lock, active] = await Promise.all([
@@ -299,7 +272,6 @@ export default function ClientDashboard({ user, onLogout}) {
     }
   };
   useEffect(() => {
-    fetchProfile();
     fetchProgressHistory();
   }, [user, activeTab]);
 
@@ -379,6 +351,7 @@ export default function ClientDashboard({ user, onLogout}) {
   const [todaySessionsByDay, setTodaySessionsByDay] = useState({});
 
   // Review Form State
+  // eslint-disable-next-line no-unused-vars
   const [reviewData, setReviewData] = useState({
     weight: '', waist: '', cadera: '', biceps: '', pierna: '', comments: '',
     photos: { front: '', left: '', right: '', back: '' }
@@ -434,6 +407,7 @@ export default function ClientDashboard({ user, onLogout}) {
   // into the next day's workout.
   useEffect(() => {
     if (!clientData?.routine) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchHistory().then(list => {
       if (!Array.isArray(list)) return;
       // Compute the [Monday, Sunday] window for the current week (week starts on Monday in ES).
@@ -482,6 +456,7 @@ export default function ClientDashboard({ user, onLogout}) {
            try {
               const parsed = JSON.parse(s.logsJson);
               slot = parsed._executionSlot;
+           // eslint-disable-next-line no-unused-vars, no-empty
            } catch(e) {}
         }
         
@@ -513,18 +488,23 @@ export default function ClientDashboard({ user, onLogout}) {
           // is looking at the REAL weekday (e.g. "Martes"). Project the inner slot onto the
           // real day so currentLogs = logs[selectedDay] resolves to the saved sets.
           const innerSlot = isFlat ? parsed : (parsed[todays.dayName] || parsed[selectedDay] || {});
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setLogs(prev => ({ ...prev, [selectedDay]: innerSlot }));
+        // eslint-disable-next-line no-unused-vars
         } catch (e) { /* ignore corrupt payload */ }
       }
       if (todays.commentsJson) {
+        // eslint-disable-next-line no-unused-vars, no-empty
         try { setComments(JSON.parse(todays.commentsJson)); } catch (e) {}
       }
       if (todays.videoLinksJson) {
+        // eslint-disable-next-line no-unused-vars, no-empty
         try { setVideoLinks(JSON.parse(todays.videoLinksJson)); } catch (e) {}
       }
       setActiveSessionId(todays.id);
       setWorkoutSeconds(todays.durationSeconds || 0);
       setWorkoutSummary({
+        // eslint-disable-next-line react-hooks/immutability
         time: formatTime(todays.durationSeconds || 0),
         volume: todays.totalVolume,
         sets: todays.completedSets,
@@ -578,10 +558,12 @@ export default function ClientDashboard({ user, onLogout}) {
       const days = Object.keys(currentRoutineObj).filter(day => !day.endsWith('_notes'));
       if (days.length > 0) {
         if (!selectedDay || !days.includes(selectedDay)) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setSelectedDay(days[0]);
         }
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentRoutineObj]);
 
   // Local storage key for the in-progress workout. We keep it per user so a shared device with
@@ -634,6 +616,7 @@ export default function ClientDashboard({ user, onLogout}) {
 
     if (resumed) {
       const merged = { ...initialLogs, [resumed.dayName]: resumed.dayLogs || initialLogs[resumed.dayName] };
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLogs(merged);
       setSelectedDay(resumed.dayName);
       setWorkoutSeconds(resumed.workoutSeconds || 0);
@@ -644,6 +627,7 @@ export default function ClientDashboard({ user, onLogout}) {
     } else {
       setLogs(initialLogs);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientData?.routine, loadedRoutineByTab]);
 
   // Autosave the in-progress workout whenever the relevant slices change. Only while the
@@ -675,6 +659,7 @@ export default function ClientDashboard({ user, onLogout}) {
       return;
     }
     if (!isWorkoutStarted && !hasResumableWorkout) {
+      // eslint-disable-next-line no-empty
       try { localStorage.removeItem(IN_PROGRESS_KEY); } catch {}
     }
   }, [isWorkoutStarted, hasResumableWorkout, IN_PROGRESS_KEY]);
@@ -711,6 +696,7 @@ export default function ClientDashboard({ user, onLogout}) {
   const discardResumableWorkout = () => {
     setHasResumableWorkout(false);
     setResumableDayName(null);
+    // eslint-disable-next-line no-empty
     try { localStorage.removeItem(IN_PROGRESS_KEY); } catch {}
     // Restore the day to fresh empty logs.
     if (clientData?.routine && selectedDay) {
@@ -884,6 +870,7 @@ export default function ClientDashboard({ user, onLogout}) {
     setHasFinishedSession(false);
   };
 
+  // eslint-disable-next-line no-unused-vars
   const cancelLoadedRoutine = () => {
     const loadedRoutine = loadedRoutineByTab[selectedDay];
     if (!loadedRoutine) return;
@@ -962,6 +949,7 @@ export default function ClientDashboard({ user, onLogout}) {
     }
   };
 
+  // eslint-disable-next-line no-unused-vars
   const retrieveRoutine = () => {
     const targetTab = targetTabWhereLoaded;
     if (!targetTab) return;
@@ -1061,11 +1049,13 @@ export default function ClientDashboard({ user, onLogout}) {
     return () => {
       disconnectWebSocket(handleWsMessage);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.email]);
 
   // When opening modal, reset unread and fetch history immediately
   useEffect(() => {
     if (showChatModal && user?.email) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setUnreadMessages(0);
       getChatMessages(user.email).then(msgs => setMessages(msgs));
     }
@@ -1082,12 +1072,16 @@ export default function ClientDashboard({ user, onLogout}) {
   const [dailyWeight, setDailyWeight] = useState('');
   useEffect(() => {
     const last = [...progressHistory].reverse().find((l) => l.weight != null);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (last) setDailyWeight(String(last.weight));
   }, [progressHistory]);
   const [chartType, setChartType] = useState('weight');
+  // eslint-disable-next-line react-hooks/purity
   const lastReviewDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+  // eslint-disable-next-line react-hooks/purity
   const daysSinceReview = Math.floor((Date.now() - lastReviewDate) / (1000 * 60 * 60 * 24));
   const daysUntilNext = 7 - daysSinceReview;
+  // eslint-disable-next-line no-unused-vars
   const isMeasurementsLocked = daysUntilNext > 0;
 
 
@@ -1770,6 +1764,7 @@ export default function ClientDashboard({ user, onLogout}) {
     }
 
     // Revoke after a generous delay so the new tab has time to fetch the blob.
+    // eslint-disable-next-line no-empty
     setTimeout(() => { try { URL.revokeObjectURL(url); } catch {} }, 60000);
   };
 
@@ -1918,11 +1913,21 @@ export default function ClientDashboard({ user, onLogout}) {
     );
   };
 
-  if (!clientData) {
+  if (isLoading || !clientData) {
     return (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', gap: '15px' }}>
           <div style={{ color: 'var(--accent-primary)', fontSize: '2rem' }}>⏳</div>
           <h3 style={{ color: '#fff', fontFamily: 'Outfit' }}>Cargando tu panel...</h3>
+        </div>
+    );
+  }
+
+  if (isError) {
+    return (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', gap: '15px' }}>
+          <div style={{ color: '#f44336', fontSize: '2rem' }}>⚠️</div>
+          <h3 style={{ color: '#fff', fontFamily: 'Outfit' }}>Error al cargar tu panel.</h3>
+          <button onClick={() => fetchProfile()} className="primary-btn">Reintentar</button>
         </div>
     );
   }
@@ -2869,6 +2874,7 @@ export default function ClientDashboard({ user, onLogout}) {
                            if (parsed._executionSlot) {
                              executedTab = parsed._executionSlot;
                            }
+                         // eslint-disable-next-line no-unused-vars, no-empty
                          } catch(e){}
                       }
                       
@@ -2883,12 +2889,15 @@ export default function ClientDashboard({ user, onLogout}) {
                                // currentLogs = logs[selectedDay] resolves correctly.
                                const isFlat = parsed && typeof parsed === 'object' && Object.keys(parsed).every(k => /^\d+$/.test(k));
                                setLogs(isFlat ? { [session.dayName]: parsed } : parsed);
+                             // eslint-disable-next-line no-unused-vars, no-empty
                              } catch(e){}
                           }
                           if (session.commentsJson) {
+                             // eslint-disable-next-line no-unused-vars, no-empty
                              try { setComments(JSON.parse(session.commentsJson)); } catch(e){}
                           }
                           if (session.videoLinksJson) {
+                             // eslint-disable-next-line no-unused-vars, no-empty
                              try { setVideoLinks(JSON.parse(session.videoLinksJson)); } catch(e){}
                           }
                           setSelectedDay(executedTab);

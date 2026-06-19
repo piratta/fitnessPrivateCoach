@@ -4,7 +4,7 @@ import com.fitnessApp.feature.progress.ProgressLog;
 import com.fitnessApp.feature.progress.ProgressLogRepository;
 import com.fitnessApp.feature.review.ReviewImage;
 import com.fitnessApp.feature.review.ReviewService;
-import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -25,26 +25,28 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fitnessApp.feature.workout.WorkoutSession;
 import com.fitnessApp.feature.workout.WorkoutSessionRepository;
+import lombok.RequiredArgsConstructor;
 
 @Service
+@RequiredArgsConstructor
+@SuppressWarnings("null")
 public class UserService {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    private ProgressLogRepository progressLogRepository;
+    private final ProgressLogRepository progressLogRepository;
 
-    @Autowired
-    private WorkoutSessionRepository workoutSessionRepository;
+    private final WorkoutSessionRepository workoutSessionRepository;
 
-    @Autowired
-    private ReviewService reviewService;
+    private final ReviewService reviewService;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
+
+    private final UserMapper userMapper;
 
     private static final SecureRandom RANDOM = new SecureRandom();
+
+
 
     public User getUserByPrincipal(String principal) {
         return userRepository.findByEmail(principal)
@@ -62,7 +64,7 @@ public class UserService {
         List<UserDto> dtos = new ArrayList<>();
 
         for (User u : clients) {
-            UserDto dto = new UserDto(u);
+            UserDto dto = userMapper.toDto(u);
 
             // 1. Get latest weight
             progressLogRepository.findTopByClientOrderByLogDateDesc(u)
@@ -72,13 +74,16 @@ public class UserService {
             int compliance = 0;
             if (u.getRoutineJson() != null && !u.getRoutineJson().isEmpty()) {
                 try {
-                    Map<String, Object> routine = mapper.readValue(u.getRoutineJson(), new TypeReference<Map<String, Object>>() {});
+                    Map<String, Object> routine = mapper.readValue(u.getRoutineJson(),
+                            new TypeReference<Map<String, Object>>() {
+                            });
                     int weeklySessions = routine.size();
                     if (weeklySessions > 0) {
                         int totalExpected = weeklySessions * 4; // last 28 days
 
                         LocalDate thirtyDaysAgo = LocalDate.now().minusDays(28);
-                        List<WorkoutSession> recentSessions = workoutSessionRepository.findByClientIdOrderBySessionDateDesc(u.getId())
+                        List<WorkoutSession> recentSessions = workoutSessionRepository
+                                .findByClientIdOrderBySessionDateDesc(u.getId())
                                 .stream()
                                 .filter(s -> s.getSessionDate() != null && !s.getSessionDate().isBefore(thirtyDaysAgo))
                                 .collect(Collectors.toList());
@@ -112,7 +117,6 @@ public class UserService {
             throw new IllegalArgumentException("Se requieren ambos apellidos.");
         }
 
-        String fullName = firstName + " " + surnames;
         String username = generateUniqueUsername(firstName, surnames);
 
         User client = new User();
@@ -140,32 +144,24 @@ public class UserService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes permisos.");
         }
 
-        if (clientDto.getName() != null && !clientDto.getName().isBlank()) client.setName(clientDto.getName().trim());
-        if (clientDto.getLastName() != null && !clientDto.getLastName().isBlank()) client.setLastName(clientDto.getLastName().trim());
-        if (clientDto.getEmail() != null && !clientDto.getEmail().isBlank() && !clientDto.getEmail().equalsIgnoreCase(client.getEmail())) {
+        userMapper.updateEntityFromDto(clientDto, client);
+        
+        // Manual updates that we want to keep specific control over, 
+        // e.g. ignoring email if conflict, ignoring nulls handled by MapStruct IgnoreStrategy
+        // Wait, MapStruct nullValuePropertyMappingStrategy = IGNORE takes care of nulls.
+        // We just need to check email conflict:
+        if (clientDto.getEmail() != null && !clientDto.getEmail().isBlank()
+                && !clientDto.getEmail().equalsIgnoreCase(client.getEmail())) {
             String newEmail = clientDto.getEmail().trim();
             userRepository.findByEmail(newEmail).ifPresent(existing -> {
-                if (!existing.getId().equals(client.getId())) throw new ResponseStatusException(HttpStatus.CONFLICT, "Email en uso.");
+                if (!existing.getId().equals(client.getId()))
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Email en uso.");
             });
             client.setEmail(newEmail);
         }
-        if (clientDto.getReviewFrequency() != null) client.setReviewFrequency(clientDto.getReviewFrequency());
-        if (clientDto.getProgressionStrategy() != null) client.setProgressionStrategy(clientDto.getProgressionStrategy());
-        if (clientDto.getGoal() != null) client.setGoal(clientDto.getGoal());
-        if (clientDto.getStrategies() != null) client.setStrategies(clientDto.getStrategies());
-        if (clientDto.getStatus() != null) client.setStatus(clientDto.getStatus());
+
         if (clientDto.getRoutineJson() != null) {
-            client.setRoutineJson(clientDto.getRoutineJson());
             client.setRoutineUpdatedAt(java.time.LocalDateTime.now());
-        }
-        if (clientDto.getRoutineStartDate() != null) {
-            client.setRoutineStartDate(clientDto.getRoutineStartDate());
-        }
-        if (clientDto.getRoutineEndDate() != null) {
-            client.setRoutineEndDate(clientDto.getRoutineEndDate());
-        }
-        if (clientDto.getNextRoutineJson() != null) {
-            client.setNextRoutineJson(clientDto.getNextRoutineJson());
         }
 
         return userRepository.save(client);
@@ -182,8 +178,9 @@ public class UserService {
         }
 
         progressLogRepository.deleteAll(progressLogRepository.findByClientOrderByLogDateAsc(client));
-        workoutSessionRepository.deleteAll(workoutSessionRepository.findByClientIdOrderBySessionDateDesc(client.getId()));
-        
+        workoutSessionRepository
+                .deleteAll(workoutSessionRepository.findByClientIdOrderBySessionDateDesc(client.getId()));
+
         userRepository.delete(client);
     }
 
@@ -206,21 +203,27 @@ public class UserService {
     public User updateMe(String principalEmail, UserDto dto) {
         User user = userRepository.findByEmail(principalEmail).orElseThrow();
 
-        if (dto.getName() != null && !dto.getName().isBlank()) user.setName(dto.getName().trim());
+        if (dto.getName() != null && !dto.getName().isBlank())
+            user.setName(dto.getName().trim());
         if (dto.getLastName() != null) {
             String ln = dto.getLastName().trim();
-            if (ln.isEmpty() || ln.equalsIgnoreCase(user.getUsername())) user.setLastName(null);
-            else user.setLastName(ln);
+            if (ln.isEmpty() || ln.equalsIgnoreCase(user.getUsername()))
+                user.setLastName(null);
+            else
+                user.setLastName(ln);
         }
-        if (dto.getBirthDate() != null) user.setBirthDate(dto.getBirthDate());
+        if (dto.getBirthDate() != null)
+            user.setBirthDate(dto.getBirthDate());
         if (dto.getEmail() != null && !dto.getEmail().isBlank() && !dto.getEmail().equalsIgnoreCase(user.getEmail())) {
             String newEmail = dto.getEmail().trim();
             userRepository.findByEmail(newEmail).ifPresent(existing -> {
-                if (!existing.getId().equals(user.getId())) throw new ResponseStatusException(HttpStatus.CONFLICT, "Email en uso.");
+                if (!existing.getId().equals(user.getId()))
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Email en uso.");
             });
             user.setEmail(newEmail);
         }
-        if (dto.getRoutineJson() != null) user.setRoutineJson(dto.getRoutineJson());
+        if (dto.getRoutineJson() != null)
+            user.setRoutineJson(dto.getRoutineJson());
 
         return userRepository.save(user);
     }
@@ -234,16 +237,26 @@ public class UserService {
         log.setClient(user);
         log.setLogDate(today);
         if (body != null) {
-            if (body.get("weight") != null) log.setWeight(readDouble(body.get("weight")));
-            if (body.get("waist") != null) log.setWaist(readDouble(body.get("waist")));
-            if (body.get("hip") != null) log.setHip(readDouble(body.get("hip")));
-            if (body.get("neck") != null) log.setNeck(readDouble(body.get("neck")));
-            if (body.get("biceps") != null) log.setBiceps(readDouble(body.get("biceps")));
-            if (body.get("leg") != null) log.setLeg(readDouble(body.get("leg")));
-            if (body.get("chest") != null) log.setChest(readDouble(body.get("chest")));
-            if (body.get("calf") != null) log.setCalf(readDouble(body.get("calf")));
-            if (body.get("forearm") != null) log.setForearm(readDouble(body.get("forearm")));
-            if (body.get("back") != null) log.setBack(readDouble(body.get("back")));
+            if (body.get("weight") != null)
+                log.setWeight(readDouble(body.get("weight")));
+            if (body.get("waist") != null)
+                log.setWaist(readDouble(body.get("waist")));
+            if (body.get("hip") != null)
+                log.setHip(readDouble(body.get("hip")));
+            if (body.get("neck") != null)
+                log.setNeck(readDouble(body.get("neck")));
+            if (body.get("biceps") != null)
+                log.setBiceps(readDouble(body.get("biceps")));
+            if (body.get("leg") != null)
+                log.setLeg(readDouble(body.get("leg")));
+            if (body.get("chest") != null)
+                log.setChest(readDouble(body.get("chest")));
+            if (body.get("calf") != null)
+                log.setCalf(readDouble(body.get("calf")));
+            if (body.get("forearm") != null)
+                log.setForearm(readDouble(body.get("forearm")));
+            if (body.get("back") != null)
+                log.setBack(readDouble(body.get("back")));
         }
         progressLogRepository.save(log);
 
@@ -257,6 +270,48 @@ public class UserService {
     public ReviewImage uploadInitialPhoto(String principal, String view, MultipartFile file) {
         User user = getUserByPrincipal(principal);
         return reviewService.addStandaloneImage(user, view, true, file);
+    }
+
+    // --- PR Updates ---
+    @Transactional
+    public void updatePersonalRecords(String principal, Map<String, Double> newRecords) {
+        if (newRecords == null || newRecords.isEmpty()) return;
+        User user = getUserByPrincipal(principal);
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            Map<String, Double> currentRecords = new java.util.HashMap<>();
+            if (user.getPersonalRecordsJson() != null && !user.getPersonalRecordsJson().isBlank()) {
+                currentRecords = mapper.readValue(user.getPersonalRecordsJson(), new TypeReference<Map<String, Double>>() {});
+            }
+            
+            boolean updated = false;
+            for (Map.Entry<String, Double> entry : newRecords.entrySet()) {
+                String exName = entry.getKey();
+                Double newWeight = entry.getValue();
+                if (exName == null || exName.isBlank() || newWeight == null || newWeight <= 0) continue;
+                
+                String cleanName = cleanExerciseNamePR(exName);
+                if (cleanName.isBlank()) continue;
+                
+                Double currentMax = currentRecords.get(cleanName);
+                if (currentMax == null || newWeight > currentMax) {
+                    currentRecords.put(cleanName, newWeight);
+                    updated = true;
+                }
+            }
+            
+            if (updated) {
+                user.setPersonalRecordsJson(mapper.writeValueAsString(currentRecords));
+                userRepository.save(user);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private String cleanExerciseNamePR(String text) {
+        if (text == null) return "";
+        return text.toLowerCase().replaceAll("[^a-záéíóúüñ0-9]", "").trim();
     }
 
     // --- Private Helper Methods ---
@@ -289,7 +344,8 @@ public class UserService {
 
         String username = baseUsername;
         int num = 1;
-        while (userRepository.existsByUsernameIgnoreCase(username) || userRepository.findByEmailIgnoreCase(username).isPresent()) {
+        while (userRepository.existsByUsernameIgnoreCase(username)
+                || userRepository.findByEmailIgnoreCase(username).isPresent()) {
             username = baseUsername + num;
             num++;
         }
@@ -297,7 +353,8 @@ public class UserService {
     }
 
     private String normalizeAndClean(String text) {
-        if (text == null) return "";
+        if (text == null)
+            return "";
         String normalized = java.text.Normalizer.normalize(text.toLowerCase(), java.text.Normalizer.Form.NFD);
         return normalized.replaceAll("[^a-z\\s]", "").replaceAll("\\s+", " ").trim();
     }
@@ -305,14 +362,20 @@ public class UserService {
     private String generateTempPassword() {
         String alphabet = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < 8; i++) sb.append(alphabet.charAt(RANDOM.nextInt(alphabet.length())));
+        for (int i = 0; i < 8; i++)
+            sb.append(alphabet.charAt(RANDOM.nextInt(alphabet.length())));
         return sb.toString();
     }
 
     private Double readDouble(Object value) {
-        if (value == null) return null;
-        if (value instanceof Number n) return n.doubleValue();
-        try { return Double.parseDouble(value.toString().trim().replace(',', '.')); }
-        catch (NumberFormatException e) { return null; }
+        if (value == null)
+            return null;
+        if (value instanceof Number n)
+            return n.doubleValue();
+        try {
+            return Double.parseDouble(value.toString().trim().replace(',', '.'));
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

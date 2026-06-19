@@ -2,7 +2,6 @@ package com.fitnessApp.feature.workout;
 
 import com.fitnessApp.feature.user.User;
 import com.fitnessApp.feature.user.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,14 +12,15 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import lombok.RequiredArgsConstructor;
+
 @Service // ¡Esta anotación es la clave!
+@RequiredArgsConstructor
+@SuppressWarnings("null")
 public class WorkoutService {
 
-    @Autowired
-    private WorkoutSessionRepository workoutRepository;
-
-    @Autowired
-    private UserRepository userRepository;
+    private final WorkoutSessionRepository workoutRepository;
+    private final UserRepository userRepository;
 
     public UUID finishWorkout(String principalEmail, WorkoutDto request) {
         User client = userRepository.findByEmail(principalEmail)
@@ -39,9 +39,17 @@ public class WorkoutService {
         session.setCompletedSets(request.getCompletedSets());
         session.setCompletionPercentage(request.getCompletionPercentage());
         session.setSessionDate(today);
+        session.setAssignedDate(request.getAssignedDate() != null ? request.getAssignedDate() : today);
         session.setLogsJson(request.getLogsJson());
         session.setCommentsJson(request.getCommentsJson());
         session.setVideoLinksJson(request.getVideoLinksJson());
+        
+        String snapshot = request.getRoutineSnapshotJson();
+        if (snapshot == null || snapshot.isBlank()) {
+            snapshot = client.getRoutineJson();
+        }
+        session.setRoutineSnapshotJson(snapshot);
+
         session.setStress(request.getStress());
         session.setFatigue(request.getFatigue());
         session.setMotivation(request.getMotivation());
@@ -86,9 +94,11 @@ public class WorkoutService {
             dto.setCompletedSets(s.getCompletedSets());
             dto.setCompletionPercentage(s.getCompletionPercentage());
             dto.setSessionDate(s.getSessionDate());
+            dto.setAssignedDate(s.getAssignedDate());
             dto.setLogsJson(s.getLogsJson());
             dto.setCommentsJson(s.getCommentsJson());
             dto.setVideoLinksJson(s.getVideoLinksJson());
+            dto.setRoutineSnapshotJson(s.getRoutineSnapshotJson());
             dto.setStress(s.getStress());
             dto.setFatigue(s.getFatigue());
             dto.setMotivation(s.getMotivation());

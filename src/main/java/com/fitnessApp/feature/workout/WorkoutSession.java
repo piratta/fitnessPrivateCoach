@@ -37,6 +37,8 @@ public class WorkoutSession {
     @Column(nullable = false)
     private LocalDate sessionDate;
 
+    private LocalDate assignedDate;
+
     private Boolean isSkipped = false;
 
     private String clientComments;
@@ -50,6 +52,9 @@ public class WorkoutSession {
 
     @Column(columnDefinition = "TEXT")
     private String videoLinksJson;
+
+    @Column(columnDefinition = "TEXT")
+    private String routineSnapshotJson;
 
     @OneToMany(mappedBy = "workoutSession", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<SetLog> sets = new ArrayList<>();
@@ -95,6 +100,9 @@ public class WorkoutSession {
     public LocalDate getSessionDate() { return sessionDate; }
     public void setSessionDate(LocalDate sessionDate) { this.sessionDate = sessionDate; }
 
+    public LocalDate getAssignedDate() { return assignedDate; }
+    public void setAssignedDate(LocalDate assignedDate) { this.assignedDate = assignedDate; }
+
     public boolean isSkipped() { return isSkipped != null && isSkipped; }
     public void setSkipped(boolean skipped) { isSkipped = skipped; }
 
@@ -115,6 +123,9 @@ public class WorkoutSession {
 
     public String getVideoLinksJson() { return videoLinksJson; }
     public void setVideoLinksJson(String videoLinksJson) { this.videoLinksJson = videoLinksJson; }
+
+    public String getRoutineSnapshotJson() { return routineSnapshotJson; }
+    public void setRoutineSnapshotJson(String routineSnapshotJson) { this.routineSnapshotJson = routineSnapshotJson; }
 
     public void addSetLog(SetLog setLog) {
         sets.add(setLog);

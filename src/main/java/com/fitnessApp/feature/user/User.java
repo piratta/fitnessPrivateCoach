@@ -90,6 +90,9 @@ public class User {
     @Column(columnDefinition = "TEXT")
     private String nextRoutineJson;
 
+    @Column(columnDefinition = "TEXT")
+    private String personalRecordsJson;
+
     private LocalDateTime routineUpdatedAt;
 
     private LocalDate routineStartDate;

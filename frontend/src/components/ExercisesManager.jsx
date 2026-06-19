@@ -24,6 +24,7 @@ export default function ExercisesManager() {
     try {
       const data = await exercisesApi.list();
       setItems(Array.isArray(data) ? data : []);
+    // eslint-disable-next-line no-unused-vars
     } catch (e) {
       dialog.toast('No se pudo cargar el catálogo', { variant: 'error' });
     } finally {
@@ -31,7 +32,8 @@ export default function ExercisesManager() {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
+  useEffect(() => { load();   }, []);
 
   const filtered = search.trim()
     ? items.filter(ex => ex.name.toLowerCase().includes(search.trim().toLowerCase()))

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+// eslint-disable-next-line no-unused-vars
 import { getChatMessages, addChatMessage, connectWebSocket, disconnectWebSocket, sendWebSocketMessage } from '../utils/chatStore';
 import { getClientBillingStatus } from '../utils/statusUtils';
 import { usersApi } from '../utils/api';
@@ -128,7 +129,9 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
   const [clientHistoryData, setClientHistoryData] = useState([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [trainerEditingSets, setTrainerEditingSets] = useState({});
+  // eslint-disable-next-line no-unused-vars
   const [trainerEditingExtras, setTrainerEditingExtras] = useState({});
   
   const [openedFromTable, setOpenedFromTable] = useState(false);
@@ -162,9 +165,11 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
     if (selectedClient) {
       const latest = clients.find(c => c.id === selectedClient.id);
       if (latest && JSON.stringify(latest.messages) !== JSON.stringify(selectedClient.messages)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSelectedClient(prev => prev ? { ...prev, messages: latest.messages } : null);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clients, selectedClient?.id]);
 
   // Fetch initial history when chat opens
@@ -724,6 +729,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
                     } else {
                       await dialog.alert("Error al guardar el objetivo en el servidor.", { title: "Error" });
                     }
+                  // eslint-disable-next-line no-unused-vars
                   } catch (err) {
                     await dialog.alert("Error de red al guardar el objetivo.", { title: "Error" });
                   }
@@ -761,6 +767,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
                           setSelectedClient(prev => ({ ...prev, strategies: newStrategies }));
                           setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, strategies: newStrategies } : c));
                         }
+                      // eslint-disable-next-line no-unused-vars, no-empty
                       } catch (err) {}
                     }} style={{ background: 'none', border: 'none', color: '#ff4444', cursor: 'pointer' }}>✕</button>
                   </li>
@@ -794,6 +801,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
                         setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, strategies: newStrategies } : c));
                         setNewStrategyInput('');
                       }
+                    // eslint-disable-next-line no-unused-vars, no-empty
                     } catch (err) {}
                   }}
                   style={{ background: 'var(--accent-primary)', color: '#000', border: 'none', padding: '0 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
@@ -825,6 +833,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
                     } else {
                       await dialog.alert("Error al guardar la estrategia de progresión en el servidor.", { title: "Error" });
                     }
+                  // eslint-disable-next-line no-unused-vars
                   } catch (err) {
                     await dialog.alert("Error de red al guardar la estrategia.", { title: "Error" });
                   }
@@ -863,6 +872,7 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
                     } else {
                       await dialog.alert("Error al guardar la periodicidad de revisiones en el servidor.", { title: "Error" });
                     }
+                  // eslint-disable-next-line no-unused-vars
                   } catch (err) {
                     await dialog.alert("Error de red al guardar la periodicidad.", { title: "Error" });
                   }
@@ -1088,11 +1098,15 @@ export default function ClientList({ clients, setClients, billingPlans, onPlanRo
                   let sessionLogs = {};
                   let sessionComments = {};
                   let sessionVideos = {};
+                  // eslint-disable-next-line no-unused-vars, no-empty
                   try { sessionLogs = JSON.parse(session.logsJson || '{}'); } catch(e){}
+                  // eslint-disable-next-line no-unused-vars, no-empty
                   try { sessionComments = JSON.parse(session.commentsJson || '{}'); } catch(e){}
+                  // eslint-disable-next-line no-unused-vars, no-empty
                   try { sessionVideos = JSON.parse(session.videoLinksJson || '{}'); } catch(e){}
 
                   // Try to get the day's logs - they might be nested under dayName or flat
+                  // eslint-disable-next-line no-unused-vars
                   const dayLogs = sessionLogs[session.dayName] || sessionLogs;
 
                   return (

@@ -3,7 +3,6 @@ package com.fitnessApp.feature.workout;
 import com.fitnessApp.feature.user.Role;
 import com.fitnessApp.feature.user.User;
 import com.fitnessApp.feature.user.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -15,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import lombok.RequiredArgsConstructor;
+
 /**
  * Read-only for any authenticated user (so the routine builder running under the coach AND
  * the client preview both can render the catalogue). Mutations are restricted to COACH /
@@ -22,13 +23,12 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/exercises")
+@RequiredArgsConstructor
+@SuppressWarnings("null")
 public class ExerciseController {
 
-    @Autowired
-    private ExerciseRepository repo;
-
-    @Autowired
-    private UserRepository userRepo;
+    private final ExerciseRepository repo;
+    private final UserRepository userRepo;
 
     private User currentUserOrThrow() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();

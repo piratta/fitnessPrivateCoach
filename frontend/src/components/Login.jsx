@@ -35,6 +35,7 @@ export default function Login({ onLogin }) {
 
       localStorage.setItem('token', data.accessToken);
       // Persist the user too so a full reload skips the credentials screen.
+      // eslint-disable-next-line no-empty
       try { localStorage.setItem('user', JSON.stringify(data.user)); } catch {}
 
       if (data.user && data.user.mustChangePassword) {
@@ -81,6 +82,7 @@ export default function Login({ onLogin }) {
 
       // Password changed, login completely
       onLogin({ ...tempUser, mustChangePassword: false });
+    // eslint-disable-next-line no-unused-vars
     } catch (err) {
       setError('Hubo un problema al actualizar la contraseña. Reinténtalo.');
     }

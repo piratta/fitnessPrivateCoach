@@ -12,6 +12,7 @@ export default function AuthImage({ imageId, alt = '', style, className, onClick
   useEffect(() => {
     let revoked = false;
     let objectUrl = null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setUrl(null);
     setFailed(false);
 

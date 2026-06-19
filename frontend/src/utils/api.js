@@ -76,6 +76,7 @@ export const exercisesApi = {
 };
 
 export const usersApi = {
+  getMe: () => request('/api/users/me'),
   completeOnboarding: (measurements) => request('/api/users/me/complete-onboarding', { method: 'POST', body: measurements }),
   uploadInitialPhoto: (file, view) => {
     const form = new FormData();

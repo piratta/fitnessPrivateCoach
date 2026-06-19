@@ -20,9 +20,11 @@ public class WorkoutDto {
     private int completedSets;
     private int completionPercentage;
     private LocalDate sessionDate;
+    private LocalDate assignedDate;
     private String logsJson;
     private String commentsJson;
     private String videoLinksJson;
+    private String routineSnapshotJson;
     private Integer stress;
     private Integer fatigue;
     private Integer motivation;

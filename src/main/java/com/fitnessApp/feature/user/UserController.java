@@ -2,7 +2,6 @@ package com.fitnessApp.feature.user;
 
 import com.fitnessApp.feature.review.ReviewImage;
 import com.fitnessApp.feature.workout.WorkoutService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -19,11 +18,15 @@ import java.util.UUID;
 @RequestMapping("/api/users")
 public class UserController {
 
-    @Autowired
-    private UserService userService;
+    private final UserService userService;
+    private final WorkoutService workoutService;
+    private final UserMapper userMapper;
 
-    @Autowired
-    private WorkoutService workoutService;
+    public UserController(UserService userService, WorkoutService workoutService, UserMapper userMapper) {
+        this.userService = userService;
+        this.workoutService = workoutService;
+        this.userMapper = userMapper;
+    }
 
     @GetMapping("/me/whoami")
     public ResponseEntity<Map<String, Object>> whoami() {
@@ -38,9 +41,10 @@ public class UserController {
     @GetMapping("/me")
     public ResponseEntity<UserDto> getMe() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getName() == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (auth == null || auth.getName() == null)
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         User user = userService.getUserByPrincipal(auth.getName());
-        UserDto dto = new UserDto(user);
+        UserDto dto = userMapper.toDto(user);
         dto.setRoutineJson(workoutService.enrichRoutineWithSuggestedWeights(user, dto.getRoutineJson()));
         if (dto.getNextRoutineJson() != null) {
             dto.setNextRoutineJson(workoutService.enrichRoutineWithSuggestedWeights(user, dto.getNextRoutineJson()));
@@ -56,7 +60,8 @@ public class UserController {
             User client = userService.getUserByPrincipal(dto.getEmail());
             dto.setRoutineJson(workoutService.enrichRoutineWithSuggestedWeights(client, dto.getRoutineJson()));
             if (dto.getNextRoutineJson() != null) {
-                dto.setNextRoutineJson(workoutService.enrichRoutineWithSuggestedWeights(client, dto.getNextRoutineJson()));
+                dto.setNextRoutineJson(
+                        workoutService.enrichRoutineWithSuggestedWeights(client, dto.getNextRoutineJson()));
             }
         }
         return ResponseEntity.ok(clients);
@@ -67,7 +72,7 @@ public class UserController {
         try {
             String principal = SecurityContextHolder.getContext().getAuthentication().getName();
             User savedClient = userService.createClient(principal, clientDto);
-            return ResponseEntity.ok(new UserDto(savedClient));
+            return ResponseEntity.ok(userMapper.toDto(savedClient));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
@@ -77,7 +82,7 @@ public class UserController {
     public ResponseEntity<?> updateClient(@PathVariable UUID clientId, @RequestBody UserDto clientDto) {
         String principal = SecurityContextHolder.getContext().getAuthentication().getName();
         User updatedClient = userService.updateClient(principal, clientId, clientDto);
-        return ResponseEntity.ok(new UserDto(updatedClient));
+        return ResponseEntity.ok(userMapper.toDto(updatedClient));
     }
 
     @DeleteMapping("/clients/{clientId}")
@@ -104,27 +109,37 @@ public class UserController {
     public ResponseEntity<?> updateMe(@RequestBody UserDto dto) {
         String principal = SecurityContextHolder.getContext().getAuthentication().getName();
         User updatedMe = userService.updateMe(principal, dto);
-        return ResponseEntity.ok(new UserDto(updatedMe));
+        return ResponseEntity.ok(userMapper.toDto(updatedMe));
     }
 
     @PostMapping("/me/complete-onboarding")
     public ResponseEntity<?> completeOnboarding(@RequestBody(required = false) Map<String, Object> body) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getName() == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Sesión expirada.");
+        if (auth == null || auth.getName() == null)
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Sesión expirada.");
 
         User user = userService.completeOnboarding(auth.getName(), body);
-        return ResponseEntity.ok(new UserDto(user));
+        return ResponseEntity.ok(userMapper.toDto(user));
     }
 
     @PostMapping(value = "/me/initial-photo", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> uploadInitialPhoto(@RequestParam("file") MultipartFile file, @RequestParam(value = "view", required = false) String view) {
+    public ResponseEntity<?> uploadInitialPhoto(@RequestParam("file") MultipartFile file,
+            @RequestParam(value = "view", required = false) String view) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getName() == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Sesión expirada.");
+        if (auth == null || auth.getName() == null)
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Sesión expirada.");
 
         ReviewImage saved = userService.uploadInitialPhoto(auth.getName(), view, file);
         Map<String, Object> body = new HashMap<>();
         body.put("id", saved.getId());
         body.put("view", saved.getView());
         return ResponseEntity.ok(body);
+    }
+
+    @PutMapping("/me/prs")
+    public ResponseEntity<?> updatePersonalRecords(@RequestBody Map<String, Double> newRecords) {
+        String principal = SecurityContextHolder.getContext().getAuthentication().getName();
+        userService.updatePersonalRecords(principal, newRecords);
+        return ResponseEntity.ok().build();
     }
 }

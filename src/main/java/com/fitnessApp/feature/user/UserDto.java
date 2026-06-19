@@ -32,6 +32,7 @@ public class UserDto {
     private String billingPlanId;
     private String routineJson;
     private String nextRoutineJson;
+    private String personalRecordsJson;
     private LocalDateTime routineUpdatedAt;
     private LocalDate routineStartDate;
     private LocalDate routineEndDate;
@@ -41,32 +42,4 @@ public class UserDto {
     private Double currentWeight;
     private Integer compliance;
 
-    public UserDto(User user) {
-        this.id = user.getId();
-        this.email = user.getEmail();
-        this.name = user.getName();
-
-        String ln = user.getLastName();
-        this.lastName = (ln != null && ln.equalsIgnoreCase(user.getUsername())) ? null : ln;
-        this.birthDate = user.getBirthDate();
-        this.role = user.getRole().name();
-        this.status = user.getStatus();
-        this.goal = user.getGoal();
-        this.strategies = user.getStrategies();
-        this.progressionStrategy = user.getProgressionStrategy();
-        this.username = user.getUsername();
-        this.mustChangePassword = user.isMustChangePassword();
-        this.onboardingCompleted = Boolean.TRUE.equals(user.getOnboardingCompleted());
-        this.reviewFrequency = user.getReviewFrequency();
-        this.routineJson = user.getRoutineJson();
-        this.nextRoutineJson = user.getNextRoutineJson();
-        this.routineUpdatedAt = user.getRoutineUpdatedAt();
-        this.routineStartDate = user.getRoutineStartDate();
-        this.routineEndDate = user.getRoutineEndDate();
-        this.lastReviewDate = user.getLastReviewDate();
-        this.nextReviewAt = user.getNextReviewAt();
-        this.createdAt = user.getCreatedAt();
-        this.currentWeight = 0.0;
-        this.compliance = 0;
-    }
 }

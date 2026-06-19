@@ -3,7 +3,6 @@ package com.fitnessApp.feature.workout;
 import com.fitnessApp.feature.user.Role;
 import com.fitnessApp.feature.user.User;
 import com.fitnessApp.feature.user.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -17,16 +16,20 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import lombok.RequiredArgsConstructor;
+
 /**
  * Coach-scoped CRUD of routine templates. All operations require COACH / SUPER_ADMIN role and
  * are guarded by ownership: a coach can only see / modify their own library.
  */
 @RestController
 @RequestMapping("/api/templates")
+@RequiredArgsConstructor
+@SuppressWarnings("null")
 public class RoutineTemplateController {
 
-    @Autowired private RoutineTemplateRepository repo;
-    @Autowired private UserRepository userRepo;
+    private final RoutineTemplateRepository repo;
+    private final UserRepository userRepo;
 
     private User currentCoach() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();

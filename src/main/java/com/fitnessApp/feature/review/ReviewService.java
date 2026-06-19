@@ -2,7 +2,6 @@ package com.fitnessApp.feature.review;
 
 import com.fitnessApp.feature.user.User;
 import com.fitnessApp.feature.user.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,19 +13,23 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import lombok.RequiredArgsConstructor;
+
 /**
  * Owns the review lifecycle. All state transitions and the review-creation lock live here so the
  * frontend never decides anything critical — it only reflects the state the backend reports.
  */
 @Service
+@RequiredArgsConstructor
+@SuppressWarnings("null")
 public class ReviewService {
 
     private static final List<ReviewStatus> ACTIVE_STATUSES =
             List.of(ReviewStatus.PENDING, ReviewStatus.VALIDATED, ReviewStatus.FEEDBACK_RECEIVED);
 
-    @Autowired private ReviewRepository reviewRepository;
-    @Autowired private ReviewImageRepository reviewImageRepository;
-    @Autowired private UserRepository userRepository;
+    private final ReviewRepository reviewRepository;
+    private final ReviewImageRepository reviewImageRepository;
+    private final UserRepository userRepository;
 
     /**
      * Computes when the next review is allowed, based on the client's configured frequency.

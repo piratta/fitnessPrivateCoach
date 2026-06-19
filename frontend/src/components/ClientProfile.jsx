@@ -40,6 +40,7 @@ export default function ClientProfile({ user, onClose, onUpdated }) {
     // Defensive: avoid showing the username as a surname if a legacy row had them confused.
     const safeLastName = user.lastName && user.lastName.toLowerCase() !== (user.username || '').toLowerCase()
       ? user.lastName : '';
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setForm({
       name: user.name || '',
       lastName: safeLastName,

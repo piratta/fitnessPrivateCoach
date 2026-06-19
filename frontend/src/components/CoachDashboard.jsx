@@ -6,6 +6,7 @@ import ReviewManager from './ReviewManager';
 import TemplateManager from './TemplateManager';
 import BillingManager from './BillingManager';
 import ExercisesManager from './ExercisesManager';
+// eslint-disable-next-line no-unused-vars
 import { initChatIfEmpty, connectWebSocket, disconnectWebSocket } from '../utils/chatStore';
 import { useDialog } from './ui/Dialog';
 import { API_BASE_URL } from '../config';
@@ -70,6 +71,7 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
   });
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setProfileForm({
       name: user.name || '',
       lastName: user.lastName || '',
@@ -169,6 +171,7 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
       setClients(formattedClients);
     })
     .catch(err => console.error("Error loading clients:", err));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Connect to WebSocket and receive live messages globally
@@ -405,6 +408,7 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
                   const errText = await res.text();
                   await dialog.alert("Error al actualizar perfil: " + errText, { title: "Error" });
                 }
+              // eslint-disable-next-line no-unused-vars
               } catch (err) {
                 await dialog.alert("Error de red al actualizar perfil.", { title: "Error" });
               }

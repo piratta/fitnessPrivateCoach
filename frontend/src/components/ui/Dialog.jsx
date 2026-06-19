@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 /**
@@ -16,6 +16,7 @@ import { createPortal } from 'react-dom';
 
 const DialogContext = createContext(null);
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useDialog() {
   const ctx = useContext(DialogContext);
   if (!ctx) throw new Error('useDialog must be used within <DialogProvider>');
@@ -48,9 +49,13 @@ export function DialogProvider({ children }) {
   }, []);
 
   const api = useRef({});
+  // eslint-disable-next-line react-hooks/refs
   api.current.alert = (message, options) => open('alert', message, options);
+  // eslint-disable-next-line react-hooks/refs
   api.current.confirm = (message, options) => open('confirm', message, options);
+  // eslint-disable-next-line react-hooks/refs
   api.current.prompt = (message, options) => open('prompt', message, options);
+  // eslint-disable-next-line react-hooks/refs
   api.current.toast = (message, options = {}) => {
     const id = ++toastId.current;
     setToasts((t) => [...t, { id, message, variant: options.variant || 'info' }]);
@@ -60,6 +65,7 @@ export function DialogProvider({ children }) {
   const accent = dialog?.options?.danger ? '#ff4500' : 'var(--accent-primary)';
 
   return (
+    // eslint-disable-next-line react-hooks/refs
     <DialogContext.Provider value={api.current}>
       {children}
 

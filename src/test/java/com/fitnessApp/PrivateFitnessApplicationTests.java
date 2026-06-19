@@ -1,6 +1,6 @@
 package com.fitnessApp;
 
-import com.fitnessApp.feature.user.User;
+
 import com.fitnessApp.feature.user.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

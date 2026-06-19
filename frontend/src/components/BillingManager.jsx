@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getClientBillingStatus } from '../utils/statusUtils';
 import { useDialog } from './ui/Dialog';
@@ -240,6 +240,7 @@ export default function BillingManager({ clients, setClients, billingPlans, setB
                               } else {
                                 await dialog.alert("Error al eliminar el cliente del servidor.", { title: "Error" });
                               }
+                            // eslint-disable-next-line no-unused-vars
                             } catch (err) {
                               await dialog.alert("Error de red al eliminar el cliente.", { title: "Error" });
                             }

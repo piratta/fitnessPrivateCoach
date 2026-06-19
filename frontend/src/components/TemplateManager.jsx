@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useDialog } from './ui/Dialog';
 import { API_BASE_URL } from '../config';
 import '../index.css';
@@ -65,6 +65,7 @@ export default function TemplateManager({ templates, setTemplates, onCreateNew, 
                     } else {
                       await dialog.alert("Error al eliminar la plantilla.", { title: "Error" });
                     }
+                  // eslint-disable-next-line no-unused-vars
                   } catch (err) {
                     await dialog.alert("Error de red al eliminar la plantilla.", { title: "Error de red" });
                   }

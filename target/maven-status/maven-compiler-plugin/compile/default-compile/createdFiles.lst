@@ -5,6 +5,7 @@ com\fitnessApp\feature\chat\ChatMessageDto.class
 com\fitnessApp\core\security\SecurityConfig.class
 com\fitnessApp\feature\chat\ChatMessageDto$ChatMessageDtoBuilder.class
 com\fitnessApp\feature\workout\SetLog.class
+META-INF\spring-configuration-metadata.json
 com\fitnessApp\feature\progress\ProgressLogController.class
 com\fitnessApp\feature\user\UserController.class
 com\fitnessApp\feature\user\UserService$1.class
@@ -29,6 +30,7 @@ com\fitnessApp\core\websocket\ChatWebSocketHandler.class
 com\fitnessApp\feature\workout\Exercise.class
 com\fitnessApp\feature\workout\RoutineTemplateController.class
 com\fitnessApp\feature\workout\RoutineTemplateRepository.class
+com\fitnessApp\core\security\JwtProperties.class
 com\fitnessApp\feature\review\ReviewImage.class
 com\fitnessApp\feature\workout\WorkoutDto$WorkoutDtoBuilder.class
 com\fitnessApp\feature\workout\WorkoutService$2.class
@@ -49,9 +51,12 @@ com\fitnessApp\feature\chat\ChatMessage.class
 com\fitnessApp\feature\workout\RoutineTemplate.class
 com\fitnessApp\feature\workout\WorkoutController.class
 com\fitnessApp\core\config\DataSeeder.class
+com\fitnessApp\feature\user\UserService$2.class
+com\fitnessApp\feature\user\UserMapperImpl.class
 com\fitnessApp\feature\review\ReviewRepository.class
 com\fitnessApp\feature\review\ReviewStatus.class
 com\fitnessApp\feature\auth\JwtAuthenticationResponse.class
+com\fitnessApp\feature\user\UserMapper.class
 com\fitnessApp\feature\workout\WorkoutSession.class
 com\fitnessApp\feature\auth\AuthController.class
 com\fitnessApp\feature\user\UserService.class

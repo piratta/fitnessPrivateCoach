@@ -49,6 +49,7 @@ export async function addChatMessage(clientEmail, text) {
 }
 
 // Legacy function no longer needed, keeping signature empty to prevent crashes
+// eslint-disable-next-line no-unused-vars
 export function initChatIfEmpty(clientEmail, defaultMessages) {
 }
 

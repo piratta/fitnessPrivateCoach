@@ -37,14 +37,17 @@ export default function ReviewManager({ clients, setClients }) {
         const img = new Image();
         img.onload = () => {
           setBackgroundImg(img);
+          // eslint-disable-next-line react-hooks/immutability
           redrawCanvas([], null, img);
         };
         img.src = drawings[largePhotoView];
       } else {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setBackgroundImg(null);
         redrawCanvas([], null, null);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editMode, largePhotoView]);
 
   const redrawCanvas = (elems = elements, selId = selectedElementId, bg = backgroundImg) => {

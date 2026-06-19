@@ -1,10 +1,10 @@
 package com.fitnessApp.feature.auth;
 
-import com.fitnessApp.feature.user.UserDto;
+
 import com.fitnessApp.feature.user.User;
 import com.fitnessApp.feature.user.UserRepository;
 import com.fitnessApp.core.security.JwtTokenProvider;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.fitnessApp.feature.user.UserMapper;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -17,17 +17,19 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    @Autowired
-    private AuthenticationManager authenticationManager;
+    private final AuthenticationManager authenticationManager;
+    private final UserRepository userRepository;
+    private final JwtTokenProvider tokenProvider;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    private final UserMapper userMapper;
 
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private JwtTokenProvider tokenProvider;
-
-    @Autowired
-    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    public AuthController(AuthenticationManager authenticationManager, UserRepository userRepository, JwtTokenProvider tokenProvider, org.springframework.security.crypto.password.PasswordEncoder passwordEncoder, UserMapper userMapper) {
+        this.authenticationManager = authenticationManager;
+        this.userRepository = userRepository;
+        this.tokenProvider = tokenProvider;
+        this.passwordEncoder = passwordEncoder;
+        this.userMapper = userMapper;
+    }
 
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
@@ -47,7 +49,7 @@ public class AuthController {
                 .or(() -> userRepository.findByEmailIgnoreCase(loginRequest.getEmail()))
                 .orElseThrow();
         
-        return ResponseEntity.ok(new JwtAuthenticationResponse(jwt, new UserDto(user)));
+        return ResponseEntity.ok(new JwtAuthenticationResponse(jwt, userMapper.toDto(user)));
     }
 
     @PostMapping("/change-password")

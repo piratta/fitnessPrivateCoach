@@ -3,7 +3,6 @@ package com.fitnessApp.feature.review;
 import com.fitnessApp.feature.user.Role;
 import com.fitnessApp.feature.user.User;
 import com.fitnessApp.feature.user.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -20,13 +19,17 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
 @RequestMapping("/api/reviews")
+@RequiredArgsConstructor
+@SuppressWarnings("null")
 public class ReviewController {
 
-    @Autowired private ReviewService reviewService;
-    @Autowired private ReviewRepository reviewRepository;
-    @Autowired private UserRepository userRepository;
+    private final ReviewService reviewService;
+    private final ReviewRepository reviewRepository;
+    private final UserRepository userRepository;
 
     private User currentUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();

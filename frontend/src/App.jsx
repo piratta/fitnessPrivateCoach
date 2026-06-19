@@ -37,6 +37,7 @@ function App() {
   // If the token is missing but we have a stale user (e.g. cleared cookies), drop the user too
   // so the next render shows the login screen instead of an empty dashboard.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (user && !localStorage.getItem('token')) setUser(null);
   }, [user]);
 

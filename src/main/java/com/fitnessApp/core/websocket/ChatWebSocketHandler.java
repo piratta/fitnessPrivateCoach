@@ -8,7 +8,6 @@ import com.fitnessApp.feature.chat.ChatMessageRepository;
 import com.fitnessApp.feature.user.UserRepository;
 import com.fitnessApp.core.security.JwtTokenProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.socket.CloseStatus;
@@ -21,20 +20,17 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import lombok.RequiredArgsConstructor;
+
 @Component
+@RequiredArgsConstructor
+@SuppressWarnings("null")
 public class ChatWebSocketHandler extends TextWebSocketHandler {
 
-    @Autowired
-    private JwtTokenProvider tokenProvider;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private ChatMessageRepository chatMessageRepository;
-
-    @Autowired
-    private ObjectMapper objectMapper;
+    private final JwtTokenProvider tokenProvider;
+    private final UserRepository userRepository;
+    private final ChatMessageRepository chatMessageRepository;
+    private final ObjectMapper objectMapper;
 
     // Map: User Email -> Set of active WebSocketSessions
     private final Map<String, Set<WebSocketSession>> userSessions = new ConcurrentHashMap<>();

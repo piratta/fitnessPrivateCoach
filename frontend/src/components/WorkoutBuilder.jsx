@@ -92,6 +92,7 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
         lastLoadedRef.current = { clientName: '', assignAs: '', templateId: currentTemplateId };
         if (editingTemplate) {
           const { exercises, notes } = parseRoutineJson(editingTemplate.routineJson || editingTemplate.routine);
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setWeeklyRoutine(exercises);
           setDailyNotes(notes);
           setTemplateTitle(editingTemplate.title || '');
@@ -609,6 +610,7 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
                 const errText = await response.text();
                 await dialog.alert("Error al guardar la plantilla: " + errText, { title: "Error" });
               }
+            // eslint-disable-next-line no-unused-vars
             } catch (err) {
               await dialog.alert("Error de red al guardar la plantilla.", { title: "Error de red" });
             }
@@ -673,6 +675,7 @@ export default function WorkoutBuilder({ clients = [], templates = [], isTemplat
               } else {
                 await dialog.alert("Error al guardar la rutina en el servidor.", { title: "Error" });
               }
+            // eslint-disable-next-line no-unused-vars
             } catch (err) {
               await dialog.alert("Error de red al guardar la rutina.", { title: "Error" });
             }

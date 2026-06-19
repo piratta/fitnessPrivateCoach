@@ -3,7 +3,6 @@ package com.fitnessApp.feature.chat;
 import com.fitnessApp.feature.user.Role;
 import com.fitnessApp.feature.user.User;
 import com.fitnessApp.feature.user.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -13,18 +12,16 @@ import java.util.List;
 import java.util.stream.Collectors;
 import com.fitnessApp.core.websocket.ChatWebSocketHandler;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
 @RequestMapping("/api/chat")
+@RequiredArgsConstructor
 public class ChatController {
 
-    @Autowired
-    private ChatMessageRepository chatMessageRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private ChatWebSocketHandler chatWebSocketHandler;
+    private final ChatMessageRepository chatMessageRepository;
+    private final UserRepository userRepository;
+    private final ChatWebSocketHandler chatWebSocketHandler;
 
     @GetMapping("/{clientEmail}")
     public ResponseEntity<List<ChatMessageDto>> getChatHistory(@PathVariable String clientEmail) {

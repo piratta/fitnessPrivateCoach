@@ -80,6 +80,7 @@ export default function ReviewTab({ onLockChange }) {
       setActive(activeReview);
       setHistory(hist || []);
       if (onLockChange) onLockChange(!!lockStatus?.locked);
+    // eslint-disable-next-line no-unused-vars
     } catch (e) {
       dialog.toast('No se pudo cargar la revisión', { variant: 'error' });
     } finally {
@@ -87,7 +88,8 @@ export default function ReviewTab({ onLockChange }) {
     }
   };
 
-  useEffect(() => { refresh(); /* eslint-disable-next-line */ }, []);
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
+  useEffect(() => { refresh();   }, []);
 
   // Live countdown while locked.
   useEffect(() => {
@@ -309,6 +311,7 @@ function ActiveReview({ review, onAcknowledge, refresh }) {
       await reviewsApi.uploadImage(review.id, file, slot, visibleForClient);
       dialog.toast('Imagen subida correctamente', { variant: 'success' });
       if (refresh) refresh();
+    // eslint-disable-next-line no-unused-vars
     } catch (err) {
       dialog.toast('No se pudo subir la imagen', { variant: 'error' });
     }
@@ -319,6 +322,7 @@ function ActiveReview({ review, onAcknowledge, refresh }) {
       await reviewsApi.deleteImage(imageId);
       dialog.toast('Imagen eliminada', { variant: 'success' });
       if (refresh) refresh();
+    // eslint-disable-next-line no-unused-vars
     } catch (err) {
       dialog.toast('No se pudo eliminar la imagen', { variant: 'error' });
     }

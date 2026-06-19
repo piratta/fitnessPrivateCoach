@@ -19,6 +19,7 @@ export default function GalleryTab() {
       setImages(prev => prev.filter(i => i.id !== id));
       setZoom(null);
       dialog.toast('Foto eliminada', { variant: 'success' });
+    // eslint-disable-next-line no-unused-vars
     } catch (e) {
       dialog.toast('Error al eliminar', { variant: 'error' });
     }

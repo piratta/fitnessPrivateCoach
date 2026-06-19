@@ -464,6 +464,7 @@ const cacheListeners = new Set();
 function notifyCustomCacheUpdated() {
   cacheListeners.forEach(fn => { try { fn(); } catch { /* swallow */ } });
 }
+// eslint-disable-next-line react-refresh/only-export-components
 export function refreshCustomExerciseCache() {
   cachedCustomExercises = null;
   notifyCustomCacheUpdated();
@@ -538,6 +539,7 @@ export default function SearchableExerciseSelect({ value, onChange }) {
       onChange(created?.name || term);
       setIsOpen(false);
       setSearch('');
+    // eslint-disable-next-line no-unused-vars
     } catch (err) {
       // Silently fall back to just picking the typed name so the user is not blocked even
       // if the persistence fails. Manager screen will reconcile later.
