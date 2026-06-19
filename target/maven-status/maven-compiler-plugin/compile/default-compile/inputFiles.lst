@@ -16,6 +16,7 @@ C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\auth\JwtAuthenticationResponse.java
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\auth\LoginRequest.java
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\chat\ChatController.java
+C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\chat\ChatMapper.java
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\chat\ChatMessage.java
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\chat\ChatMessageDto.java
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\chat\ChatMessageRepository.java
@@ -51,6 +52,7 @@ C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\workout\SetLogRepository.java
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\workout\WorkoutController.java
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\workout\WorkoutDto.java
+C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\workout\WorkoutMapper.java
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\workout\WorkoutService.java
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\workout\WorkoutSession.java
 C:\Users\wdriv\IdeaProjects\privateFitness\src\main\java\com\fitnessApp\feature\workout\WorkoutSessionRepository.java
