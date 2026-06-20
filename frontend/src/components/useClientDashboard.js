@@ -1243,12 +1243,13 @@ export default function useClientDashboard(user, onLogout) {
     try {
       const payload = {
         dayName: selectedDay,
+        sessionDate: new Date().toISOString().split('T')[0],
         durationSeconds: workoutSeconds,
         totalVolume: totalVolume,
         completedSets: completedSets.length,
         completionPercentage: completionPercentage,
-        commentsJson: comments,
-        videoLinksJson: videoLinks,
+        commentsJson: JSON.stringify(comments),
+        videoLinksJson: JSON.stringify(videoLinks),
         stress: workoutEval.stress,
         fatigue: workoutEval.fatigue,
         motivation: workoutEval.motivation,
@@ -1323,16 +1324,17 @@ export default function useClientDashboard(user, onLogout) {
 
       const payload = {
         dayName: selectedDay,
+        sessionDate: new Date().toISOString().split('T')[0],
         durationSeconds: workoutSeconds,
         totalVolume: totalVolume,
         completedSets: completedSets.length,
         completionPercentage: completionPercentage,
-        logsJson: {
+        logsJson: JSON.stringify({
           ...(currentLogsToSave[selectedDay] || currentLogsToSave),
           _executionSlot: selectedDay
-        },
-        commentsJson: currentCommentsToSave,
-        videoLinksJson: currentLinksToSave
+        }),
+        commentsJson: JSON.stringify(currentCommentsToSave),
+        videoLinksJson: JSON.stringify(currentLinksToSave)
       };
       await workoutsApi.saveOrUpdate(activeSessionId, payload);
 

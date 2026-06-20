@@ -140,6 +140,14 @@ public class WorkoutService {
             throw new RuntimeException("No tienes permisos para modificar este entrenamiento.");
         }
 
+        if (request.getDayName() != null && !request.getDayName().isBlank()) {
+            session.setDayName(request.getDayName());
+        }
+        
+        if (request.getSessionDate() != null) {
+            session.setSessionDate(request.getSessionDate());
+        }
+
         session.setCommentsJson(request.getCommentsJson());
         session.setVideoLinksJson(request.getVideoLinksJson());
         session.setDurationSeconds(request.getDurationSeconds());
