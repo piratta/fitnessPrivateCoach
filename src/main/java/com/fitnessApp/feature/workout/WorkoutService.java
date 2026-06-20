@@ -24,8 +24,9 @@ public class WorkoutService {
     private final WorkoutSessionRepository workoutRepository;
     private final UserRepository userRepository;
     private final WorkoutMapper workoutMapper;
+    private final SetLogRepository setLogRepository;
 
-        public UUID finishWorkout(String principalEmail, WorkoutDto request) {
+    public UUID finishWorkout(String principalEmail, WorkoutDto request) {
         User client = userRepository.findByEmail(principalEmail)
                 .or(() -> userRepository.findByUsername(principalEmail))
                 .orElseThrow();
@@ -43,10 +44,10 @@ public class WorkoutService {
         session.setCompletionPercentage(request.getCompletionPercentage());
         session.setSessionDate(today);
         session.setAssignedDate(request.getAssignedDate() != null ? request.getAssignedDate() : today);
-        
+
         session.setCommentsJson(request.getCommentsJson());
         session.setVideoLinksJson(request.getVideoLinksJson());
-        
+
         String snapshot = request.getRoutineSnapshotJson();
         if (snapshot == null || snapshot.isBlank()) {
             snapshot = client.getRoutineJson();
@@ -64,9 +65,11 @@ public class WorkoutService {
         return workoutRepository.save(session).getId();
     }
 
-        public void updateWorkout(String principalEmail, UUID id, WorkoutDto request) {
-        User client = userRepository.findByEmail(principalEmail).orElseThrow(() -> new ClientNotFoundException("Cliente no encontrado con email: " + principalEmail));
-        WorkoutSession session = workoutRepository.findById(id).orElseThrow(() -> new WorkoutNotFoundException("Sesión de entrenamiento no encontrada con ID: " + id));
+    public void updateWorkout(String principalEmail, UUID id, WorkoutDto request) {
+        User client = userRepository.findByEmail(principalEmail)
+                .orElseThrow(() -> new ClientNotFoundException("Cliente no encontrado con email: " + principalEmail));
+        WorkoutSession session = workoutRepository.findById(id)
+                .orElseThrow(() -> new WorkoutNotFoundException("Sesión de entrenamiento no encontrada con ID: " + id));
 
         if (!session.getClient().getId().equals(client.getId())) {
             throw new RuntimeException("No tienes permisos para modificar este entrenamiento.");
@@ -89,14 +92,16 @@ public class WorkoutService {
         workoutRepository.save(session);
     }
 
-        @SuppressWarnings("unchecked")
     private void parseAndSaveSetLogs(String logsJson, WorkoutSession session) {
-        if (logsJson == null || logsJson.isBlank()) return;
-        
+        if (logsJson == null || logsJson.isBlank())
+            return;
+
         try {
             ObjectMapper mapper = new ObjectMapper();
-            Map<String, List<Map<String, Object>>> logsMap = mapper.readValue(logsJson, new TypeReference<Map<String, List<Map<String, Object>>>>() {});
-            
+            Map<String, List<Map<String, Object>>> logsMap = mapper.readValue(logsJson,
+                    new TypeReference<Map<String, List<Map<String, Object>>>>() {
+                    });
+
             if (session.getSets() == null) {
                 session.setSets(new java.util.ArrayList<>());
             } else {
@@ -112,46 +117,51 @@ public class WorkoutService {
                 }
 
                 List<Map<String, Object>> exLogs = entry.getValue();
-                if (exLogs == null) continue;
+                if (exLogs == null)
+                    continue;
 
                 for (int setIndex = 0; setIndex < exLogs.size(); setIndex++) {
                     Map<String, Object> setMap = exLogs.get(setIndex);
-                    if (setMap == null) continue;
+                    if (setMap == null)
+                        continue;
 
                     SetLog setLog = new SetLog();
                     setLog.setExerciseIndex(exerciseIndex);
                     setLog.setSetIndex(setIndex);
-                    
+
                     if (setMap.get("exerciseName") != null) {
                         setLog.setExerciseName(String.valueOf(setMap.get("exerciseName")));
                     }
-                    
+
                     if (setMap.get("completed") != null) {
                         setLog.setCompleted(Boolean.parseBoolean(String.valueOf(setMap.get("completed"))));
                     }
-                    
+
                     if (setMap.get("weight") != null && !String.valueOf(setMap.get("weight")).isBlank()) {
                         try {
                             setLog.setWeightLifted(Double.parseDouble(String.valueOf(setMap.get("weight"))));
-                        } catch (NumberFormatException ignored) {}
+                        } catch (NumberFormatException ignored) {
+                        }
                     }
-                    
+
                     if (setMap.get("reps") != null) {
                         setLog.setRepsDone(String.valueOf(setMap.get("reps")));
                     }
-                    
+
                     if (setMap.get("rir") != null && !String.valueOf(setMap.get("rir")).isBlank()) {
                         try {
                             setLog.setRir(Integer.parseInt(String.valueOf(setMap.get("rir"))));
-                        } catch (NumberFormatException ignored) {}
+                        } catch (NumberFormatException ignored) {
+                        }
                     }
-                    
+
                     if (setMap.get("rpe") != null && !String.valueOf(setMap.get("rpe")).isBlank()) {
                         try {
                             setLog.setRpe(Double.parseDouble(String.valueOf(setMap.get("rpe"))));
-                        } catch (NumberFormatException ignored) {}
+                        } catch (NumberFormatException ignored) {
+                        }
                     }
-                    
+
                     if (setMap.get("tempo") != null) {
                         setLog.setTempo(String.valueOf(setMap.get("tempo")));
                     }
@@ -171,12 +181,14 @@ public class WorkoutService {
 
     public List<WorkoutDto> getHistoryByEmail(String email) {
         User client = userRepository.findByEmail(email).orElse(null);
-        if (client == null) return null;
+        if (client == null)
+            return null;
         return getHistory(client.getId());
     }
 
     private String cleanExerciseName(Object nameObj) {
-        if (nameObj == null) return "";
+        if (nameObj == null)
+            return "";
         return nameObj.toString().toLowerCase()
                 .replaceAll("[^a-záéíóúüñ0-9]", "")
                 .trim();
@@ -184,10 +196,12 @@ public class WorkoutService {
 
     @SuppressWarnings("unchecked")
     public String enrichRoutineWithSuggestedWeights(User client, String routineJson) {
-        if (routineJson == null || routineJson.isBlank()) return routineJson;
+        if (routineJson == null || routineJson.isBlank())
+            return routineJson;
         try {
             ObjectMapper mapper = new ObjectMapper();
-            Map<String, Object> rawRoutine = mapper.readValue(routineJson, new TypeReference<Map<String, Object>>() {});
+            Map<String, Object> rawRoutine = mapper.readValue(routineJson, new TypeReference<Map<String, Object>>() {
+            });
             List<WorkoutSession> history = workoutRepository.findByClientIdOrderBySessionDateDesc(client.getId());
 
             for (Map.Entry<String, Object> entry : rawRoutine.entrySet()) {
@@ -205,79 +219,38 @@ public class WorkoutService {
                     Map<String, Object> exercise = exercises.get(i);
                     String exName = exercise.get("name") == null ? "" : exercise.get("name").toString();
                     String targetClean = cleanExerciseName(exName);
-                    
+
                     String lastWeight = null;
                     boolean foundByName = false;
-
-                    // 1. Try to find the most recent set log in history matching the exercise name
+                    
                     if (!targetClean.isEmpty()) {
-                        for (WorkoutSession s : history) {
-                            if (s.getLogsJson() == null || s.getLogsJson().isBlank()) continue;
-                            try {
-                                Map<String, Object> logs = mapper.readValue(s.getLogsJson(), new TypeReference<Map<String, Object>>() {});
-                                for (Object logVal : logs.values()) {
-                                    if (logVal instanceof List<?> exLogs) {
-                                        boolean matchesName = false;
-                                        String tempLastWeight = null;
-                                        
-                                        for (Object setLogObj : exLogs) {
-                                            if (setLogObj instanceof Map<?, ?> setLog) {
-                                                Object nameVal = setLog.get("exerciseName");
-                                                if (nameVal != null && cleanExerciseName(nameVal).equals(targetClean)) {
-                                                    matchesName = true;
-                                                }
-                                                if (Boolean.TRUE.equals(setLog.get("completed")) && setLog.get("weight") != null) {
-                                                    String w = String.valueOf(setLog.get("weight"));
-                                                    if (!w.isBlank() && !w.equals("null")) {
-                                                        tempLastWeight = w;
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        
-                                        if (matchesName && tempLastWeight != null) {
-                                            lastWeight = tempLastWeight;
-                                            foundByName = true;
-                                            break;
-                                        }
-                                    }
-                                }
-                            } catch (Exception ignored) {}
-                            if (foundByName) break;
+                        List<SetLog> historySets = setLogRepository.findByWorkoutSessionClientIdAndIsCompletedTrueAndWeightLiftedGreaterThanOrderByWorkoutSessionSessionDateDesc(client.getId(), 0.0);
+                        java.util.Map<String, String> latestWeightsByCleanName = new java.util.HashMap<>();
+                        for (SetLog log : historySets) {
+                            if (log.getExerciseName() == null) continue;
+                            String cleanName = cleanExerciseName(log.getExerciseName());
+                            if (!cleanName.isEmpty() && !latestWeightsByCleanName.containsKey(cleanName)) {
+                                latestWeightsByCleanName.put(cleanName, String.valueOf(log.getWeightLifted()));
+                            }
                         }
+                        lastWeight = latestWeightsByCleanName.get(targetClean);
                     }
-
-                    // 2. Fallback to index-based matching in the last session for the same day name (legacy)
-                    if (lastWeight == null) {
-                        WorkoutSession lastSession = history.stream()
-                                .filter(s -> dayName.equals(s.getDayName()) && s.getLogsJson() != null && !s.getLogsJson().isBlank())
-                                .findFirst().orElse(null);
-
-                        if (lastSession != null) {
-                            try {
-                                Map<String, Object> logs = mapper.readValue(lastSession.getLogsJson(), new TypeReference<Map<String, Object>>() {});
-                                Object exLogsObj = logs.get(String.valueOf(i));
-                                if (exLogsObj instanceof List<?> exLogs) {
-                                    for (Object setLogObj : exLogs) {
-                                        if (setLogObj instanceof Map<?, ?> setLog) {
-                                            if (Boolean.TRUE.equals(setLog.get("completed")) && setLog.get("weight") != null) {
-                                                String w = String.valueOf(setLog.get("weight"));
-                                                if (!w.isBlank() && !w.equals("null")) {
-                                                    lastWeight = w;
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            } catch (Exception ignored) {}
-                        }
-                    }
-
+                    
                     if (lastWeight != null) {
-                        exercise.put("suggestedWeight", lastWeight);
+                        try {
+                            double w = Double.parseDouble(lastWeight);
+                            if (w == Math.floor(w)) {
+                                exercise.put("expectedWeight", String.valueOf((int) w));
+                            } else {
+                                exercise.put("expectedWeight", String.valueOf(w));
+                            }
+                        } catch (NumberFormatException e) {
+                            exercise.put("expectedWeight", lastWeight);
+                        }
                     }
                 }
             }
+
             return mapper.writeValueAsString(rawRoutine);
         } catch (Exception e) {
             e.printStackTrace();
