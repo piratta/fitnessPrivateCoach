@@ -563,101 +563,80 @@ export default function useClientDashboard(user, onLogout) {
 
   // Local storage key for the in-progress workout. We keep it per user so a shared device with
   // multiple accounts does not cross-contaminate state.
-  const IN_PROGRESS_KEY = `pf:inProgressWorkout:${user?.id || user?.email || 'anon'}`;
+  
 
   // normalizeExerciseSets lives at module scope (see top of this file).
 
   // (hasResumableWorkout / resumableDayName declared above the per-day reset effect.)
 
-  // Initialize logs dynamically when routine changes. If we have a fresh-on-disk in-progress
-  // workout for today, merge its persisted logs/timer into the initialised template so the
-  // user can pick up exactly where they left off after F5 / closing the tab.
+  // Get Active Session from backend
   useEffect(() => {
-    if (!clientData?.routine) return;
-    const initialLogs = {};
-    Object.keys(clientData.routine).filter(day => !day.endsWith('_notes')).forEach(day => {
-      initialLogs[day] = {};
-      const sourceDay = loadedRoutineByTab[day] || day;
-      const exercises = clientData.routine[sourceDay] || [];
-      const sorted = [...exercises].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
-      sorted.forEach((ex, exIdx) => {
-        const sets = normalizeExerciseSets(ex);
-        initialLogs[day][exIdx] = sets.map(s => ({
-          weight: '',
-          reps: s.reps || '10',
-          completed: false,
-          skipped: false,
-          exerciseName: ex.name,
-          intensity: s.intensity || '',
-          notes: s.notes || '',
-        }));
-      });
-    });
-
-    let resumed = null;
-    try {
-      const raw = localStorage.getItem(IN_PROGRESS_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        const today = new Date().toISOString().split('T')[0];
-        // Only resume if it was started today AND the day still exists in the current routine.
-        if (parsed.sessionDate === today && parsed.dayName && initialLogs[parsed.dayName]) {
-          resumed = parsed;
+    workoutsApi.active()
+      .then((activeSession) => {
+        if (activeSession && activeSession.status !== 'COMPLETED') {
+           const parsedLogs = activeSession.logsJson ? JSON.parse(activeSession.logsJson) : {};
+           const executionDay = activeSession.dayName;
+           
+           if (clientData?.routine) {
+              const initialLogs = {};
+              Object.keys(clientData.routine).filter(day => !day.endsWith('_notes')).forEach(day => {
+                initialLogs[day] = {};
+                const sourceDay = loadedRoutineByTab[day] || day;
+                const exercises = clientData.routine[sourceDay] || [];
+                const sorted = [...exercises].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
+                sorted.forEach((ex, exIdx) => {
+                  const sets = normalizeExerciseSets(ex);
+                  initialLogs[day][exIdx] = sets.map(s => ({
+                    weight: '',
+                    reps: s.reps || '10',
+                    completed: false,
+                    skipped: false,
+                    exerciseName: ex.name,
+                    intensity: s.intensity || '',
+                    notes: s.notes || '',
+                  }));
+                });
+              });
+              
+              const mergedLogs = { ...initialLogs, [executionDay]: parsedLogs[executionDay] || initialLogs[executionDay] };
+              setLogs(mergedLogs);
+           }
+           
+           setActiveSessionId(activeSession.id);
+           setWorkoutSeconds(activeSession.durationSeconds || 0);
+           setSelectedDay(executionDay);
+           
+           setHasResumableWorkout(true);
+           setResumableDayName(executionDay);
         } else {
-          localStorage.removeItem(IN_PROGRESS_KEY);
+          // Si no hay sesión activa, inicializamos vacío
+          if (!clientData?.routine) return;
+          const initialLogs = {};
+          Object.keys(clientData.routine).filter(day => !day.endsWith('_notes')).forEach(day => {
+            initialLogs[day] = {};
+            const sourceDay = loadedRoutineByTab[day] || day;
+            const exercises = clientData.routine[sourceDay] || [];
+            const sorted = [...exercises].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1));
+            sorted.forEach((ex, exIdx) => {
+              const sets = normalizeExerciseSets(ex);
+              initialLogs[day][exIdx] = sets.map(s => ({
+                weight: '',
+                reps: s.reps || '10',
+                completed: false,
+                skipped: false,
+                exerciseName: ex.name,
+                intensity: s.intensity || '',
+                notes: s.notes || '',
+              }));
+            });
+          });
+          setLogs(initialLogs);
         }
-      }
-    } catch (e) { console.error(e);  /* ignore corrupt blob */  }
-
-    if (resumed) {
-      const merged = { ...initialLogs, [resumed.dayName]: resumed.dayLogs || initialLogs[resumed.dayName] };
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLogs(merged);
-      setSelectedDay(resumed.dayName);
-      setWorkoutSeconds(resumed.workoutSeconds || 0);
-      if (resumed.activeSessionId) setActiveSessionId(resumed.activeSessionId);
-      // Do not flip isWorkoutStarted automatically; show a banner that lets the user resume.
-      setHasResumableWorkout(true);
-      setResumableDayName(resumed.dayName);
-    } else {
-      setLogs(initialLogs);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+      })
+      .catch(err => console.error("Error cargando sesion activa", err));
   }, [clientData?.routine, loadedRoutineByTab]);
 
-  // Autosave the in-progress workout whenever the relevant slices change. Only while the
-  // workout is running — once it is finished or locked we let the backend be the source of
-  // truth and clear the local snapshot.
-  useEffect(() => {
-    if (!isWorkoutStarted || !selectedDay || !logs || !logs[selectedDay]) return;
-    try {
-      localStorage.setItem(IN_PROGRESS_KEY, JSON.stringify({
-        dayName: selectedDay,
-        sessionDate: new Date().toISOString().split('T')[0],
-        dayLogs: logs[selectedDay],
-        workoutSeconds,
-        activeSessionId,
-        savedAt: Date.now(),
-      }));
-    } catch (e) { console.error(e);  /* quota or serialisation issue — ignore */  }
-  }, [isWorkoutStarted, selectedDay, logs, workoutSeconds, activeSessionId, IN_PROGRESS_KEY]);
 
-  // Drop the local snapshot when the workout is no longer in progress.
-  // Skipping the first render here is critical: at mount time both flags start as false but
-  // the resume effect has not had a chance to read localStorage yet. Without this guard the
-  // snapshot was being wiped right before hydration, so refreshing while paused lost the
-  // workout entirely.
-  const cleanupGuardRef = useRef(false);
-  useEffect(() => {
-    if (!cleanupGuardRef.current) {
-      cleanupGuardRef.current = true;
-      return;
-    }
-    if (!isWorkoutStarted && !hasResumableWorkout) {
-      // eslint-disable-next-line no-empty
-      try { localStorage.removeItem(IN_PROGRESS_KEY); } catch (e) { console.error("Error capturado:", e); }
-    }
-  }, [isWorkoutStarted, hasResumableWorkout, IN_PROGRESS_KEY]);
 
   const resumeWorkout = () => {
     setHasResumableWorkout(false);
@@ -667,20 +646,10 @@ export default function useClientDashboard(user, onLogout) {
     setHasFinishedSession(false);
   };
 
-  // Manual pause: stop the live timer, force-write the snapshot so it survives a refresh
-  // / lost session, and surface the resume banner so the user can pick up later.
   const handlePauseWorkout = () => {
     if (!isWorkoutStarted) return;
-    try {
-      localStorage.setItem(IN_PROGRESS_KEY, JSON.stringify({
-        dayName: selectedDay,
-        sessionDate: new Date().toISOString().split('T')[0],
-        dayLogs: logs?.[selectedDay] || {},
-        workoutSeconds,
-        activeSessionId,
-        savedAt: Date.now(),
-      }));
-    } catch (e) { console.error(e);  /* quota — ignore, we still pause locally */  }
+    // Se guarda en backend automáticamente gracias al updateBackendSession que ya actualiza la duración
+    updateBackendSession(logs, comments, videoLinks);
     setIsWorkoutStarted(false);
     setHasResumableWorkout(true);
     setResumableDayName(selectedDay);
@@ -691,8 +660,6 @@ export default function useClientDashboard(user, onLogout) {
   const discardResumableWorkout = () => {
     setHasResumableWorkout(false);
     setResumableDayName(null);
-    // eslint-disable-next-line no-empty
-    try { localStorage.removeItem(IN_PROGRESS_KEY); } catch (e) { console.error("Error capturado:", e); }
     // Restore the day to fresh empty logs.
     if (clientData?.routine && selectedDay) {
       const fresh = {};
@@ -990,7 +957,6 @@ export default function useClientDashboard(user, onLogout) {
     const currentSet = logs?.[selectedDay]?.[exIdx]?.[setIdx];
     if (!currentSet) return;
 
-    // Prevent completing if weight is empty
     if (!currentSet.completed && (!currentSet.weight || currentSet.weight.toString().trim() === '')) {
       dialog.toast("Introduce el peso levantado antes de completar la serie", { variant: 'error' });
       return;
@@ -1008,8 +974,22 @@ export default function useClientDashboard(user, onLogout) {
       return newLogs;
     });
 
+    if (isWorkoutStarted && activeSessionId) {
+      const setDto = {
+        exerciseIndex: Number(exIdx),
+        setIndex: Number(setIdx),
+        exerciseName: currentSet.exerciseName,
+        weightLifted: parseFloat(currentSet.weight) || 0,
+        repsDone: currentSet.reps,
+        intensity: currentSet.intensity,
+        notes: currentSet.notes,
+        isCompleted: isNowCompleted
+      };
+      workoutsApi.syncSetLog(activeSessionId, setDto).catch(e => console.error("Error syncSetLog:", e));
+    }
+
     if (isNowCompleted && isWorkoutStarted) {
-      setRestSeconds(180); // 3-minute rest timer between sets
+      setRestSeconds(180);
     }
   };
 
@@ -1267,11 +1247,6 @@ export default function useClientDashboard(user, onLogout) {
         totalVolume: totalVolume,
         completedSets: completedSets.length,
         completionPercentage: completionPercentage,
-        logsJson: { 
-          ...logs, 
-          [(loadedRoutineHere || selectedDay)]: logs[selectedDay],
-          _executionSlot: selectedDay 
-        },
         commentsJson: comments,
         videoLinksJson: videoLinks,
         stress: workoutEval.stress,
@@ -1281,12 +1256,13 @@ export default function useClientDashboard(user, onLogout) {
         digestions: workoutEval.digestions
       };
       
-      const resData = await workoutsApi.saveOrUpdate(activeSessionId, payload);
-      
-      if (!activeSessionId && resData) {
-        // Asumiendo que el ID se devuelve directo o dentro de id
-        const newId = typeof resData === 'string' ? resData.replace(/"/g, '') : resData.id;
-        if (newId) setActiveSessionId(newId);
+      let resData;
+      if (activeSessionId) {
+         await workoutsApi.finish(payload);
+         resData = activeSessionId;
+      } else {
+         resData = await workoutsApi.finish(payload);
+         if (resData) setActiveSessionId(resData.id || resData);
       }
     } catch (e) {
       console.error("Error saving workout to backend", e);
@@ -1439,8 +1415,16 @@ export default function useClientDashboard(user, onLogout) {
       setHasFinishedSession(false);
       setActiveSessionId(null);
     }
-    // Always reset the timer when a workout starts so leftover seconds (e.g. from viewing a
-    // historic session in this same tab) never bleed into the new session.
+    
+    try {
+      const sessionId = await workoutsApi.start(selectedDay, JSON.stringify(clientData?.routine || {}));
+      setActiveSessionId(sessionId);
+    } catch(e) {
+      console.error("Error starting workout session:", e);
+      dialog.toast("Error al iniciar el entrenamiento", {variant: "error"});
+      return;
+    }
+    
     setWorkoutSeconds(0);
     setRestSeconds(0);
     setIsWorkoutStarted(true);
