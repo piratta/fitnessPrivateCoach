@@ -428,7 +428,7 @@ export default function useClientDashboard(user, onLogout) {
       sunday.setHours(23, 59, 59, 999);
 
       let limitDate = monday;
-      if (clientData?.routineUpdatedAt) {
+      if (clientData?.routineUpdatedAt && weekOffset >= 0) {
         const updateDate = new Date(clientData.routineUpdatedAt);
         updateDate.setHours(0, 0, 0, 0);
         if (updateDate > limitDate) {
@@ -759,13 +759,32 @@ export default function useClientDashboard(user, onLogout) {
     : (clientData?.routine?.[selectedDay]?.length > 0)
       ? selectedDay
       : (completedSessionToday?.dayName || selectedDay);
-  const activeWorkout = viewingNextRoutine
-    ? (clientData?.nextRoutine?.[selectedDay] ? [...clientData.nextRoutine[selectedDay]].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1)) : [])
-    : ((isDayConsumedElsewhere || isLoadedElsewhere) && !loadedRoutineHere)
-      ? []
-      : (clientData?.routine && routineDayForRender && clientData.routine[routineDayForRender])
-        ? [...clientData.routine[routineDayForRender]].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1))
-        : [];
+
+  let activeWorkout = [];
+  if (isWorkoutLocked && logs && logs[selectedDay]) {
+    const lockedLogs = logs[selectedDay];
+    const maxKey = Math.max(-1, ...Object.keys(lockedLogs).filter(k => !isNaN(k)).map(Number));
+    if (maxKey >= 0) {
+      for (let i = 0; i <= maxKey; i++) {
+        if (lockedLogs[i] && lockedLogs[i].length > 0) {
+          activeWorkout.push({
+            name: lockedLogs[i][0]?.exerciseName || 'Ejercicio ' + (i + 1),
+            isOptional: false
+          });
+        } else {
+          activeWorkout.push({ name: 'Eliminado', isOptional: true });
+        }
+      }
+    }
+  }
+
+  if (activeWorkout.length === 0) {
+    activeWorkout = viewingNextRoutine
+      ? (clientData?.nextRoutine?.[selectedDay] ? [...clientData.nextRoutine[selectedDay]].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1)) : [])
+      : ((isDayConsumedElsewhere || isLoadedElsewhere) && !loadedRoutineHere)
+        ? []
+        : (clientData?.routine?.[routineDayForRender] ? [...clientData.routine[routineDayForRender]].sort((a, b) => (a.isOptional === b.isOptional ? 0 : a.isOptional ? 1 : -1)) : []);
+  }
 
   // Days that have a routine assigned but no completed session this week.
   const pendingOptions = clientData?.routine
