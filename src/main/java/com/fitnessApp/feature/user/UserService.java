@@ -4,6 +4,10 @@ import com.fitnessApp.feature.progress.ProgressLog;
 import com.fitnessApp.feature.progress.ProgressLogRepository;
 import com.fitnessApp.feature.review.ReviewImage;
 import com.fitnessApp.feature.review.ReviewService;
+import com.fitnessApp.feature.review.ReviewRepository;
+import com.fitnessApp.feature.review.ReviewImageRepository;
+import com.fitnessApp.feature.workout.RoutineRepository;
+import com.fitnessApp.feature.workout.RoutineTemplateRepository;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -46,6 +50,10 @@ public class UserService {
     private final UserMapper userMapper;
     
     private final com.fitnessApp.feature.workout.RoutineJsonService routineJsonService;
+
+    private final ReviewRepository reviewRepository;
+    private final ReviewImageRepository reviewImageRepository;
+    private final RoutineTemplateRepository routineTemplateRepository;
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -184,10 +192,25 @@ public class UserService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes permisos.");
         }
 
-        progressLogRepository.deleteAll(progressLogRepository.findByClientOrderByLogDateAsc(client));
-        workoutSessionRepository
-                .deleteAll(workoutSessionRepository.findByClientIdOrderBySessionDateDesc(client.getId()));
+        // 1. Review images (FK directa a client + FK a review)
+        reviewImageRepository.deleteAll(reviewImageRepository.findByClientOrderByUploadedAtDesc(client));
 
+        // 2. Reviews
+        reviewRepository.deleteAll(reviewRepository.findByClientOrderByCreatedAtDesc(client));
+
+        // 3. Workout sessions (SetLogs se borran en cascada desde WorkoutSession)
+        workoutSessionRepository.deleteAll(workoutSessionRepository.findByClientIdOrderBySessionDateDesc(client.getId()));
+
+        // 4. Progress logs
+        progressLogRepository.deleteAll(progressLogRepository.findByClientOrderByLogDateAsc(client));
+
+        // 5. Desvincular rutinas del usuario (se borran en cascada por CascadeType.ALL + orphanRemoval)
+        client.setRoutine(null);
+        client.setNextRoutine(null);
+        client.getStrategies().clear();
+        userRepository.save(client);
+
+        // 6. Eliminar el usuario
         userRepository.delete(client);
     }
 
