@@ -1289,8 +1289,7 @@ export default function useClientDashboard(user, onLogout) {
         completedSets: completedSets.length,
         completionPercentage,
         logsJson: JSON.stringify({ 
-           ...logs, 
-           [realDayName]: logs[selectedDay],
+           ...(logs[selectedDay] || logs),
            _executionSlot: selectedDay
         }),
         commentsJson: JSON.stringify(comments),
@@ -1329,8 +1328,7 @@ export default function useClientDashboard(user, onLogout) {
         completedSets: completedSets.length,
         completionPercentage: completionPercentage,
         logsJson: {
-          ...currentLogsToSave,
-          [selectedDay]: currentLogsToSave[selectedDay],
+          ...(currentLogsToSave[selectedDay] || currentLogsToSave),
           _executionSlot: selectedDay
         },
         commentsJson: currentCommentsToSave,

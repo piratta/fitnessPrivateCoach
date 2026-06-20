@@ -127,7 +127,13 @@ public class UserService {
         User client = new User();
         client.setName(firstName);
         client.setLastName(surnames);
-        client.setEmail(clientDto.getEmail());
+        
+        String finalEmail = clientDto.getEmail();
+        if (finalEmail == null || finalEmail.isBlank()) {
+            finalEmail = username + "@client.local";
+        }
+        client.setEmail(finalEmail);
+
         client.setGoal(clientDto.getGoal());
         client.setReviewFrequency(clientDto.getReviewFrequency() != null ? clientDto.getReviewFrequency() : "Semanal");
         client.setStatus("Activo");
