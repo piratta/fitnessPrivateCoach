@@ -30,6 +30,7 @@ public class RoutineTemplateController {
 
     private final RoutineTemplateRepository repo;
     private final UserRepository userRepo;
+    private final RoutineJsonService routineJsonService;
 
     private User currentCoach() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -51,7 +52,7 @@ public class RoutineTemplateController {
         m.put("id", t.getId());
         m.put("title", t.getTitle());
         m.put("description", t.getDescription());
-        m.put("routineJson", t.getRoutineJson());
+        m.put("routineJson", routineJsonService.toJson(t.getRoutineData()));
         m.put("createdAt", t.getCreatedAt());
         m.put("updatedAt", t.getUpdatedAt());
         return m;
@@ -86,7 +87,9 @@ public class RoutineTemplateController {
         t.setOwnerCoach(coach);
         t.setTitle(title);
         if (body.get("description") != null) t.setDescription(body.get("description").toString());
-        if (body.get("routineJson") != null) t.setRoutineJson(serializeRoutineJson(body.get("routineJson")));
+        if (body.get("routineJson") != null) {
+            t.setRoutineData(routineJsonService.fromJson(serializeRoutineJson(body.get("routineJson")), t.getRoutineData()));
+        }
         return ResponseEntity.ok(toDto(repo.save(t)));
     }
 
@@ -110,7 +113,7 @@ public class RoutineTemplateController {
             existing.setDescription(d == null ? null : d.toString());
         }
         if (body.containsKey("routineJson")) {
-            existing.setRoutineJson(serializeRoutineJson(body.get("routineJson")));
+            existing.setRoutineData(routineJsonService.fromJson(serializeRoutineJson(body.get("routineJson")), existing.getRoutineData()));
         }
         return ResponseEntity.ok(toDto(repo.save(existing)));
     }

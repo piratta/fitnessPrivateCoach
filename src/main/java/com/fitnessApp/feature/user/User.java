@@ -84,11 +84,13 @@ public class User {
     private String progressionStrategy = "Sobrecarga Progresiva (Subir peso)"; // Mantenimiento, Descarga, Subir reps,
                                                                                // etc.
 
-    @Column(columnDefinition = "TEXT")
-    private String routineJson;
+    @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JoinColumn(name = "routine_id")
+    private com.fitnessApp.feature.workout.Routine routine;
 
-    @Column(columnDefinition = "TEXT")
-    private String nextRoutineJson;
+    @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JoinColumn(name = "next_routine_id")
+    private com.fitnessApp.feature.workout.Routine nextRoutine;
 
     @Column(columnDefinition = "TEXT")
     private String personalRecordsJson;

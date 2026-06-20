@@ -25,6 +25,7 @@ public class WorkoutService {
     private final UserRepository userRepository;
     private final WorkoutMapper workoutMapper;
     private final SetLogRepository setLogRepository;
+    private final RoutineJsonService routineJsonService;
 
     public UUID startWorkoutSession(String principalEmail, StartWorkoutDto request) {
         User client = userRepository.findByEmail(principalEmail)
@@ -45,7 +46,7 @@ public class WorkoutService {
             
             String snapshot = request.getRoutineSnapshotJson();
             if (snapshot == null || snapshot.isBlank()) {
-                snapshot = client.getRoutineJson();
+                snapshot = routineJsonService.toJson(client.getRoutine());
             }
             session.setRoutineSnapshotJson(snapshot);
             session = workoutRepository.save(session);
@@ -65,11 +66,11 @@ public class WorkoutService {
         setLog.setExerciseIndex(request.getExerciseIndex());
         setLog.setSetIndex(request.getSetIndex());
         setLog.setExerciseName(request.getExerciseName());
-        setLog.setWeightLifted(request.getWeightLifted());
-        setLog.setRepsDone(request.getRepsDone());
-        setLog.setRir(request.getRir());
-        setLog.setRpe(request.getRpe());
-        setLog.setTempo(request.getTempo());
+        setLog.setWeight(request.getWeight());
+        setLog.setReps(request.getReps());
+        setLog.setSkipped(request.isSkipped());
+        setLog.setIntensity(request.getIntensity());
+        setLog.setNotes(request.getNotes());
         setLog.setCompleted(request.isCompleted());
 
         setLogRepository.save(setLog);
@@ -112,12 +113,12 @@ public class WorkoutService {
 
         session.setStatus(WorkoutStatus.COMPLETED);
 
-        session.setCommentsJson(request.getCommentsJson());
-        session.setVideoLinksJson(request.getVideoLinksJson());
+        session.setClientComments(extractFromJsonMap(request.getCommentsJson(), request.getDayName()));
+        session.setVideoLink(extractFromJsonMap(request.getVideoLinksJson(), request.getDayName()));
 
         String snapshot = request.getRoutineSnapshotJson();
         if (snapshot == null || snapshot.isBlank()) {
-            snapshot = client.getRoutineJson();
+            snapshot = routineJsonService.toJson(client.getRoutine());
         }
         session.setRoutineSnapshotJson(snapshot);
 
@@ -148,8 +149,8 @@ public class WorkoutService {
             session.setSessionDate(request.getSessionDate());
         }
 
-        session.setCommentsJson(request.getCommentsJson());
-        session.setVideoLinksJson(request.getVideoLinksJson());
+        session.setClientComments(extractFromJsonMap(request.getCommentsJson(), request.getDayName()));
+        session.setVideoLink(extractFromJsonMap(request.getVideoLinksJson(), request.getDayName()));
         session.setDurationSeconds(request.getDurationSeconds());
         session.setTotalVolume(request.getTotalVolume());
         session.setCompletedSets(request.getCompletedSets());
@@ -171,9 +172,19 @@ public class WorkoutService {
 
         try {
             ObjectMapper mapper = new ObjectMapper();
-            Map<String, List<Map<String, Object>>> logsMap = mapper.readValue(logsJson,
-                    new TypeReference<Map<String, List<Map<String, Object>>>>() {
-                    });
+            Map<String, Map<String, List<Map<String, Object>>>> outerMap = mapper.readValue(logsJson,
+                    new TypeReference<Map<String, Map<String, List<Map<String, Object>>>>>() {});
+
+            Map<String, List<Map<String, Object>>> logsMap = outerMap.get(session.getDayName());
+            if (logsMap == null && !outerMap.isEmpty()) {
+                // Try fallback logic if the top level doesn't have dayName (legacy payload)
+                // If it's already a direct map of "0", "1" -> List
+                if (outerMap.keySet().stream().anyMatch(k -> k.matches("\\d+"))) {
+                     logsMap = mapper.readValue(logsJson, new TypeReference<Map<String, List<Map<String, Object>>>>() {});
+                }
+            }
+
+            if (logsMap == null) return;
 
             if (session.getSets() == null) {
                 session.setSets(new java.util.ArrayList<>());
@@ -190,60 +201,40 @@ public class WorkoutService {
                 }
 
                 List<Map<String, Object>> exLogs = entry.getValue();
-                if (exLogs == null)
-                    continue;
+                if (exLogs == null) continue;
 
                 for (int setIndex = 0; setIndex < exLogs.size(); setIndex++) {
                     Map<String, Object> setMap = exLogs.get(setIndex);
-                    if (setMap == null)
-                        continue;
+                    if (setMap == null) continue;
 
                     SetLog setLog = new SetLog();
                     setLog.setExerciseIndex(exerciseIndex);
                     setLog.setSetIndex(setIndex);
 
-                    if (setMap.get("exerciseName") != null) {
-                        setLog.setExerciseName(String.valueOf(setMap.get("exerciseName")));
-                    }
-
-                    if (setMap.get("completed") != null) {
-                        setLog.setCompleted(Boolean.parseBoolean(String.valueOf(setMap.get("completed"))));
-                    }
-
-                    if (setMap.get("weight") != null && !String.valueOf(setMap.get("weight")).isBlank()) {
-                        try {
-                            setLog.setWeightLifted(Double.parseDouble(String.valueOf(setMap.get("weight"))));
-                        } catch (NumberFormatException ignored) {
-                        }
-                    }
-
-                    if (setMap.get("reps") != null) {
-                        setLog.setRepsDone(String.valueOf(setMap.get("reps")));
-                    }
-
-                    if (setMap.get("rir") != null && !String.valueOf(setMap.get("rir")).isBlank()) {
-                        try {
-                            setLog.setRir(Integer.parseInt(String.valueOf(setMap.get("rir"))));
-                        } catch (NumberFormatException ignored) {
-                        }
-                    }
-
-                    if (setMap.get("rpe") != null && !String.valueOf(setMap.get("rpe")).isBlank()) {
-                        try {
-                            setLog.setRpe(Double.parseDouble(String.valueOf(setMap.get("rpe"))));
-                        } catch (NumberFormatException ignored) {
-                        }
-                    }
-
-                    if (setMap.get("tempo") != null) {
-                        setLog.setTempo(String.valueOf(setMap.get("tempo")));
-                    }
+                    if (setMap.get("exerciseName") != null) setLog.setExerciseName(String.valueOf(setMap.get("exerciseName")));
+                    if (setMap.get("weight") != null) setLog.setWeight(String.valueOf(setMap.get("weight")));
+                    if (setMap.get("reps") != null) setLog.setReps(String.valueOf(setMap.get("reps")));
+                    if (setMap.get("completed") != null) setLog.setCompleted(Boolean.parseBoolean(String.valueOf(setMap.get("completed"))));
+                    if (setMap.get("skipped") != null) setLog.setSkipped(Boolean.parseBoolean(String.valueOf(setMap.get("skipped"))));
+                    if (setMap.get("intensity") != null) setLog.setIntensity(String.valueOf(setMap.get("intensity")));
+                    if (setMap.get("notes") != null) setLog.setNotes(String.valueOf(setMap.get("notes")));
 
                     session.addSetLog(setLog);
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    private String extractFromJsonMap(String json, String key) {
+        if (json == null || json.isBlank() || key == null) return null;
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            Map<String, String> map = mapper.readValue(json, new TypeReference<Map<String, String>>() {});
+            return map.get(key);
+        } catch (Exception e) {
+            return json; // Fallback in case it wasn't a map
         }
     }
 
@@ -295,9 +286,9 @@ public class WorkoutService {
                     String lastWeight = null;
                     
                     if (!exName.isEmpty()) {
-                        java.util.Optional<SetLog> lastSetOpt = setLogRepository.findFirstByWorkoutSessionClientIdAndExerciseNameAndIsCompletedTrueAndWeightLiftedGreaterThanOrderByWorkoutSessionSessionDateDesc(client.getId(), exName, 0.0);
+                        java.util.Optional<SetLog> lastSetOpt = setLogRepository.findLastValidSetForExercise(client.getId(), exName);
                         if (lastSetOpt.isPresent()) {
-                            lastWeight = String.valueOf(lastSetOpt.get().getWeightLifted());
+                            lastWeight = lastSetOpt.get().getWeight();
                         }
                     }
                     

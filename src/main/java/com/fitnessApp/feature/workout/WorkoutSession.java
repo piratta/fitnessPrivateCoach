@@ -48,15 +48,6 @@ public class WorkoutSession {
     private String videoLink;
 
     @Column(columnDefinition = "TEXT")
-    private String logsJson;
-
-    @Column(columnDefinition = "TEXT")
-    private String commentsJson;
-
-    @Column(columnDefinition = "TEXT")
-    private String videoLinksJson;
-
-    @Column(columnDefinition = "TEXT")
     private String routineSnapshotJson;
 
     @OneToMany(mappedBy = "workoutSession", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -120,15 +111,6 @@ public class WorkoutSession {
 
     public List<SetLog> getSets() { return sets; }
     public void setSets(List<SetLog> sets) { this.sets = sets; }
-
-    public String getLogsJson() { return logsJson; }
-    public void setLogsJson(String logsJson) { this.logsJson = logsJson; }
-
-    public String getCommentsJson() { return commentsJson; }
-    public void setCommentsJson(String commentsJson) { this.commentsJson = commentsJson; }
-
-    public String getVideoLinksJson() { return videoLinksJson; }
-    public void setVideoLinksJson(String videoLinksJson) { this.videoLinksJson = videoLinksJson; }
 
     public String getRoutineSnapshotJson() { return routineSnapshotJson; }
     public void setRoutineSnapshotJson(String routineSnapshotJson) { this.routineSnapshotJson = routineSnapshotJson; }

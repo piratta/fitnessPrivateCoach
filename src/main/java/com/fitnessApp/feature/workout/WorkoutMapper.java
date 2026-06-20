@@ -18,50 +18,71 @@ public abstract class WorkoutMapper {
 
     @AfterMapping
     protected void fillLogsJson(WorkoutSession entity, @MappingTarget WorkoutDto dto) {
+        ObjectMapper mapper = new ObjectMapper();
+        
+        // logsJson
         if (entity.getSets() != null && !entity.getSets().isEmpty()) {
             try {
-                // Reconstruir logsJson agrupando por exerciseIndex
-                Map<String, List<Map<String, Object>>> logsMap = new HashMap<>();
+                Map<String, List<Map<String, Object>>> dayLogs = new HashMap<>();
                 for (SetLog setLog : entity.getSets()) {
                     String exIdx = String.valueOf(setLog.getExerciseIndex());
-                    logsMap.putIfAbsent(exIdx, new ArrayList<>());
+                    dayLogs.putIfAbsent(exIdx, new ArrayList<>());
                     
                     Map<String, Object> map = new HashMap<>();
                     map.put("completed", setLog.isCompleted());
-                    map.put("weight", setLog.getWeightLifted());
-                    map.put("reps", setLog.getRepsDone());
-                    map.put("rir", setLog.getRir());
-                    map.put("rpe", setLog.getRpe());
-                    map.put("tempo", setLog.getTempo());
+                    map.put("skipped", setLog.isSkipped());
+                    map.put("weight", setLog.getWeight() != null ? setLog.getWeight() : "");
+                    map.put("reps", setLog.getReps() != null ? setLog.getReps() : "");
+                    map.put("intensity", setLog.getIntensity() != null ? setLog.getIntensity() : "");
+                    map.put("notes", setLog.getNotes() != null ? setLog.getNotes() : "");
                     map.put("exerciseName", setLog.getExerciseName());
-                    map.put("setIndex", setLog.getSetIndex());
                     
-                    // Add back to the list in order
-                    List<Map<String, Object>> exLogs = logsMap.get(exIdx);
-                    // Ensure the list is big enough to accommodate the setIndex
+                    List<Map<String, Object>> exLogs = dayLogs.get(exIdx);
                     while (exLogs.size() <= setLog.getSetIndex()) {
                         exLogs.add(null);
                     }
                     exLogs.set(setLog.getSetIndex(), map);
                 }
                 
-                // Clean up any nulls
-                for (List<Map<String, Object>> exLogs : logsMap.values()) {
+                for (List<Map<String, Object>> exLogs : dayLogs.values()) {
                     exLogs.removeIf(m -> m == null);
                 }
 
-                ObjectMapper mapper = new ObjectMapper();
-                dto.setLogsJson(mapper.writeValueAsString(logsMap));
+                Map<String, Object> outerMap = new HashMap<>();
+                outerMap.put(entity.getDayName(), dayLogs);
+                
+                dto.setLogsJson(mapper.writeValueAsString(outerMap));
             } catch (Exception e) {
-                // Fallback to legacy
-                if (dto.getLogsJson() == null) {
-                    dto.setLogsJson(entity.getLogsJson());
-                }
+                dto.setLogsJson("{}");
             }
         } else {
-            // Legacy workouts
-            dto.setLogsJson(entity.getLogsJson());
+            dto.setLogsJson("{}");
+        }
+        
+        // commentsJson
+        if (entity.getClientComments() != null && !entity.getClientComments().isBlank()) {
+            try {
+                Map<String, String> commentsMap = new HashMap<>();
+                commentsMap.put(entity.getDayName(), entity.getClientComments());
+                dto.setCommentsJson(mapper.writeValueAsString(commentsMap));
+            } catch (Exception e) {
+                dto.setCommentsJson("{}");
+            }
+        } else {
+            dto.setCommentsJson("{}");
+        }
+        
+        // videoLinksJson
+        if (entity.getVideoLink() != null && !entity.getVideoLink().isBlank()) {
+            try {
+                Map<String, String> linksMap = new HashMap<>();
+                linksMap.put(entity.getDayName(), entity.getVideoLink());
+                dto.setVideoLinksJson(mapper.writeValueAsString(linksMap));
+            } catch (Exception e) {
+                dto.setVideoLinksJson("{}");
+            }
+        } else {
+            dto.setVideoLinksJson("{}");
         }
     }
 }
-

@@ -44,6 +44,8 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
 
     private final UserMapper userMapper;
+    
+    private final com.fitnessApp.feature.workout.RoutineJsonService routineJsonService;
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -73,28 +75,21 @@ public class UserService {
 
             // 2. Calculate compliance
             int compliance = 0;
-            if (u.getRoutineJson() != null && !u.getRoutineJson().isEmpty()) {
-                try {
-                    Map<String, Object> routine = mapper.readValue(u.getRoutineJson(),
-                            new TypeReference<Map<String, Object>>() {
-                            });
-                    int weeklySessions = routine.size();
-                    if (weeklySessions > 0) {
-                        int totalExpected = weeklySessions * 4; // last 28 days
+            if (u.getRoutine() != null && !u.getRoutine().getDays().isEmpty()) {
+                int weeklySessions = u.getRoutine().getDays().size();
+                if (weeklySessions > 0) {
+                    int totalExpected = weeklySessions * 4; // last 28 days
 
-                        LocalDate thirtyDaysAgo = LocalDate.now().minusDays(28);
-                        List<WorkoutSession> recentSessions = workoutSessionRepository
-                                .findByClientIdOrderBySessionDateDesc(u.getId())
-                                .stream()
-                                .filter(s -> s.getSessionDate() != null && !s.getSessionDate().isBefore(thirtyDaysAgo))
-                                .collect(Collectors.toList());
+                    LocalDate thirtyDaysAgo = LocalDate.now().minusDays(28);
+                    List<WorkoutSession> recentSessions = workoutSessionRepository
+                            .findByClientIdOrderBySessionDateDesc(u.getId())
+                            .stream()
+                            .filter(s -> s.getSessionDate() != null && !s.getSessionDate().isBefore(thirtyDaysAgo))
+                            .collect(Collectors.toList());
 
-                        int completed = recentSessions.size();
-                        compliance = (int) Math.round((completed * 100.0) / totalExpected);
-                        compliance = Math.min(compliance, 100);
-                    }
-                } catch (Exception e) {
-                    // ignore mapping error
+                    int completed = recentSessions.size();
+                    compliance = (int) Math.round((completed * 100.0) / totalExpected);
+                    compliance = Math.min(compliance, 100);
                 }
             }
             dto.setCompliance(compliance);
@@ -172,6 +167,7 @@ public class UserService {
         }
 
         if (clientDto.getRoutineJson() != null) {
+            client.setRoutine(routineJsonService.fromJson(clientDto.getRoutineJson(), client.getRoutine()));
             client.setRoutineUpdatedAt(java.time.LocalDateTime.now());
         }
 
@@ -233,8 +229,10 @@ public class UserService {
             });
             user.setEmail(newEmail);
         }
-        if (dto.getRoutineJson() != null)
-            user.setRoutineJson(dto.getRoutineJson());
+        if (dto.getRoutineJson() != null) {
+            user.setRoutine(routineJsonService.fromJson(dto.getRoutineJson(), user.getRoutine()));
+            user.setRoutineUpdatedAt(java.time.LocalDateTime.now());
+        }
 
         return userRepository.save(user);
     }

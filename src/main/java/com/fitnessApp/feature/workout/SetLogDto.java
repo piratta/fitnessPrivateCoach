@@ -4,12 +4,12 @@ public class SetLogDto {
     private int exerciseIndex;
     private int setIndex;
     private String exerciseName;
-    private double weightLifted;
-    private String repsDone;
-    private Integer rir;
-    private Double rpe;
-    private String tempo;
-    private boolean isCompleted;
+    private String weight;
+    private String reps;
+    private boolean completed;
+    private boolean skipped;
+    private String intensity;
+    private String notes;
 
     public int getExerciseIndex() { return exerciseIndex; }
     public void setExerciseIndex(int exerciseIndex) { this.exerciseIndex = exerciseIndex; }
@@ -20,21 +20,21 @@ public class SetLogDto {
     public String getExerciseName() { return exerciseName; }
     public void setExerciseName(String exerciseName) { this.exerciseName = exerciseName; }
 
-    public double getWeightLifted() { return weightLifted; }
-    public void setWeightLifted(double weightLifted) { this.weightLifted = weightLifted; }
+    public String getWeight() { return weight; }
+    public void setWeight(String weight) { this.weight = weight; }
 
-    public String getRepsDone() { return repsDone; }
-    public void setRepsDone(String repsDone) { this.repsDone = repsDone; }
+    public String getReps() { return reps; }
+    public void setReps(String reps) { this.reps = reps; }
 
-    public Integer getRir() { return rir; }
-    public void setRir(Integer rir) { this.rir = rir; }
+    public boolean isCompleted() { return completed; }
+    public void setCompleted(boolean completed) { this.completed = completed; }
 
-    public Double getRpe() { return rpe; }
-    public void setRpe(Double rpe) { this.rpe = rpe; }
+    public boolean isSkipped() { return skipped; }
+    public void setSkipped(boolean skipped) { this.skipped = skipped; }
 
-    public String getTempo() { return tempo; }
-    public void setTempo(String tempo) { this.tempo = tempo; }
+    public String getIntensity() { return intensity; }
+    public void setIntensity(String intensity) { this.intensity = intensity; }
 
-    public boolean isCompleted() { return isCompleted; }
-    public void setCompleted(boolean completed) { isCompleted = completed; }
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
 }

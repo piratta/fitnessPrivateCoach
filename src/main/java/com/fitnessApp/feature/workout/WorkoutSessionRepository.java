@@ -10,14 +10,14 @@ import java.util.UUID;
 
 public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, UUID> {
     
-    @EntityGraph(attributePaths = {"sets", "sets.routineExercise"})
+    @EntityGraph(attributePaths = {"sets"})
     List<WorkoutSession> findByClientIdOrderBySessionDateDesc(UUID clientId);
 
     // Used by the finish-workout endpoint to UPSERT instead of creating a duplicate row when
     // the client finalises the same day's routine multiple times in the same calendar day.
-    @EntityGraph(attributePaths = {"sets", "sets.routineExercise"})
+    @EntityGraph(attributePaths = {"sets"})
     Optional<WorkoutSession> findFirstByClientAndDayNameAndSessionDate(User client, String dayName, LocalDate sessionDate);
 
-    @EntityGraph(attributePaths = {"sets", "sets.routineExercise"})
+    @EntityGraph(attributePaths = {"sets"})
     Optional<WorkoutSession> findFirstByClientIdAndStatusInOrderBySessionDateDesc(UUID clientId, List<WorkoutStatus> statuses);
 }
