@@ -118,6 +118,10 @@ public class UserService {
             throw new IllegalArgumentException("Se requieren ambos apellidos.");
         }
 
+        if (clientDto.getEmail() != null && userRepository.findByEmail(clientDto.getEmail()).isPresent()) {
+            throw new IllegalArgumentException("El email introducido ya está registrado en el sistema.");
+        }
+
         String username = generateUniqueUsername(firstName, surnames);
 
         User client = new User();
