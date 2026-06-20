@@ -407,26 +407,28 @@ export default function ClientDashboard({ user, onLogout}) {
                       const isPast = dayIdx !== -1 && todayIdx !== -1 && dayIdx < todayIdx;
                       
                       let bgColor = 'transparent';
-                      let borderColor = 'var(--border-light)';
-                      let textColor = 'var(--text-muted)';
-                      
-                      if (selectedDay === day) {
-                        bgColor = 'var(--accent-primary)';
-                        borderColor = 'var(--accent-primary)';
-                        textColor = '#000';
-                      } else if (isTabCompleted) {
-                        bgColor = 'rgba(0, 230, 118, 0.15)';
-                        borderColor = 'rgba(0, 230, 118, 0.6)';
-                        textColor = '#00e676';
-                      } else if (hasLoadedRoutine) {
-                        bgColor = 'rgba(0, 195, 255, 0.1)';
-                        borderColor = 'rgba(0, 195, 255, 0.5)';
-                        textColor = '#00c3ff';
-                      } else if (isPast) {
-                        bgColor = 'rgba(255, 0, 0, 0.1)';
-                        borderColor = 'rgba(255, 0, 0, 0.5)';
-                        textColor = '#ff4444';
-                      }
+                        let borderColor = 'rgba(255,255,255,0.05)';
+                        let textColor = 'rgba(255,255,255,0.2)';
+                        
+                        const hasRoutine = !!(clientData?.routine?.[day] && clientData.routine[day].length > 0);
+                        
+                        if (selectedDay === day) {
+                          bgColor = 'var(--accent-primary)';
+                          borderColor = 'var(--accent-primary)';
+                          textColor = '#000';
+                        } else if (isTabCompleted) {
+                          bgColor = 'rgba(0, 230, 118, 0.15)';
+                          borderColor = 'rgba(0, 230, 118, 0.6)';
+                          textColor = '#00e676';
+                        } else if (hasLoadedRoutine) {
+                          bgColor = 'rgba(0, 195, 255, 0.1)';
+                          borderColor = 'rgba(0, 195, 255, 0.5)';
+                          textColor = '#00c3ff';
+                        } else if (hasRoutine) {
+                          bgColor = 'transparent';
+                          borderColor = 'var(--border-light)';
+                          textColor = 'var(--text-muted)';
+                        }
 
                       return (
                         <button
@@ -1196,20 +1198,22 @@ export default function ClientDashboard({ user, onLogout}) {
                 </div>
 
                 <div className="scrollable-tabs" style={{ marginBottom: '15px', borderBottom: '1px solid var(--border-light)' }}>
-                  {routineDays.map(day => (
-                    <button
-                      key={day}
-                      onClick={() => setSelectedDay(day)}
-                      style={{
-                        padding: '10px 20px', whiteSpace: 'nowrap', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem', transition: 'all 0.3s',
-                        background: selectedDay === day ? '#ffaa00' : 'transparent',
-                        color: selectedDay === day ? '#000' : 'var(--text-muted)',
-                        border: selectedDay === day ? '1px solid #ffaa00' : '1px solid var(--border-light)'
-                      }}
-                    >
-                      {day.split(' - ')[0]}
-                    </button>
-                  ))}
+                  {routineDays.map(day => {
+                      const hasNextRoutine = !!(clientData?.nextRoutine?.[day] && clientData.nextRoutine[day].length > 0);
+                      return (
+                      <button
+                        key={day}
+                        onClick={() => setSelectedDay(day)}
+                        style={{
+                          padding: '10px 20px', whiteSpace: 'nowrap', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem', transition: 'all 0.3s',
+                          background: selectedDay === day ? '#ffaa00' : 'transparent',
+                          color: selectedDay === day ? '#000' : (hasNextRoutine ? 'var(--text-muted)' : 'rgba(255,255,255,0.2)'),
+                          border: selectedDay === day ? '1px solid #ffaa00' : (hasNextRoutine ? '1px solid var(--border-light)' : '1px solid rgba(255,255,255,0.05)')
+                        }}
+                      >
+                        {day.split(' - ')[0]}
+                      </button>
+                    )})}
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
