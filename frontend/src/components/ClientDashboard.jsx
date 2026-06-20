@@ -414,7 +414,7 @@ export default function ClientDashboard({ user, onLogout}) {
                         bgColor = 'var(--accent-primary)';
                         borderColor = 'var(--accent-primary)';
                         textColor = '#000';
-                      } else if (isCompleted || isTabCompleted) {
+                      } else if (isTabCompleted) {
                         bgColor = 'rgba(0, 230, 118, 0.15)';
                         borderColor = 'rgba(0, 230, 118, 0.6)';
                         textColor = '#00e676';
