@@ -169,6 +169,25 @@ export default function ClientDashboard({ user, onLogout}) {
     loadedRoutineByTab
   } = useClientDashboard(user, onLogout);
 
+  const hasPromptedResumeRef = useRef(false);
+
+  useEffect(() => {
+    if (hasResumableWorkout && !hasPromptedResumeRef.current) {
+      hasPromptedResumeRef.current = true;
+      dialog.confirm("Tienes un entrenamiento en curso. ¿Deseas reanudarlo o descartarlo?", {
+        title: "Entrenamiento en curso",
+        confirmText: "Reanudar",
+        cancelText: "Descartar"
+      }).then(res => {
+        if (res) {
+          resumeWorkout();
+        } else {
+          discardResumableWorkout();
+        }
+      });
+    }
+  }, [hasResumableWorkout, dialog, resumeWorkout, discardResumableWorkout]);
+
     if (isLoading || !clientData) {
     return (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', gap: '15px' }}>
@@ -607,21 +626,7 @@ export default function ClientDashboard({ user, onLogout}) {
                           </div>
                         ) : (
                           <>
-                            {hasResumableWorkout && resumableDayName === selectedDay && (
-                              <div style={{ background: 'rgba(255, 170, 0, 0.1)', border: '1px solid #ffaa00', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-                                  <span style={{ fontSize: '1.4rem' }}>⏱️</span>
-                                  <strong style={{ color: '#ffaa00' }}>Entrenamiento sin terminar</strong>
-                                </div>
-                                <p style={{ color: 'var(--text-main)', fontSize: '0.9rem', marginBottom: '12px' }}>
-                                  Tienes un entrenamiento empezado hoy ({selectedDay}). ¿Quieres continuarlo?
-                                </p>
-                                <div style={{ display: 'flex', gap: '10px' }}>
-                                  <button onClick={resumeWorkout} className="btn-primary" style={{ flex: 1, padding: '12px', fontWeight: 'bold' }}>▶ Reanudar</button>
-                                  <button onClick={discardResumableWorkout} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid #ff4500', color: '#ff4500', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Descartar</button>
-                                </div>
-                              </div>
-                            )}
+                            
                             <div style={{ textAlign: 'center', padding: '20px 0 30px' }}>
                               <button
                                 onClick={handleStartWorkout}
