@@ -1082,81 +1082,30 @@ export default function useClientDashboard(user, onLogout) {
       if (!ok) return;
     }
 
-    // 1. Prepare logs, comments, video links for targetTab (loading incomingRoutine)
-    const targetData = initializeLogsForTab(incomingRoutine, targetTab, clientData, logs, comments, videoLinks);
+    try {
+      // Create a deep copy of the routine to swap the days
+      const newRoutine = JSON.parse(JSON.stringify(clientData.routine));
+      
+      // Swap exercises
+      const tempExercises = newRoutine[incomingRoutine] || [];
+      newRoutine[incomingRoutine] = newRoutine[displacedRoutine] || [];
+      newRoutine[displacedRoutine] = tempExercises;
+      
+      // Swap notes if any exist
+      const tempNotes = newRoutine[incomingRoutine + '_notes'] || '';
+      newRoutine[incomingRoutine + '_notes'] = newRoutine[displacedRoutine + '_notes'] || '';
+      newRoutine[displacedRoutine + '_notes'] = tempNotes;
 
-    let finalLogs = { ...logs, [targetTab]: targetData.logs };
-    let finalComments = targetData.comments;
-    let finalVideoLinks = targetData.videoLinks;
-
-    // 2. Load displacedRoutine on sourceTab (swap!)
-    if (hasDisplacedRoutine) {
-      const sourceData = initializeLogsForTab(displacedRoutine, sourceTab, clientData, finalLogs, finalComments, finalVideoLinks);
-      finalLogs[sourceTab] = sourceData.logs;
-      finalComments = sourceData.comments;
-      finalVideoLinks = sourceData.videoLinks;
-    } else {
-      finalLogs[sourceTab] = {};
-    }
-
-    setComments(finalComments);
-    setVideoLinks(finalVideoLinks);
-    setLogs(finalLogs);
-
-    setLoadedRoutineByTab(prev => {
-      const copy = { ...prev };
-      // Remove old references to incomingRoutine and displacedRoutine
-      Object.keys(copy).forEach(k => {
-        if (copy[k] === incomingRoutine || copy[k] === displacedRoutine) {
-          delete copy[k];
-        }
-      });
-      // Assign new mappings if they actually move
-      if (targetTab !== incomingRoutine) {
-        copy[targetTab] = incomingRoutine;
-      } else {
-        delete copy[targetTab];
-      }
-      if (hasDisplacedRoutine) {
-        if (sourceTab !== displacedRoutine) {
-          copy[sourceTab] = displacedRoutine;
-        } else {
-          delete copy[sourceTab];
-        }
-      }
-      return copy;
-    });
-
-    setOverrideConsumed(prev => {
-      const n = new Set(prev);
-      if (targetTab !== incomingRoutine) {
-        n.add(targetTab);
-      } else {
-        n.delete(targetTab);
-      }
-      if (hasDisplacedRoutine) {
-        if (sourceTab !== displacedRoutine) {
-          n.add(sourceTab);
-        } else {
-          n.delete(sourceTab);
-        }
-      }
-      return n;
-    });
-
-    setWorkoutSeconds(0);
-    setRestSeconds(0);
-    setWorkoutSummary(null);
-    setActiveSessionId(null);
-    setIsWorkoutLocked(false);
-    setHasFinishedSession(false);
-
-    setSelectedDay(targetTab);
-
-    if (hasDisplacedRoutine) {
-      dialog.toast(`Rutinas intercambiadas: "${incomingRoutine}" en ${targetTab} y "${displacedRoutine}" en ${sourceTab}`, { variant: 'success' });
-    } else {
-      dialog.toast(`Rutina de ${incomingRoutine} cargada para hoy (${targetTab})`, { variant: 'success' });
+      // Update the user's routine in the backend permanently
+      await usersApi.updateMe({ routineJson: JSON.stringify(newRoutine) });
+      
+      // Reload the page to fetch the clean swapped routine from the backend
+      // This eliminates any phantom state or double dates!
+      window.location.reload();
+      return;
+    } catch (e) {
+      console.error("Error swapping routine", e);
+      dialog.toast("Error al guardar el intercambio en la base de datos.", {variant: "error"});
     }
   };
 
