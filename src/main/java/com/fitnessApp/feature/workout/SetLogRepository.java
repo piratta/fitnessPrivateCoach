@@ -10,4 +10,6 @@ public interface SetLogRepository extends JpaRepository<SetLog, UUID> {
     List<SetLog> findByWorkoutSessionClientIdAndIsCompletedTrueAndWeightLiftedGreaterThanOrderByWorkoutSessionSessionDateDesc(UUID clientId, double minWeight);
     
     java.util.Optional<SetLog> findByWorkoutSessionIdAndExerciseIndexAndSetIndex(UUID sessionId, int exerciseIndex, int setIndex);
+
+    java.util.Optional<SetLog> findFirstByWorkoutSessionClientIdAndExerciseNameAndIsCompletedTrueAndWeightLiftedGreaterThanOrderByWorkoutSessionSessionDateDesc(UUID clientId, String exerciseName, double minWeight);
 }

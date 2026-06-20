@@ -283,22 +283,14 @@ public class WorkoutService {
                 for (int i = 0; i < exercises.size(); i++) {
                     Map<String, Object> exercise = exercises.get(i);
                     String exName = exercise.get("name") == null ? "" : exercise.get("name").toString();
-                    String targetClean = cleanExerciseName(exName);
 
                     String lastWeight = null;
-                    boolean foundByName = false;
                     
-                    if (!targetClean.isEmpty()) {
-                        List<SetLog> historySets = setLogRepository.findByWorkoutSessionClientIdAndIsCompletedTrueAndWeightLiftedGreaterThanOrderByWorkoutSessionSessionDateDesc(client.getId(), 0.0);
-                        java.util.Map<String, String> latestWeightsByCleanName = new java.util.HashMap<>();
-                        for (SetLog log : historySets) {
-                            if (log.getExerciseName() == null) continue;
-                            String cleanName = cleanExerciseName(log.getExerciseName());
-                            if (!cleanName.isEmpty() && !latestWeightsByCleanName.containsKey(cleanName)) {
-                                latestWeightsByCleanName.put(cleanName, String.valueOf(log.getWeightLifted()));
-                            }
+                    if (!exName.isEmpty()) {
+                        java.util.Optional<SetLog> lastSetOpt = setLogRepository.findFirstByWorkoutSessionClientIdAndExerciseNameAndIsCompletedTrueAndWeightLiftedGreaterThanOrderByWorkoutSessionSessionDateDesc(client.getId(), exName, 0.0);
+                        if (lastSetOpt.isPresent()) {
+                            lastWeight = String.valueOf(lastSetOpt.get().getWeightLifted());
                         }
-                        lastWeight = latestWeightsByCleanName.get(targetClean);
                     }
                     
                     if (lastWeight != null) {
