@@ -22,13 +22,13 @@ public class Routine {
 
     @Setter
     @Getter
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String title; // ej. "Hipertrofia 4 Días"
 
     @Setter
     @Getter
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "coach_id", nullable = false)
+    @JoinColumn(name = "coach_id", nullable = true)
     private User coach;
 
     @Getter

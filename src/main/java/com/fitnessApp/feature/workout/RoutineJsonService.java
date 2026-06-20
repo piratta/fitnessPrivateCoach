@@ -62,6 +62,9 @@ public class RoutineJsonService {
         try {
             Map<String, Object> rawRoutine = mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
             Routine routine = existingRoutine != null ? existingRoutine : new Routine();
+            if (routine.getTitle() == null) {
+                routine.setTitle("Rutina Generada");
+            }
             routine.getDays().clear();
 
             for (Map.Entry<String, Object> entry : rawRoutine.entrySet()) {

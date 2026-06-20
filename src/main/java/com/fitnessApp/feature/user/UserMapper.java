@@ -15,6 +15,8 @@ public abstract class UserMapper {
     @Mapping(target = "passwordHash", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "videoLink", ignore = true)
+    @Mapping(target = "routine", ignore = true)
+    @Mapping(target = "nextRoutine", ignore = true)
     public abstract User toEntity(UserDto dto);
 
     @Mapping(target = "currentWeight", constant = "0.0")
@@ -45,5 +47,7 @@ public abstract class UserMapper {
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "username", ignore = true)
     @Mapping(target = "videoLink", ignore = true)
+    @Mapping(target = "routine", ignore = true)
+    @Mapping(target = "nextRoutine", ignore = true)
     public abstract void updateEntityFromDto(UserDto dto, @MappingTarget User entity);
 }
