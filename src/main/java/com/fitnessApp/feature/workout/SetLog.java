@@ -17,8 +17,11 @@ public class SetLog {
     private WorkoutSession workoutSession;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "routine_exercise_id", nullable = false)
+    @JoinColumn(name = "routine_exercise_id", nullable = true)
     private RoutineExercise routineExercise;
+
+    private String exerciseName;
+    private int exerciseIndex;
 
     private int setIndex;
     private double weightLifted;
@@ -44,6 +47,12 @@ public class SetLog {
 
     public RoutineExercise getRoutineExercise() { return routineExercise; }
     public void setRoutineExercise(RoutineExercise routineExercise) { this.routineExercise = routineExercise; }
+
+    public String getExerciseName() { return exerciseName; }
+    public void setExerciseName(String exerciseName) { this.exerciseName = exerciseName; }
+
+    public int getExerciseIndex() { return exerciseIndex; }
+    public void setExerciseIndex(int exerciseIndex) { this.exerciseIndex = exerciseIndex; }
 
     public int getSetIndex() { return setIndex; }
     public void setSetIndex(int setIndex) { this.setIndex = setIndex; }

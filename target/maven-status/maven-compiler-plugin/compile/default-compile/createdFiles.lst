@@ -65,6 +65,7 @@ com\fitnessApp\feature\review\ReviewRepository.class
 com\fitnessApp\feature\review\ReviewStatus.class
 com\fitnessApp\feature\auth\JwtAuthenticationResponse.class
 com\fitnessApp\feature\user\UserMapper.class
+com\fitnessApp\feature\workout\WorkoutService$4.class
 com\fitnessApp\feature\workout\WorkoutSession.class
 com\fitnessApp\feature\auth\AuthController.class
 com\fitnessApp\feature\user\UserService.class

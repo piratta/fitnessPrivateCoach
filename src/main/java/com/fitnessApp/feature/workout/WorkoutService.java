@@ -25,7 +25,7 @@ public class WorkoutService {
     private final UserRepository userRepository;
     private final WorkoutMapper workoutMapper;
 
-    public UUID finishWorkout(String principalEmail, WorkoutDto request) {
+        public UUID finishWorkout(String principalEmail, WorkoutDto request) {
         User client = userRepository.findByEmail(principalEmail)
                 .or(() -> userRepository.findByUsername(principalEmail))
                 .orElseThrow();
@@ -43,7 +43,7 @@ public class WorkoutService {
         session.setCompletionPercentage(request.getCompletionPercentage());
         session.setSessionDate(today);
         session.setAssignedDate(request.getAssignedDate() != null ? request.getAssignedDate() : today);
-        session.setLogsJson(request.getLogsJson());
+        
         session.setCommentsJson(request.getCommentsJson());
         session.setVideoLinksJson(request.getVideoLinksJson());
         
@@ -59,10 +59,12 @@ public class WorkoutService {
         session.setSleepHours(request.getSleepHours());
         session.setDigestions(request.getDigestions());
 
+        parseAndSaveSetLogs(request.getLogsJson(), session);
+
         return workoutRepository.save(session).getId();
     }
 
-    public void updateWorkout(String principalEmail, UUID id, WorkoutDto request) {
+        public void updateWorkout(String principalEmail, UUID id, WorkoutDto request) {
         User client = userRepository.findByEmail(principalEmail).orElseThrow(() -> new ClientNotFoundException("Cliente no encontrado con email: " + principalEmail));
         WorkoutSession session = workoutRepository.findById(id).orElseThrow(() -> new WorkoutNotFoundException("Sesión de entrenamiento no encontrada con ID: " + id));
 
@@ -70,7 +72,6 @@ public class WorkoutService {
             throw new RuntimeException("No tienes permisos para modificar este entrenamiento.");
         }
 
-        session.setLogsJson(request.getLogsJson());
         session.setCommentsJson(request.getCommentsJson());
         session.setVideoLinksJson(request.getVideoLinksJson());
         session.setDurationSeconds(request.getDurationSeconds());
@@ -83,7 +84,84 @@ public class WorkoutService {
         session.setSleepHours(request.getSleepHours());
         session.setDigestions(request.getDigestions());
 
+        parseAndSaveSetLogs(request.getLogsJson(), session);
+
         workoutRepository.save(session);
+    }
+
+        @SuppressWarnings("unchecked")
+    private void parseAndSaveSetLogs(String logsJson, WorkoutSession session) {
+        if (logsJson == null || logsJson.isBlank()) return;
+        
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            Map<String, List<Map<String, Object>>> logsMap = mapper.readValue(logsJson, new TypeReference<Map<String, List<Map<String, Object>>>>() {});
+            
+            if (session.getSets() == null) {
+                session.setSets(new java.util.ArrayList<>());
+            } else {
+                session.getSets().clear();
+            }
+
+            for (Map.Entry<String, List<Map<String, Object>>> entry : logsMap.entrySet()) {
+                int exerciseIndex = 0;
+                try {
+                    exerciseIndex = Integer.parseInt(entry.getKey());
+                } catch (NumberFormatException e) {
+                    continue;
+                }
+
+                List<Map<String, Object>> exLogs = entry.getValue();
+                if (exLogs == null) continue;
+
+                for (int setIndex = 0; setIndex < exLogs.size(); setIndex++) {
+                    Map<String, Object> setMap = exLogs.get(setIndex);
+                    if (setMap == null) continue;
+
+                    SetLog setLog = new SetLog();
+                    setLog.setExerciseIndex(exerciseIndex);
+                    setLog.setSetIndex(setIndex);
+                    
+                    if (setMap.get("exerciseName") != null) {
+                        setLog.setExerciseName(String.valueOf(setMap.get("exerciseName")));
+                    }
+                    
+                    if (setMap.get("completed") != null) {
+                        setLog.setCompleted(Boolean.parseBoolean(String.valueOf(setMap.get("completed"))));
+                    }
+                    
+                    if (setMap.get("weight") != null && !String.valueOf(setMap.get("weight")).isBlank()) {
+                        try {
+                            setLog.setWeightLifted(Double.parseDouble(String.valueOf(setMap.get("weight"))));
+                        } catch (NumberFormatException ignored) {}
+                    }
+                    
+                    if (setMap.get("reps") != null) {
+                        setLog.setRepsDone(String.valueOf(setMap.get("reps")));
+                    }
+                    
+                    if (setMap.get("rir") != null && !String.valueOf(setMap.get("rir")).isBlank()) {
+                        try {
+                            setLog.setRir(Integer.parseInt(String.valueOf(setMap.get("rir"))));
+                        } catch (NumberFormatException ignored) {}
+                    }
+                    
+                    if (setMap.get("rpe") != null && !String.valueOf(setMap.get("rpe")).isBlank()) {
+                        try {
+                            setLog.setRpe(Double.parseDouble(String.valueOf(setMap.get("rpe"))));
+                        } catch (NumberFormatException ignored) {}
+                    }
+                    
+                    if (setMap.get("tempo") != null) {
+                        setLog.setTempo(String.valueOf(setMap.get("tempo")));
+                    }
+
+                    session.addSetLog(setLog);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     public List<WorkoutDto> getHistory(UUID clientId) {
