@@ -1242,7 +1242,7 @@ export default function useClientDashboard(user, onLogout) {
 
     try {
       const payload = {
-        dayName: loadedRoutineHere || selectedDay,
+        dayName: selectedDay,
         durationSeconds: workoutSeconds,
         totalVolume: totalVolume,
         completedSets: completedSets.length,
@@ -1275,7 +1275,7 @@ export default function useClientDashboard(user, onLogout) {
     setHasResumableWorkout(false);
     setResumableDayName(null);
 
-    const realDayName = loadedRoutineHere || selectedDay;
+    const realDayName = selectedDay;
     // Registramos este día como completado en la pestaña actual (selectedDay)
     // para que la vista bloqueada se mantenga en el slot que el usuario eligió.
     setTodaySessionsByDay(prev => ({
@@ -1323,14 +1323,14 @@ export default function useClientDashboard(user, onLogout) {
       const completionPercentage = Math.round((completedSets.length / totalSets) * 100) || 0;
 
       const payload = {
-        dayName: loadedRoutineHere || selectedDay,
+        dayName: selectedDay,
         durationSeconds: workoutSeconds,
         totalVolume: totalVolume,
         completedSets: completedSets.length,
         completionPercentage: completionPercentage,
         logsJson: {
           ...currentLogsToSave,
-          [(loadedRoutineHere || selectedDay)]: currentLogsToSave[selectedDay],
+          [selectedDay]: currentLogsToSave[selectedDay],
           _executionSlot: selectedDay
         },
         commentsJson: currentCommentsToSave,
