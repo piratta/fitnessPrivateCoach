@@ -1777,7 +1777,7 @@ export default function useClientDashboard(user, onLogout) {
   };
 
 
-  const routineDays = clientData?.routine ? Object.keys(clientData.routine).filter(day => !day.endsWith('_notes')) : [];
+  const routineDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
   const activeDayNotes = clientData?.routine?.[selectedDay + '_notes'] || '';
 
   return {
