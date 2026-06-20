@@ -116,6 +116,7 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
   ]);
 
   const [clients, setClients] = useState([]);
+  const [isLoadingClients, setIsLoadingClients] = useState(true);
 
   // Fetch clients from backend database
   useEffect(() => {
@@ -173,8 +174,9 @@ export default function CoachDashboard({ user, onLogout, onUserUpdate }) {
         };
       });
       setClients(formattedClients);
+        setIsLoadingClients(false);
     })
-    .catch(err => console.error("Error loading clients:", err));
+    .catch(err => { console.error("Error loading clients:", err); setIsLoadingClients(false); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
               setEditingTemplate(null);
               setActiveTab('rutinas');

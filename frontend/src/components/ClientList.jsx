@@ -8,7 +8,7 @@ import { useDialog } from './ui/Dialog';
 import { API_BASE_URL } from '../config';
 import '../index.css';
 
-export default function ClientList({ clients, setClients, billingPlans, onPlanRoutine, isChatMode, onViewClientDetail }) {
+export default function ClientList({ clients, setClients, billingPlans, onPlanRoutine, isChatMode, onViewClientDetail, isLoadingClients }) {
   const dialog = useDialog();
   const [selectedClient, setSelectedClient] = useState(null);
   const [editingClient, setEditingClient] = useState(null); // { name, email }

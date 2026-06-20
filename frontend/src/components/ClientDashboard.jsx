@@ -409,21 +409,224 @@ export default function ClientDashboard({ user, onLogout}) {
                               fontWeight: 'bold', fontSize: '0.85rem', transition: 'all 0.2s'
                             }}
                           >▶</button>
+            PRVT<span style={{ color: 'var(--accent-primary)' }}>FITNESS</span>
+          </h2>
+        </div>
+        <div className="mobile-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          {isWorkoutStarted && (
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {restSeconds > 0 && (
+                <div style={{ background: 'rgba(255, 170, 0, 0.2)', color: '#ffaa00', padding: '5px 10px', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  ⏳ {formatTime(restSeconds)}
+                </div>
+              )}
+              <div style={{ background: 'rgba(0, 230, 118, 0.2)', color: '#00e676', padding: '5px 10px', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                ⏱️ {formatTime(workoutSeconds)}
+              </div>
+            </div>
+          )}
+          <button
+              onClick={() => setShowProfile(true)}
+              title="Mi perfil"
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', cursor: 'pointer', textAlign: 'right', padding: 0 }}
+          >
+            <p style={{ fontWeight: '600', fontSize: '0.9rem', textDecoration: 'underline dotted', textUnderlineOffset: '3px' }}>
+              {user?.name ? user.name.split(' ')[0] : 'Perfil'}
+            </p>
+          </button>
+          <button onClick={() => { setShowChatModal(true); setUnreadMessages(0); }} style={{ position: 'relative', background: 'var(--accent-primary)', border: 'none', color: '#000', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '1.2rem', boxShadow: '0 0 10px rgba(224,248,0,0.3)' }}>
+            💬
+            {unreadMessages > 0 && (
+              <span style={{
+                position: 'absolute', top: '-8px', right: '-8px',
+                background: '#ff4500', color: '#fff', fontSize: '0.7rem', fontWeight: 'bold',
+                borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 2px 5px rgba(0,0,0,0.5)'
+              }}>
+                {unreadMessages}
+              </span>
+            )}
+          </button>
+          {!isWorkoutStarted && (
+            <button onClick={onLogout} style={{ background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-main)', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontFamily: 'Outfit', fontWeight: '600', fontSize: '0.8rem' }}>Salir</button>
+          )}
+        </div>
+      </header>
+
+      {/* Notificación Evaluación Recibida */}
+      {clientData?.lastCompletedReview && !showEvaluationModal && !hasAcceptedEvaluation && (
+        <div
+          onClick={() => setShowEvaluationModal(true)}
+          style={{
+            margin: '20px', padding: '15px', background: 'rgba(224, 248, 0, 0.15)', border: '1px solid var(--accent-primary)',
+            borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer',
+            boxShadow: '0 4px 15px rgba(224, 248, 0, 0.1)'
+          }}
+        >
+          <div>
+            <h4 style={{ color: 'var(--accent-primary)', margin: '0 0 5px 0' }}>🎉 ¡Evaluación de Revisión Recibida!</h4>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-main)' }}>Tu entrenador ha analizado tus fotos y medidas. Haz clic para ver el feedback.</p>
+          </div>
+          <span style={{ fontSize: '1.5rem' }}>👉</span>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <div style={{ flex: 1, padding: '0 20px', maxWidth: '600px', margin: '0 auto', width: '100%' }}>
+        {clientData && clientData.onboardingCompleted === false ? (
+          <InitialQuestionnaire onComplete={handleCompleteOnboarding} />
+        ) : (
+          <div className="fade-in">
+
+            {/* Pestaña: ENTRENAR */}
+            {activeTab === 'workout' && (
+              !clientData?.hasRoutine ? (
+                <div className="glass-panel fade-in" style={{ padding: '60px 20px', textAlign: 'center', marginTop: '20px', borderTop: '4px solid var(--accent-primary)' }}>
+                  <div style={{ fontSize: '4rem', marginBottom: '20px' }}>🏋️‍♂️</div>
+                  <h3 style={{ fontSize: '1.8rem', fontWeight: '800', marginBottom: '10px', color: '#fff' }}>Sin Rutina Asignada</h3>
+                  <p style={{ color: 'var(--text-muted)', maxWidth: '400px', margin: '0 auto 20px auto', lineHeight: '1.6' }}>
+                    Tu entrenador aún está preparando tu plan de entrenamiento personalizado. ¡Te notificaremos tan pronto como esté listo!
+                  </p>
+                  <div style={{ display: 'inline-block', padding: '10px 20px', background: 'rgba(224, 248, 0, 0.1)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                    Frecuencia de revisión: {clientData?.reviewFrequency || 'Semanal'}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  
+                  {clientData?.nextRoutineJson && (
+                    <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                      <button
+                        onClick={() => setViewingNextRoutine(false)}
+                        style={{
+                          flex: 1, padding: '12px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s',
+                          background: !viewingNextRoutine ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)',
+                          color: !viewingNextRoutine ? '#000' : 'var(--text-muted)',
+                          border: !viewingNextRoutine ? '1px solid var(--accent-primary)' : '1px solid var(--border-light)'
+                        }}
+                      >
+                        💪 Rutina Actual
+                      </button>
+                      <button
+                        onClick={() => setViewingNextRoutine(true)}
+                        style={{
+                          flex: 1, padding: '12px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s',
+                          background: viewingNextRoutine ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)',
+                          color: viewingNextRoutine ? '#000' : 'var(--text-muted)',
+                          border: viewingNextRoutine ? '1px solid var(--accent-primary)' : '1px solid var(--border-light)'
+                        }}
+                      >
+                        📅 Siguiente Rutina
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Estrategia asignada y botón de tabla */}
+                 <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                   <div style={{ flex: 1, minWidth: '200px', background: 'rgba(224, 248, 0, 0.05)', border: '1px dashed var(--accent-primary)', padding: '10px 15px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 0 }}>
+                     <span style={{ fontSize: '1.5rem' }}>🎯</span>
+                     <div>
+                       <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '2px' }}>Objetivo de Pesos Semanal</div>
+                       <div style={{ color: 'var(--accent-primary)', fontWeight: 'bold', fontSize: '0.95rem' }}>{clientData.progressionStrategy || user?.progressionStrategy || "Sobrecarga Progresiva (Subir peso)"}</div>
+                     </div>
+                   </div>
+                   <button
+                     onClick={() => setShowRoutineTable(true)}
+                     style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-light)', color: '#fff', padding: '10px 18px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}
+                     onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                     onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                   >
+                     <span>📋</span> Ver Tabla / PDF
+                   </button>
+                 </div>
+
+                {/* Week Navigation + Selector de Días */}
+                {(() => {
+                  // Compute the Monday of the displayed week
+                  const now = new Date();
+                  const currentDow = (now.getDay() + 6) % 7; // 0=Mon
+                  const displayedMonday = new Date(now);
+                  displayedMonday.setHours(0, 0, 0, 0);
+                  displayedMonday.setDate(now.getDate() - currentDow + weekOffset * 7);
+                  const displayedSunday = new Date(displayedMonday);
+                  displayedSunday.setDate(displayedMonday.getDate() + 6);
+
+                  // Parse routine date limits
+                  const parseLD = (s) => { if (!s) return null; const p = String(s).split('T')[0].split('-'); return p.length === 3 ? new Date(+p[0], +p[1]-1, +p[2]) : null; };
+                  const rStart = parseLD(clientData?.routineStartDate);
+                  const rEnd = parseLD(clientData?.routineEndDate);
+
+                  // Check if prev/next is allowed
+                  const prevMonday = new Date(displayedMonday); prevMonday.setDate(prevMonday.getDate() - 7);
+                  const nextMonday = new Date(displayedMonday); nextMonday.setDate(nextMonday.getDate() + 7);
+                  const canGoPrev = !rStart || prevMonday >= rStart || weekOffset > 0;
+                  const canGoNext = !rEnd || nextMonday <= rEnd;
+                  const isCurrentWeek = weekOffset === 0;
+
+                  // Format date range for display
+                  const fmtShort = (d) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+                  const weekLabel = isCurrentWeek ? 'Esta semana' : `${fmtShort(displayedMonday)} — ${fmtShort(displayedSunday)}`;
+
+                  return (
+                    <>
+                      {(rStart || rEnd) && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '8px' }}>
+                          <button
+                            disabled={!canGoPrev}
+                            onClick={() => setWeekOffset(w => w - 1)}
+                            style={{
+                              background: canGoPrev ? 'rgba(255,255,255,0.05)' : 'transparent',
+                              border: `1px solid ${canGoPrev ? 'var(--border-light)' : 'rgba(255,255,255,0.03)'}`,
+                              color: canGoPrev ? 'var(--text-main)' : 'rgba(255,255,255,0.15)',
+                              padding: '8px 14px', borderRadius: '8px', cursor: canGoPrev ? 'pointer' : 'default',
+                              fontWeight: 'bold', fontSize: '0.85rem', transition: 'all 0.2s'
+                            }}
+                          >◀</button>
+                          <div style={{ textAlign: 'center', flex: 1 }}>
+                            <span style={{ color: isCurrentWeek ? 'var(--accent-primary)' : 'var(--text-main)', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                              {weekLabel}
+                            </span>
+                            {!isCurrentWeek && (
+                              <button
+                                onClick={() => setWeekOffset(0)}
+                                style={{ marginLeft: '10px', background: 'transparent', border: 'none', color: 'var(--accent-primary)', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }}
+                              >Hoy</button>
+                            )}
+                          </div>
+                          <button
+                            disabled={!canGoNext}
+                            onClick={() => setWeekOffset(w => w + 1)}
+                            style={{
+                              background: canGoNext ? 'rgba(255,255,255,0.05)' : 'transparent',
+                              border: `1px solid ${canGoNext ? 'var(--border-light)' : 'rgba(255,255,255,0.03)'}`,
+                              color: canGoNext ? 'var(--text-main)' : 'rgba(255,255,255,0.15)',
+                              padding: '8px 14px', borderRadius: '8px', cursor: canGoNext ? 'pointer' : 'default',
+                              fontWeight: 'bold', fontSize: '0.85rem', transition: 'all 0.2s'
+                            }}
+                          >▶</button>
                         </div>
                       )}
                     </>
                   );
                 })()}
                 <div className="scrollable-tabs" style={{ marginBottom: '15px', borderBottom: '1px solid var(--border-light)' }}>
-                    {routineDays.map(day => {
-                      const isCompleted = trainedTemplateDays.has(day);
-                      // Also consider a day "completed" if a session is stored under its tab key
-                      const isTabCompleted = !!todaySessionsByDay[day];
+                    {routineDays.map((day, index) => {
+                      // Regla de Oro: Fechas Reales
+                      const curr = new Date();
+                      const currentDayIdx = curr.getDay() === 0 ? 6 : curr.getDay() - 1;
+                      const mondayDate = new Date(curr);
+                      mondayDate.setDate(curr.getDate() - currentDayIdx);
+                      const d = new Date(mondayDate);
+                      d.setDate(mondayDate.getDate() + index);
+                      const year = d.getFullYear();
+                      const month = String(d.getMonth() + 1).padStart(2, '0');
+                      const dayOfMonth = String(d.getDate()).padStart(2, '0');
+                      const realDateStr = `${year}-${month}-${dayOfMonth}`;
+                      
+                      const sessionInHistory = historyData?.find(s => s.sessionDate === realDateStr && s.status === 'COMPLETED');
+                      const sessionInState = Object.values(todaySessionsByDay || {}).find(s => s && s.sessionDate === realDateStr && s.status === 'COMPLETED');
+                      const isCompletedByDate = !!sessionInHistory || !!sessionInState;
                       const hasLoadedRoutine = !!loadedRoutineByTab[day];
-                      const daysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-                      const todayIdx = daysOfWeek.indexOf(todayWeekday);
-                      const dayIdx = daysOfWeek.indexOf(day);
-                      const isPast = dayIdx !== -1 && todayIdx !== -1 && dayIdx < todayIdx;
                       
                       let bgColor = 'transparent';
                         let borderColor = 'rgba(255,255,255,0.05)';
@@ -435,7 +638,7 @@ export default function ClientDashboard({ user, onLogout}) {
                           bgColor = 'var(--accent-primary)';
                           borderColor = 'var(--accent-primary)';
                           textColor = '#000';
-                        } else if (isTabCompleted) {
+                        } else if (isCompletedByDate) {
                           bgColor = 'rgba(0, 230, 118, 0.15)';
                           borderColor = 'rgba(0, 230, 118, 0.6)';
                           textColor = '#00e676';
