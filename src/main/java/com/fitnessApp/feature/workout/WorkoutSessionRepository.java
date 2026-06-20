@@ -17,4 +17,7 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
     // the client finalises the same day's routine multiple times in the same calendar day.
     @EntityGraph(attributePaths = {"sets", "sets.routineExercise"})
     Optional<WorkoutSession> findFirstByClientAndDayNameAndSessionDate(User client, String dayName, LocalDate sessionDate);
+
+    @EntityGraph(attributePaths = {"sets", "sets.routineExercise"})
+    Optional<WorkoutSession> findFirstByClientIdAndStatusInOrderBySessionDateDesc(UUID clientId, List<WorkoutStatus> statuses);
 }

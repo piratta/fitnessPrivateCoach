@@ -26,15 +26,80 @@ public class WorkoutService {
     private final WorkoutMapper workoutMapper;
     private final SetLogRepository setLogRepository;
 
+    public UUID startWorkoutSession(String principalEmail, StartWorkoutDto request) {
+        User client = userRepository.findByEmail(principalEmail)
+                .or(() -> userRepository.findByUsername(principalEmail))
+                .orElseThrow();
+
+        List<WorkoutStatus> activeStatuses = List.of(WorkoutStatus.IN_PROGRESS, WorkoutStatus.PAUSED);
+        WorkoutSession session = workoutRepository
+                .findFirstByClientIdAndStatusInOrderBySessionDateDesc(client.getId(), activeStatuses)
+                .orElseGet(WorkoutSession::new);
+
+        if (session.getId() == null) {
+            session.setClient(client);
+            session.setDayName(request.getDayName());
+            session.setSessionDate(LocalDate.now());
+            session.setAssignedDate(LocalDate.now());
+            session.setStatus(WorkoutStatus.IN_PROGRESS);
+            
+            String snapshot = request.getRoutineSnapshotJson();
+            if (snapshot == null || snapshot.isBlank()) {
+                snapshot = client.getRoutineJson();
+            }
+            session.setRoutineSnapshotJson(snapshot);
+            session = workoutRepository.save(session);
+        }
+        return session.getId();
+    }
+
+    public void syncSetLog(UUID sessionId, SetLogDto request) {
+        WorkoutSession session = workoutRepository.findById(sessionId)
+                .orElseThrow(() -> new WorkoutNotFoundException("Session not found: " + sessionId));
+
+        SetLog setLog = setLogRepository.findByWorkoutSessionIdAndExerciseIndexAndSetIndex(
+                sessionId, request.getExerciseIndex(), request.getSetIndex()
+        ).orElseGet(SetLog::new);
+
+        setLog.setWorkoutSession(session);
+        setLog.setExerciseIndex(request.getExerciseIndex());
+        setLog.setSetIndex(request.getSetIndex());
+        setLog.setExerciseName(request.getExerciseName());
+        setLog.setWeightLifted(request.getWeightLifted());
+        setLog.setRepsDone(request.getRepsDone());
+        setLog.setRir(request.getRir());
+        setLog.setRpe(request.getRpe());
+        setLog.setTempo(request.getTempo());
+        setLog.setCompleted(request.isCompleted());
+
+        setLogRepository.save(setLog);
+    }
+
+    public WorkoutDto getActiveSession(String principalEmail) {
+        User client = userRepository.findByEmail(principalEmail)
+                .or(() -> userRepository.findByUsername(principalEmail))
+                .orElseThrow();
+
+        List<WorkoutStatus> activeStatuses = List.of(WorkoutStatus.IN_PROGRESS, WorkoutStatus.PAUSED);
+        WorkoutSession session = workoutRepository
+                .findFirstByClientIdAndStatusInOrderBySessionDateDesc(client.getId(), activeStatuses)
+                .orElse(null);
+
+        if (session == null) return null;
+        return workoutMapper.toDto(session);
+    }
+
     public UUID finishWorkout(String principalEmail, WorkoutDto request) {
         User client = userRepository.findByEmail(principalEmail)
                 .or(() -> userRepository.findByUsername(principalEmail))
                 .orElseThrow();
 
-        LocalDate today = LocalDate.now();
+        List<WorkoutStatus> activeStatuses = List.of(WorkoutStatus.IN_PROGRESS, WorkoutStatus.PAUSED);
         WorkoutSession session = workoutRepository
-                .findFirstByClientAndDayNameAndSessionDate(client, request.getDayName(), today)
-                .orElseGet(WorkoutSession::new);
+                .findFirstByClientIdAndStatusInOrderBySessionDateDesc(client.getId(), activeStatuses)
+                .orElseGet(() -> workoutRepository
+                    .findFirstByClientAndDayNameAndSessionDate(client, request.getDayName(), LocalDate.now())
+                    .orElseGet(WorkoutSession::new));
 
         session.setClient(client);
         session.setDayName(request.getDayName());
@@ -42,8 +107,10 @@ public class WorkoutService {
         session.setTotalVolume(request.getTotalVolume());
         session.setCompletedSets(request.getCompletedSets());
         session.setCompletionPercentage(request.getCompletionPercentage());
-        session.setSessionDate(today);
-        session.setAssignedDate(request.getAssignedDate() != null ? request.getAssignedDate() : today);
+        if (session.getSessionDate() == null) session.setSessionDate(LocalDate.now());
+        if (session.getAssignedDate() == null) session.setAssignedDate(request.getAssignedDate() != null ? request.getAssignedDate() : LocalDate.now());
+
+        session.setStatus(WorkoutStatus.COMPLETED);
 
         session.setCommentsJson(request.getCommentsJson());
         session.setVideoLinksJson(request.getVideoLinksJson());
@@ -59,8 +126,6 @@ public class WorkoutService {
         session.setMotivation(request.getMotivation());
         session.setSleepHours(request.getSleepHours());
         session.setDigestions(request.getDigestions());
-
-        parseAndSaveSetLogs(request.getLogsJson(), session);
 
         return workoutRepository.save(session).getId();
     }

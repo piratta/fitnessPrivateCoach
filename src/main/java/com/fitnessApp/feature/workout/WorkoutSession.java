@@ -41,6 +41,9 @@ public class WorkoutSession {
 
     private Boolean isSkipped = false;
 
+    @Enumerated(EnumType.STRING)
+    private WorkoutStatus status = WorkoutStatus.IN_PROGRESS;
+
     private String clientComments;
     private String videoLink;
 
@@ -102,6 +105,9 @@ public class WorkoutSession {
 
     public LocalDate getAssignedDate() { return assignedDate; }
     public void setAssignedDate(LocalDate assignedDate) { this.assignedDate = assignedDate; }
+
+    public WorkoutStatus getStatus() { return status; }
+    public void setStatus(WorkoutStatus status) { this.status = status; }
 
     public boolean isSkipped() { return isSkipped != null && isSkipped; }
     public void setSkipped(boolean skipped) { isSkipped = skipped; }

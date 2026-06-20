@@ -16,6 +16,26 @@ public class WorkoutController {
 
     private final WorkoutService workoutService;
 
+    @PostMapping("/start")
+    public ResponseEntity<UUID> startWorkout(@RequestBody StartWorkoutDto request) {
+        String principal = SecurityContextHolder.getContext().getAuthentication().getName();
+        UUID sessionId = workoutService.startWorkoutSession(principal, request);
+        return ResponseEntity.ok(sessionId);
+    }
+
+    @PutMapping("/{id}/sync-set")
+    public ResponseEntity<Void> syncSetLog(@PathVariable("id") UUID id, @RequestBody SetLogDto request) {
+        workoutService.syncSetLog(id, request);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/active")
+    public ResponseEntity<WorkoutDto> getActiveSession() {
+        String principal = SecurityContextHolder.getContext().getAuthentication().getName();
+        WorkoutDto activeSession = workoutService.getActiveSession(principal);
+        return ResponseEntity.ok(activeSession);
+    }
+
     @PostMapping("/finish")
     public ResponseEntity<UUID> finishWorkout(@RequestBody WorkoutDto request) {
         String principal = SecurityContextHolder.getContext().getAuthentication().getName();

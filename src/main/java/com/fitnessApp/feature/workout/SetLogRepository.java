@@ -8,4 +8,6 @@ import java.util.List;
 public interface SetLogRepository extends JpaRepository<SetLog, UUID> {
     
     List<SetLog> findByWorkoutSessionClientIdAndIsCompletedTrueAndWeightLiftedGreaterThanOrderByWorkoutSessionSessionDateDesc(UUID clientId, double minWeight);
+    
+    java.util.Optional<SetLog> findByWorkoutSessionIdAndExerciseIndexAndSetIndex(UUID sessionId, int exerciseIndex, int setIndex);
 }
