@@ -30,6 +30,7 @@ public class DataMigrationService implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        fixConstraints();
         try {
             migrateUsers();
         } catch (Exception e) {
@@ -39,6 +40,24 @@ public class DataMigrationService implements CommandLineRunner {
             migrateWorkoutSessions();
         } catch (Exception e) {
             log.warn("Migration of workout sessions skipped: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Hibernate ddl-auto:update does NOT alter existing columns to drop NOT NULL.
+     * We do it manually here so the schema matches the entity annotations.
+     */
+    private void fixConstraints() {
+        String[] statements = {
+            "ALTER TABLE routines ALTER COLUMN title DROP NOT NULL",
+            "ALTER TABLE routines ALTER COLUMN coach_id DROP NOT NULL",
+        };
+        for (String sql : statements) {
+            try {
+                jdbcTemplate.execute(sql);
+            } catch (Exception e) {
+                // Column might not exist yet or constraint already dropped — ignore
+            }
         }
     }
 

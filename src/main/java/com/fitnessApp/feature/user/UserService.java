@@ -175,7 +175,10 @@ public class UserService {
         }
 
         if (clientDto.getRoutineJson() != null) {
-            client.setRoutine(routineJsonService.fromJson(clientDto.getRoutineJson(), client.getRoutine()));
+            com.fitnessApp.feature.workout.Routine r = routineJsonService.fromJson(clientDto.getRoutineJson(), client.getRoutine());
+            r.setCoach(coach);
+            r.setClient(client);
+            client.setRoutine(r);
             client.setRoutineUpdatedAt(java.time.LocalDateTime.now());
         }
 
@@ -253,7 +256,12 @@ public class UserService {
             user.setEmail(newEmail);
         }
         if (dto.getRoutineJson() != null) {
-            user.setRoutine(routineJsonService.fromJson(dto.getRoutineJson(), user.getRoutine()));
+            com.fitnessApp.feature.workout.Routine r = routineJsonService.fromJson(dto.getRoutineJson(), user.getRoutine());
+            if (user.getCoach() != null) {
+                r.setCoach(user.getCoach());
+            }
+            r.setClient(user);
+            user.setRoutine(r);
             user.setRoutineUpdatedAt(java.time.LocalDateTime.now());
         }
 
